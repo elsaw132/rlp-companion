@@ -42,11 +42,21 @@ export type KeepLeaveGainInteraction = {
   }[];
 };
 
+// Qualities picker: a single flat palette of character qualities to multi-select
+// (plus room to add your own), naming the person they want to grow into. No
+// grouping or starring — kept deliberately light for the final Imagine module.
+export type QualitiesPickerInteraction = {
+  type: "qualities-picker";
+  instruction: string;
+  options: string[];
+};
+
 export type Interaction =
   | DayBuilderInteraction
   | RolePickerInteraction
   | SlidersInteraction
-  | KeepLeaveGainInteraction;
+  | KeepLeaveGainInteraction
+  | QualitiesPickerInteraction;
 
 // What the person actually built in an interaction step. Stored (as JSON) so
 // the conversation can show it back and a refresh keeps it. The union grows
@@ -82,11 +92,18 @@ export type KeepLeaveGainResult = {
   sections: { key: string; title: string; picked: string[] }[];
 };
 
+export type QualitiesPickerResult = {
+  type: "qualities-picker";
+  // The qualities picked, in the order they were chosen.
+  picked: string[];
+};
+
 export type BuildResult =
   | DayBuilderResult
   | RolePickerResult
   | SlidersResult
-  | KeepLeaveGainResult;
+  | KeepLeaveGainResult
+  | QualitiesPickerResult;
 
 export type Module = {
   id: string;
@@ -470,24 +487,53 @@ WATCH FOR
         durationMin: 15,
         contentType: "text",
         contentValue: `[Placeholder — reading/video to come.] You've pictured the days, the roles, the rhythm, and the hopes. This last module in Imagine steps back to the person at the centre of it all — the version of yourself you're becoming.`,
-        coachOpening: `For this last module in Imagine, let's step back from the days and weeks to the person at the centre of them. Picture yourself a few years into retirement, living in a way that feels true to you — how would you describe that version of yourself?`,
-        sessionInstructions: `PURPOSE OF THIS MODULE
-Help the person form a more integrated picture of who they hope to become in retirement. By the end they should have a clearer sense of the qualities, attitudes, and ways of living they want to cultivate, and how these connect to the retirement they've been picturing across Stage 1.
+        coachOpening: `You've picked out a few qualities that feel like the person you want to grow into. Picture yourself a few years from now, living as that person — where do you notice one of those showing up?`,
+        interaction: {
+          type: "qualities-picker",
+          instruction:
+            "Pick the qualities that feel like the person you want to grow into — the few that feel most like you are enough.",
+          options: [
+            "Calm",
+            "Active",
+            "Curious",
+            "Generous",
+            "Patient",
+            "Adventurous",
+            "Grounded",
+            "Creative",
+            "Warm",
+            "Independent",
+            "Content",
+            "Engaged",
+            "Playful",
+            "Kind",
+            "Resilient",
+            "Present",
+            "Open",
+            "Confident",
+            "Thoughtful",
+            "Useful",
+            "Free",
+          ],
+        },
+        sessionInstructions: `PURPOSE
+The final module in Imagine. Help the person form an integrated picture of who they hope to become — the qualities and ways of living they want to grow into — and connect it to everything they've imagined across the stage. By the end they should recognise a coherent sense of their future self, built from patterns that already run through their earlier modules.
 
 HOW TO RUN IT
-- Open by drawing together the picture from earlier modules — the day, the roles, the week, what they're keeping and leaving, the hopes and fears — and invite them to step back and look at the whole.
-- Introduce that retirement is also an opportunity for personal expression. Invite them to imagine themselves several years in, living in a way that feels satisfying and true to who they are.
-- Focus on character and presence, not achievements or possessions. Draw out, one question at a time: how they'd describe this future self; what seems important to them; how they spend their time and energy; how other people experience them and what words others would use; what they've let go of; what they've strengthened or developed.
-- Connect this future self back to themes that have already come up. The aim is not an idealised person but recognising patterns that already exist and imagining how they might develop over time.
-- Toward the end, invite them to name the qualities that stand out most strongly, and what feels most appealing about becoming that person.
+The person has chosen a few qualities that feel like the self they want to grow into. You also have what they explored in every earlier module. Open by drawing both together.
+- Invite them to picture themselves a few years into retirement, living as the person those qualities describe, and notice where each one shows up in the life they've already imagined — their day, roles, week, what they're keeping, their hopes.
+- Focus on character and presence — who they are — not achievements or possessions.
+- Draw out: what matters to this future self, how they spend their energy, how others would describe them, what they've grown into and what they've let go of.
+- Connect back to themes from earlier modules — name the patterns that already exist and how they might develop. The aim is recognition, not invention.
+- This one can carry a little more warmth and breadth than the lighter modules, but stay curious and don't over-extend.
 
 CLOSING
-Capture the future self that emerged, using their own language wherever possible. Congratulate them warmly on reaching the end of Stage 1, Imagine. Describe Stage 2 briefly, with a light, slightly playful note about what's ahead now that they have all of this to build on.
+Draw together the future self that emerged, in their own words, and reflect the throughline running across the whole of Imagine. Congratulate them warmly on finishing Stage 1, Imagine. Then describe the next stage, Explore, briefly and at a high level — a light, slightly playful note about moving from imagining the life they want to exploring it further, now they have all of this to build on. Keep it general; don't invent specific Stage 2 contents.
 
 WATCH FOR
-- Avoid idealisation — if they describe a perfect or unrealistic version of themselves, gently steer toward authenticity over perfection, toward what feels personally meaningful and achievable.
-- Avoid self-improvement framing — this isn't about fixing flaws or becoming someone different; it's about recognising and nurturing the qualities and values that matter most to them.
-- Respect uncertainty — some find it hard to picture themselves this way. Reassure them there's no right answer and that a partial or evolving picture is entirely valid.`,
+- Avoid idealisation — steer toward authenticity over perfection.
+- Avoid a self-improvement framing — this isn't about fixing flaws but nurturing what already matters.
+- Respect uncertainty — a partial or evolving picture of the future self is entirely valid.`,
       },
     ],
   },

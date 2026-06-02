@@ -16,6 +16,10 @@ import KeepLeaveGain, {
   KeepLeaveGainSummary,
   keepLeaveGainSummaryText,
 } from "./KeepLeaveGain";
+import QualitiesPicker, {
+  QualitiesPickerSummary,
+  qualitiesPickerSummaryText,
+} from "./QualitiesPicker";
 import type { Interaction, BuildResult } from "@/lib/modules";
 import {
   getCompletedIds,
@@ -51,6 +55,8 @@ function summarizeBuild(result: BuildResult): string {
       return slidersSummaryText(result);
     case "keep-leave-gain":
       return keepLeaveGainSummaryText(result);
+    case "qualities-picker":
+      return qualitiesPickerSummaryText(result);
     default:
       return "";
   }
@@ -73,6 +79,9 @@ function InteractionSummary({ result }: { result: BuildResult }) {
       break;
     case "keep-leave-gain":
       body = <KeepLeaveGainSummary result={result} />;
+      break;
+    case "qualities-picker":
+      body = <QualitiesPickerSummary result={result} />;
       break;
     default:
       body = null;
@@ -663,6 +672,8 @@ function InteractionStep({
       return <Sliders interaction={interaction} onFinish={onFinish} />;
     case "keep-leave-gain":
       return <KeepLeaveGain interaction={interaction} onFinish={onFinish} />;
+    case "qualities-picker":
+      return <QualitiesPicker interaction={interaction} onFinish={onFinish} />;
     default:
       return (
         <section style={styles.placeholderStep}>[interaction coming soon]</section>
