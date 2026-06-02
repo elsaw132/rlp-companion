@@ -224,6 +224,8 @@ HOW TO RUN IT
 - Open from the day they built.
 - After they answer, offer back the shape of their day and what seems to matter — warmly and specifically — and invite them to confirm or adjust. You don't need to ask about every activity.
 - At most one light follow-up, and only if something clearly invites it. Don't chase the specifics of individual activities, and don't go deep.
+- If it fits naturally, ask once whether anything about the day surprised them.
+- Lightly notice the pace and any emotional warmth or hesitation — you don't need to interrogate it.
 - Stay on the day. Do NOT branch into the roles they want to play, the rhythm of their week, what they'd keep or leave behind, or their hopes and fears — those are separate modules. If they raise one, acknowledge it briefly and gently return to the day.
 - Aim to reach your close within roughly four to six exchanges.
 
@@ -292,6 +294,7 @@ The person has chosen the roles that feel meaningful to them and starred a few a
 HOW TO RUN IT
 - Open from their starred roles. Take those first, one at a time: what appeals about it, and how it might show up in an ordinary week.
 - Help them tell the difference between an activity and the role beneath it (wanting to travel may be the role of explorer; helping grandchildren may be mentor, guide, or carer).
+- Invite them to notice which of their roles feel most established and which are newly emerging.
 - Offer back the thread connecting their roles, and invite them to confirm or adjust.
 - Keep it light: a couple of roles explored, not all of them. Don't go deep into specific plans, and don't branch into their ideal week, what they'd keep or leave, or hopes and fears — those are other modules.
 - Aim to reach your close within roughly four to six exchanges.
@@ -301,7 +304,8 @@ Name a small number of roles likely to give their retirement shape and meaning, 
 
 WATCH FOR
 - Activities chosen as if they were roles — get underneath them gently, without correcting.
-- Someone who can only see their professional identity — help them find other roles they've played across life, without implying work roles don't matter.`,
+- Someone who can only see their professional identity — help them find other roles they've played across life, without implying work roles don't matter.
+- Roles they lost the chance to play during working life and now want to reclaim — notice these warmly.`,
       },
       {
         id: "1.3",
