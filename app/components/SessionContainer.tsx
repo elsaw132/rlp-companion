@@ -2,10 +2,20 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import DayBuilder from "./DayBuilder";
 import type { Interaction } from "@/lib/modules";
+import {
+  getCompletedIds,
+  markModuleComplete,
+} from "@/lib/progress";
 
 type ContentType = "text" | "video";
+
+// Vita appends this to her closing message so we know the module is finished.
+// It's stripped before display and before storage, so it never shows and never
+// re-enters the conversation history.
+const MODULE_COMPLETE_MARKER = "[[MODULE_COMPLETE]]";
 
 type Message = {
   role: "coach" | "user";
@@ -18,7 +28,10 @@ type SessionContainerProps = {
   totalStages: number;
   stageName: string;
   modulesInStage: number;
-  modulesCompleted: number;
+  // Module ids in this stage, used to count how many are complete.
+  stageModuleIds: string[];
+  // Where the in-conversation "Next module →" button goes once finished.
+  nextHref: string;
   sessionTitle: string;
   sessionDescription: string;
   durationMin: number;
@@ -101,7 +114,8 @@ export default function SessionContainer({
   totalStages,
   stageName,
   modulesInStage,
-  modulesCompleted,
+  stageModuleIds,
+  nextHref,
   sessionTitle,
   sessionDescription,
   durationMin,
@@ -126,6 +140,9 @@ export default function SessionContainer({
   const [error, setError] = useState<string | null>(null);
   // Readable summary of what they built in the interaction step, sent to Vita.
   const [buildSummary, setBuildSummary] = useState<string | null>(null);
+  // Whether this module is finished, and how many in the stage are finished.
+  const [completed, setCompleted] = useState(false);
+  const [completedCount, setCompletedCount] = useState(0);
 
   const storageKey = user ? `rlp_session_${user.id}_${sessionId}` : null;
   const buildKey = user ? `rlp_build_${user.id}_${sessionId}` : null;
@@ -142,6 +159,13 @@ export default function SessionContainer({
     typeof window !== "undefined"
   ) {
     setLoadedKey(storageKey);
+
+    // How many modules in this stage are already complete (and is this one).
+    const completedIds = user ? getCompletedIds(user.id) : [];
+    setCompletedCount(
+      stageModuleIds.filter((id) => completedIds.includes(id)).length
+    );
+    if (completedIds.includes(sessionId)) setCompleted(true);
 
     let savedBuild: string | null = null;
     try {
@@ -230,7 +254,23 @@ export default function SessionContainer({
       if (!res.ok) throw new Error(`Chat request failed: ${res.status}`);
 
       const data = (await res.json()) as { reply: string };
-      setMessages([...conversation, { role: "coach", text: data.reply }]);
+
+      // If Vita signalled the close, strip the marker before it's shown or
+      // stored, then flip the module into its complete state and record it.
+      const isClosing = data.reply.includes(MODULE_COMPLETE_MARKER);
+      const replyText = isClosing
+        ? data.reply.replaceAll(MODULE_COMPLETE_MARKER, "").trimEnd()
+        : data.reply;
+
+      setMessages([...conversation, { role: "coach", text: replyText }]);
+
+      if (isClosing && user) {
+        markModuleComplete(user.id, sessionId);
+        if (!completed) {
+          setCompleted(true);
+          setCompletedCount((n) => n + 1);
+        }
+      }
     } catch {
       // Roll the user's bubble back off the conversation and hand their words
       // back to the composer, so retrying is clean. The error is a transient
@@ -260,7 +300,7 @@ export default function SessionContainer({
         </div>
         <div style={styles.progress}>
           <div style={styles.progressLabel}>
-            {modulesCompleted} of {modulesInStage} modules complete
+            {completedCount} of {modulesInStage} modules complete
           </div>
           <div style={styles.progressTrack}>
             <div
@@ -268,7 +308,7 @@ export default function SessionContainer({
                 ...styles.progressFill,
                 width: `${
                   modulesInStage > 0
-                    ? Math.min(100, (modulesCompleted / modulesInStage) * 100)
+                    ? Math.min(100, (completedCount / modulesInStage) * 100)
                     : 0
                 }%`,
               }}
@@ -352,36 +392,54 @@ export default function SessionContainer({
             {sending && <TypingBubble />}
           </div>
 
-          {error && (
-            <div style={styles.errorNotice} role="status">
-              {error}
+          {completed ? (
+            <div style={styles.completeBlock}>
+              <p style={styles.completeCue}>
+                <span aria-hidden="true">✓</span> You&apos;ve finished this
+                module
+              </p>
+              <Link
+                href={nextHref}
+                className="next-complete-btn"
+                style={styles.nextCompleteButton}
+              >
+                Next module →
+              </Link>
             </div>
-          )}
+          ) : (
+            <>
+              {error && (
+                <div style={styles.errorNotice} role="status">
+                  {error}
+                </div>
+              )}
 
-          <div style={styles.composer}>
-            <input
-              type="text"
-              className="composer-input"
-              style={styles.input}
-              placeholder="Type your message…"
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                if (error) setError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSend();
-              }}
-            />
-            <button
-              type="button"
-              className="send-btn"
-              style={styles.sendButton}
-              onClick={handleSend}
-            >
-              Send →
-            </button>
-          </div>
+              <div style={styles.composer}>
+                <input
+                  type="text"
+                  className="composer-input"
+                  style={styles.input}
+                  placeholder="Type your message…"
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSend();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="send-btn"
+                  style={styles.sendButton}
+                  onClick={handleSend}
+                >
+                  Send →
+                </button>
+              </div>
+            </>
+          )}
         </section>
       )}
     </div>
@@ -672,6 +730,41 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-muted)",
     margin: "0 2px -6px",
   },
+  completeBlock: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "16px",
+    paddingTop: "8px",
+  },
+  completeCue: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-body)",
+    fontWeight: 600,
+    color: "var(--success-text)",
+    margin: 0,
+  },
+  nextCompleteButton: {
+    width: "100%",
+    maxWidth: "360px",
+    minHeight: "48px",
+    boxSizing: "border-box",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "var(--brand-primary)",
+    color: "var(--brand-on-primary)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-body)",
+    fontWeight: 600,
+    borderRadius: "var(--r-sm)",
+    padding: "13px 24px",
+    textDecoration: "none",
+    boxShadow: "var(--shadow-sm)",
+  },
   composer: {
     display: "flex",
     gap: "12px",
@@ -706,9 +799,11 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 const focusCss = `
-  .primary-btn:hover, .send-btn:hover { background: var(--brand-primary-hover); }
+  .primary-btn:hover, .send-btn:hover,
+  .next-complete-btn:hover { background: var(--brand-primary-hover); }
   .primary-btn:focus-visible,
-  .send-btn:focus-visible {
+  .send-btn:focus-visible,
+  .next-complete-btn:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
   }

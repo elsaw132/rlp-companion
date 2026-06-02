@@ -6,6 +6,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { clearModuleComplete } from "@/lib/progress";
 
 const linkStyle: React.CSSProperties = {
   background: "none",
@@ -27,9 +28,9 @@ const hoverCss = `
   }
 `;
 
-// Clears this module's saved conversation and any built interaction (e.g. the
-// day builder), then reloads so it starts fresh from the reading. Onboarding is
-// left intact.
+// Clears this module's saved conversation, any built interaction (e.g. the day
+// builder), and its completion flag, then reloads so it starts fresh from the
+// reading. Onboarding is left intact.
 export function ResetModuleLink({ sessionId }: { sessionId: string }) {
   const { user } = useUser();
 
@@ -37,6 +38,7 @@ export function ResetModuleLink({ sessionId }: { sessionId: string }) {
     if (!user) return;
     localStorage.removeItem(`rlp_session_${user.id}_${sessionId}`);
     localStorage.removeItem(`rlp_build_${user.id}_${sessionId}`);
+    clearModuleComplete(user.id, sessionId);
     window.location.reload();
   }
 

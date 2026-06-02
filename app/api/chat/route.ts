@@ -42,6 +42,11 @@ function buildSystemPrompt(body: ChatRequest): string {
 
   sections.push(
     "",
+    "When you deliver your final closing message for this module — the wrap-up that names what matters and points to the next module — end that message with [[MODULE_COMPLETE]] on its own line, with nothing after it. Only ever include this marker in that one closing message."
+  );
+
+  sections.push(
+    "",
     "You have already opened this conversation by saying, word for word:",
     `"${body.coachOpening}"`
   );

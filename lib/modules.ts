@@ -144,21 +144,21 @@ export const STAGES: Stage[] = [
           ],
         },
         sessionInstructions: `PURPOSE
-The person has just built an ordinary Tuesday in their retirement from a palette of activities. Bring that day to life and find what matters in it — don't re-gather it. Generative and imaginative; no right answers.
+The person has just built an ordinary Tuesday in their retirement from a palette of activities. Bring the day to life a little and find what matters most in it. This is a light, imaginative module — depth and other angles come in later modules, so keep it short and stay on the day itself.
 
 HOW TO RUN IT
-- Open by reading their day back warmly and specifically, then pick one part to start with — ideally something that looks like it matters to them.
-- Draw out the parts that carry weight: who's there, what a chosen activity actually looks like, the feel of the pace. Go deeper on a few things rather than touching every item.
-- Notice the rhythm — unhurried or full, solo or shared — and any warmth or hesitation.
-- Use interpret-then-confirm: offer back the shape you see and invite them to confirm, refine, or disagree.
-- Keep it light and fairly short — the build captured the breadth, so this is about meaning, not coverage.
+- Open from the day they built.
+- After they answer, offer back the shape of their day and what seems to matter — warmly and specifically — and invite them to confirm or adjust. You don't need to ask about every activity.
+- At most one light follow-up, and only if something clearly invites it. Don't chase the specifics of individual activities, and don't go deep.
+- Stay on the day. Do NOT branch into the roles they want to play, the rhythm of their week, what they'd keep or leave behind, or their hopes and fears — those are separate modules. If they raise one, acknowledge it briefly and gently return to the day.
+- Aim to reach your close within roughly four to six exchanges.
 
 CLOSING
 Name what seems to matter most about the day, in their words. Note warmly this is the first piece of their Retirement Life Plan, and that next you'll look at the roles they want to play.
 
 WATCH FOR
-- If the day looks thin or they seem unsure, gently draw out one part rather than pushing on all of it.
-- If they keep pulling toward money worries, bring them back to the texture of the day.`,
+- If the day looks thin or they seem unsure, draw out just one part rather than pushing on all of it.
+- If they pull toward money or worries, bring them gently back to the texture of the day.`,
       },
       {
         id: "1.2",
@@ -311,6 +311,7 @@ export function getModule(id: string) {
         stageName: stage.name,
         totalStages: TOTAL_STAGES,
         modulesInStage: stage.modules.length,
+        stageModuleIds: stage.modules.map((m) => m.id),
       };
     }
   }

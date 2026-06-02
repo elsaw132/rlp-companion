@@ -19,8 +19,14 @@ export default async function SessionPage({
     );
   }
 
-  const { module: mod, stageNumber, stageName, totalStages, modulesInStage } =
-    found;
+  const {
+    module: mod,
+    stageNumber,
+    stageName,
+    totalStages,
+    modulesInStage,
+    stageModuleIds,
+  } = found;
 
   // Next module in this stage, or back to the dashboard if this is the last one.
   const nextId = getNextModule(mod.id);
@@ -43,7 +49,8 @@ export default async function SessionPage({
         totalStages={totalStages}
         stageName={stageName}
         modulesInStage={modulesInStage}
-        modulesCompleted={0}
+        stageModuleIds={stageModuleIds}
+        nextHref={nextHref}
         sessionTitle={mod.title}
         sessionDescription={mod.description}
         durationMin={mod.durationMin}
@@ -53,12 +60,6 @@ export default async function SessionPage({
         sessionInstructions={mod.sessionInstructions}
         interaction={mod.interaction}
       />
-
-      <div style={styles.nextWrap}>
-        <Link href={nextHref} className="next-button" style={styles.nextButton}>
-          Next module →
-        </Link>
-      </div>
     </main>
   );
 }
@@ -72,32 +73,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-  },
-  nextWrap: {
-    width: "100%",
-    maxWidth: "var(--content-max)",
-    margin: "0 auto",
-    padding: "8px 24px 48px",
-    display: "flex",
-    justifyContent: "center",
-  },
-  nextButton: {
-    width: "100%",
-    maxWidth: "320px",
-    minHeight: "48px",
-    boxSizing: "border-box",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "var(--brand-primary)",
-    color: "var(--brand-on-primary)",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-body)",
-    fontWeight: 600,
-    borderRadius: "var(--r-sm)",
-    padding: "13px 20px",
-    textDecoration: "none",
-    boxShadow: "var(--shadow-sm)",
   },
   ghostLink: {
     fontFamily: "var(--font-sans)",
@@ -128,11 +103,6 @@ const navCss = `
   .ghost-link:focus-visible {
     outline: none;
     border-radius: var(--r-sm);
-    box-shadow: var(--focus-ring);
-  }
-  .next-button:hover { background: var(--brand-primary-hover); }
-  .next-button:focus-visible {
-    outline: none;
     box-shadow: var(--focus-ring);
   }
 `;
