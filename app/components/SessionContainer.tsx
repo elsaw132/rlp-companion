@@ -202,6 +202,10 @@ export default function SessionContainer({
   // Whether this module is finished, and how many in the stage are finished.
   const [completed, setCompleted] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
+  // After a module finishes, the person can choose to keep talking, which
+  // re-reveals the composer. Vita signing off again returns to the finished
+  // state (this flips back to false).
+  const [reopened, setReopened] = useState(false);
 
   const storageKey = user ? `rlp_session_${user.id}_${sessionId}` : null;
   const buildKey = user ? `rlp_build_${user.id}_${sessionId}` : null;
@@ -389,6 +393,9 @@ export default function SessionContainer({
           setCompleted(true);
           setCompletedCount((n) => n + 1);
         }
+        // Vita has signed off — return to the finished state even if they had
+        // chosen to keep talking.
+        setReopened(false);
       }
     } catch {
       // Roll the user's bubble back off the conversation and hand their words
@@ -516,7 +523,7 @@ export default function SessionContainer({
             {sending && <TypingBubble />}
           </div>
 
-          {completed ? (
+          {completed && !reopened ? (
             <div style={styles.completeBlock}>
               <p style={styles.completeCue}>
                 <span aria-hidden="true">✓</span> You&apos;ve finished this
@@ -529,6 +536,14 @@ export default function SessionContainer({
               >
                 Next module →
               </Link>
+              <button
+                type="button"
+                className="keep-talking-link"
+                style={styles.keepTalkingLink}
+                onClick={() => setReopened(true)}
+              >
+                Want to add something? Keep talking
+              </button>
             </div>
           ) : (
             <>
@@ -902,6 +917,17 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: "none",
     boxShadow: "var(--shadow-sm)",
   },
+  keepTalkingLink: {
+    background: "none",
+    border: "none",
+    padding: "4px 8px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    color: "var(--text-muted)",
+    textDecoration: "underline",
+    textUnderlineOffset: "3px",
+    cursor: "pointer",
+  },
   composer: {
     display: "flex",
     gap: "12px",
@@ -947,6 +973,12 @@ const focusCss = `
   .composer-input:focus-visible {
     border-color: var(--brand-primary);
     box-shadow: var(--focus-ring);
+  }
+  .keep-talking-link:hover { color: var(--text); }
+  .keep-talking-link:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--r-sm);
   }
   .typing-dot {
     width: 7px;

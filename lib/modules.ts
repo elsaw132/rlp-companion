@@ -352,12 +352,12 @@ WATCH FOR
         durationMin: 15,
         contentType: "text",
         contentValue: `[Placeholder — reading/video to come.] Retirement is a change, but it's also a continuation. This module is about what you'd like to carry forward from your working life, what you're ready to leave behind, and what's been missing that you'd like to make room for.`,
-        coachOpening: `Here's how you've sorted things. Let's start with something you want to keep — what does it give you that you'd want to hold on to?`,
+        coachOpening: `Here's how you sorted things. Let's start with something you want to keep or have more of — what does it give you?`,
         interaction: {
           type: "card-sort",
           instruction:
-            "Sort each part of your working life — and a few things you might want more of — into where it belongs.",
-          buckets: ["Keep", "Leave behind", "Want more of"],
+            "For each one, how much do you want it in your retirement?",
+          buckets: ["Want more of", "Keep as is", "Want less of", "Leave behind"],
           cards: [
             "The daily routine and structure",
             "Colleagues and work friendships",
@@ -382,20 +382,20 @@ WATCH FOR
           ],
         },
         sessionInstructions: `PURPOSE
-The person has sorted parts of their current and working life into keep / leave behind / want more of. Help them see retirement as both continuation and change, and understand what their work and current life actually provide. This is still a light Imagine-stage module, but the material can be more personal — go gently.
+The person has gone through parts of their current and working life and said how much they want each in retirement — more of it, about the same, less of it, or to leave it behind. Help them see retirement as both continuation and change, and understand what their work and current life actually provide. Still a light Imagine-stage module, but the material can be personal — go gently.
 
 HOW TO RUN IT
-- Open from their sort. Start with something they chose to keep, and ask what it really gives them.
-- Notice tensions worth a light question — anything in both "keep" and "want more of," or a practical card that may carry an identity theme underneath (status, belonging, being needed, purpose).
+- Open from what they chose. Start with something they want to keep or have more of, and ask what it really gives them.
+- Notice tensions worth a light question — something they want more of that work has been the main source of, or a practical item that may carry an identity theme underneath (status, belonging, being needed, purpose).
 - Help them see that much of what they value isn't tied only to work, and consider how the things they want to keep might continue in a different form.
 - Don't frame work as a problem — leave room for appreciation as well as relief.
-- Keep it fairly short, and stay on what they sorted — don't branch into their day, week, or hopes and fears. Aim to reach your close within roughly four to six exchanges.
+- Keep it fairly short, and stay on what they sorted — don't branch into their day, week, or hopes and fears. Aim to close within roughly four to six exchanges.
 
 CLOSING
-Summarise what they want to carry into retirement, what they're ready to leave, and what they want to make room for, in their words. Note this builds on the day, the roles, and the week, and that next you'll look at their hopes and fears for retirement.
+Summarise what they want to carry forward, what they want more or less of, and what they're ready to leave — in their words. Note this builds on the day, the roles, and the week, and that next you'll look at their hopes and fears for retirement.
 
 WATCH FOR
-- Identity themes beneath the practical cards — notice and name gently, without over-interpreting.
+- Identity themes beneath the practical items — notice and name gently, without over-interpreting.
 - Someone who only sees relief or only sees loss — make room for both.`,
       },
       {

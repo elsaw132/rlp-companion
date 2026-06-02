@@ -53,7 +53,7 @@ function buildSystemPrompt(body: ChatRequest): string {
 
   sections.push(
     "",
-    "When you deliver your final closing message for this module — the wrap-up that names what matters and points to the next module — end that message with [[MODULE_COMPLETE]] on its own line, with nothing after it. Only ever include this marker in that one closing message."
+    "CLOSING THIS MODULE — TWO STEPS. When you're ready to close, first offer your wrap-up: name what matters in their words and check it feels right to them. This message asks a question (does this land? anything to add?), so it must NOT contain the marker. Then, only after they respond, send a brief final sign-off that points to the next module, asks nothing at all, and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. Never put [[MODULE_COMPLETE]] on any message that asks a question. Only ever include the marker in that one final sign-off."
   );
 
   sections.push(
