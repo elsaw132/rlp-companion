@@ -1,3 +1,5 @@
+import { ResetAllDataLink } from "../components/ResetControls";
+
 export default function HomePage() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg-alt)" }}>
@@ -39,6 +41,10 @@ export default function HomePage() {
         >
           Continue →
         </button>
+
+        <div style={{ marginTop: "32px" }}>
+          <ResetAllDataLink />
+        </div>
       </div>
     </div>
   );

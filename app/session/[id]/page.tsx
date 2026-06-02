@@ -1,5 +1,6 @@
 import Link from "next/link";
 import SessionContainer from "../../components/SessionContainer";
+import { ResetModuleLink } from "../../components/ResetControls";
 import { getModule, getNextModule } from "@/lib/modules";
 
 export default async function SessionPage({
@@ -33,6 +34,7 @@ export default async function SessionPage({
         <Link href="/home" className="ghost-link" style={styles.ghostLink}>
           ← Your modules
         </Link>
+        <ResetModuleLink sessionId={mod.id} />
       </div>
 
       <SessionContainer
@@ -67,7 +69,8 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 auto",
     padding: "20px 24px 0",
     display: "flex",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   navBarBottom: {
     paddingTop: "0",
