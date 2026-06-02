@@ -491,7 +491,7 @@ WATCH FOR
         interaction: {
           type: "qualities-picker",
           instruction:
-            "Pick the qualities that feel like the person you want to grow into — the few that feel most like you are enough.",
+            "Pick up to 5 — the few that feel most like the person you want to grow into.",
           options: [
             "Calm",
             "Active",

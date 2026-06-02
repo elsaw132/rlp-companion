@@ -6,6 +6,8 @@ import type {
   QualitiesPickerResult,
 } from "@/lib/modules";
 
+const MAX_PICKS = 5;
+
 function lowerFirst(s: string): string {
   return s ? s[0].toLowerCase() + s.slice(1) : s;
 }
@@ -37,32 +39,40 @@ export default function QualitiesPicker({
   const [draft, setDraft] = useState("");
 
   function toggle(option: string) {
-    setPicked((prev) =>
-      prev.includes(option)
-        ? prev.filter((o) => o !== option)
-        : [...prev, option]
-    );
+    setPicked((prev) => {
+      if (prev.includes(option)) return prev.filter((o) => o !== option);
+      if (prev.length >= MAX_PICKS) return prev;
+      return [...prev, option];
+    });
   }
 
   function submitCustom() {
     const text = draft.trim();
     if (!text) return;
+    if (picked.length >= MAX_PICKS) return;
     setExtras((prev) => (prev.includes(text) ? prev : [...prev, text]));
     setPicked((prev) => (prev.includes(text) ? prev : [...prev, text]));
     setDraft("");
   }
 
   const allOptions = [...options, ...extras];
+  const atLimit = picked.length >= MAX_PICKS;
 
   return (
     <section style={styles.wrap}>
       <style>{qualitiesPickerCss}</style>
 
-      <p style={styles.instruction}>{instruction}</p>
+      <div style={styles.instructionRow}>
+        <p style={styles.instruction}>{instruction}</p>
+        <span style={styles.counter}>
+          {picked.length} of {MAX_PICKS} chosen
+        </span>
+      </div>
 
       <div style={styles.chipWrap}>
         {allOptions.map((option) => {
           const isSelected = picked.includes(option);
+          const isDisabled = !isSelected && atLimit;
           return (
             <button
               key={option}
@@ -71,8 +81,10 @@ export default function QualitiesPicker({
               style={{
                 ...styles.chip,
                 ...(isSelected ? styles.chipSelected : null),
+                ...(isDisabled ? styles.chipDisabled : null),
               }}
               aria-pressed={isSelected}
+              disabled={isDisabled}
               onClick={() => toggle(option)}
             >
               {option}
@@ -86,8 +98,9 @@ export default function QualitiesPicker({
           type="text"
           className="custom-input"
           style={styles.customInput}
-          placeholder="Add your own…"
+          placeholder={atLimit ? "5 chosen — deselect one to add" : "Add your own…"}
           value={draft}
+          disabled={atLimit}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -99,7 +112,11 @@ export default function QualitiesPicker({
         <button
           type="button"
           className="custom-add"
-          style={styles.customAdd}
+          style={{
+            ...styles.customAdd,
+            ...(atLimit ? styles.customAddDisabled : null),
+          }}
+          disabled={atLimit}
           onClick={submitCustom}
         >
           Add
@@ -138,12 +155,28 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: "8px",
     borderTop: "1px solid var(--border)",
   },
+  instructionRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: "8px",
+  },
   instruction: {
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-body)",
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+    flex: 1,
+    minWidth: "200px",
+  },
+  counter: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    color: "var(--text-muted)",
+    flexShrink: 0,
   },
   chipWrap: {
     display: "flex",
@@ -167,6 +200,11 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid var(--brand-primary)",
     color: "var(--ink)",
     fontWeight: 600,
+  },
+  chipDisabled: {
+    opacity: 0.4,
+    cursor: "not-allowed",
+    boxShadow: "none",
   },
   customRow: {
     display: "flex",
@@ -196,6 +234,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--brand-primary)",
     cursor: "pointer",
     flexShrink: 0,
+  },
+  customAddDisabled: {
+    opacity: 0.4,
+    cursor: "not-allowed",
+    color: "var(--text-muted)",
   },
   finishRow: {
     display: "flex",
