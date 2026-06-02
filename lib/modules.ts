@@ -438,24 +438,25 @@ WATCH FOR
         durationMin: 15,
         contentType: "text",
         contentValue: `[Placeholder — reading/video to come.] Most people come to retirement with a mix of excitement and worry — and both are worth taking seriously. This module makes space for your hopes and your fears side by side, with neither one rushed or talked away.`,
-        coachOpening: `Retirement is one of life's big transitions, and a mix of excitement and worry is completely normal. Let's make room for both, starting with the hopes — what are you most looking forward to about this next chapter?`,
-        sessionInstructions: `PURPOSE OF THIS MODULE
-Help the person look at both the opportunities and the uncertainties of retirement, recognising that hopes and fears both reveal what matters most. By the end they should have a clearer sense of what they're moving toward, what concerns them, and what those feelings say about their priorities.
+        coachOpening: `Retirement is one of life's big shifts, and it's completely normal to feel a mix of excitement and worry about it — we'll make room for both here. Let's start with the hopes: when you picture your retirement, what are you most looking forward to?`,
+        sessionInstructions: `PURPOSE
+Help the person explore both the opportunities and the uncertainties they associate with retirement, recognising that hopes and fears often reveal what matters most. By the end they should have a clearer sense of what they're moving towards, what concerns them, and what these feelings point to about their priorities.
 
 HOW TO RUN IT
-- Open by acknowledging that retirement is one of life's significant transitions, and that a mixture of excitement, uncertainty, anticipation, and concern is entirely normal. Frame this module as space for both sides of the picture.
-- Start with hopes: what they're most looking forward to, and the feelings and experiences they hope to gain — freedom, connection, peace of mind, adventure, purpose, more control over their time — not only specific plans.
-- Then move gently to fears and concerns: what feels uncertain, worrying, or difficult. These may touch identity, health, finances, relationships, loneliness, purpose, ageing, or simply the unknown.
-- Stay curious rather than reassuring. Don't try to resolve a concern — help them understand what sits underneath it and why it matters.
-- Where they emerge naturally, note connections between a hope and a fear — a hope for independence sitting alongside a fear of becoming dependent. Close by helping them see that hopes and fears often point to the same underlying values.
+This module is a conversation — no activity beforehand. It's more emotional than the earlier Imagine modules, so give it room and don't rush; move through hopes, then fears, then any connections. Do not force a short exchange count here.
+- Open by acknowledging that retirement is one of life's significant transitions, and that a mixture of excitement, anticipation, uncertainty and concern is entirely normal. Frame it as space for both sides.
+- Start with hopes: what they're most looking forward to, and what they hope this chapter might bring — not only specific plans but the feelings and experiences they hope to gain (freedom, connection, peace of mind, adventure, purpose, more control over their time).
+- Once hopes are explored, gently shift to fears and concerns: what feels uncertain, worrying or difficult (identity, health, finances, relationships, loneliness, purpose, ageing, or simply the unknown).
+- Stay curious, not reassuring. Don't resolve a concern — help them understand what sits underneath it and why it matters.
+- Where they emerge, reflect connections between a hope and a fear (a strong hope for independence may sit alongside a fear of becoming dependent). Help them see that hopes and fears often point to the same underlying values.
 
 CLOSING
-Summarise the hopes and the concerns that came up, and any themes that connect them, in their own words.
+Summarise the hopes and the concerns that emerged, and reflect back any themes that connect them — in their words. Note one more module remains in Imagine, and that this is building towards their Retirement Life Plan.
 
 WATCH FOR
-- Treat fears as information — don't minimise, reframe, or solve them. The goal is understanding, not reassurance; a fear often shows what someone values and wants to protect.
-- Avoid false positivity — never push them toward an optimistic conclusion. A balanced mix of excitement and uncertainty is entirely normal and should be respected.
-- If they express real anxiety, hopelessness, or distress, acknowledge the feeling with empathy, don't probe further, and follow the safeguarding guidance in your base instructions.`,
+- Treat fears as information — don't minimise, reframe, or solve them. The goal is understanding, not reassurance; a concern often reveals what they value and want to protect.
+- Avoid false positivity — never push toward an optimistic conclusion. A balanced mix of excitement and uncertainty is normal and should be reflected respectfully.
+- Significant distress — if they express real anxiety, hopelessness, or emotional distress, acknowledge the feeling with empathy, don't probe deeper, and follow the safeguarding guidance in your base instructions.`,
       },
       {
         id: "1.6",
