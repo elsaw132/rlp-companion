@@ -29,20 +29,24 @@ export type SlidersInteraction = {
   seasonal: { prompt: string; options: string[] };
 };
 
-// A card sort: drop parts of working/current life into a few buckets (keep,
-// leave behind, want more of), with room to add your own.
-export type CardSortInteraction = {
-  type: "card-sort";
-  instruction: string;
-  buckets: string[];
-  cards: string[];
+// Keep / leave / gain: three lists about the move from working life to
+// retirement — what to carry forward, what to let go, what to make space for.
+// Each section is its own multi-select with room to add your own.
+export type KeepLeaveGainInteraction = {
+  type: "keep-leave-gain";
+  sections: {
+    key: string;
+    title: string;
+    prompt: string;
+    options: string[];
+  }[];
 };
 
 export type Interaction =
   | DayBuilderInteraction
   | RolePickerInteraction
   | SlidersInteraction
-  | CardSortInteraction;
+  | KeepLeaveGainInteraction;
 
 // What the person actually built in an interaction step. Stored (as JSON) so
 // the conversation can show it back and a refresh keeps it. The union grows
@@ -71,19 +75,18 @@ export type SlidersResult = {
   seasonal: { prompt: string; answer: string | null };
 };
 
-export type CardSortResult = {
-  type: "card-sort";
-  // The bucket names, in order, so the summary renders from the result alone.
-  buckets: string[];
-  // Bucket name → the cards sorted into it, in order. Unsorted cards are left out.
-  assigned: Record<string, string[]>;
+export type KeepLeaveGainResult = {
+  type: "keep-leave-gain";
+  // Each section with its title and the options picked, so the summary renders
+  // from the result alone. Sections with no picks are still included (empty).
+  sections: { key: string; title: string; picked: string[] }[];
 };
 
 export type BuildResult =
   | DayBuilderResult
   | RolePickerResult
   | SlidersResult
-  | CardSortResult;
+  | KeepLeaveGainResult;
 
 export type Module = {
   id: string;
@@ -352,57 +355,80 @@ WATCH FOR
         durationMin: 15,
         contentType: "text",
         contentValue: `[Placeholder — reading/video to come.] Retirement is a change, but it's also a continuation. This module is about what you'd like to carry forward from your working life, what you're ready to leave behind, and what's been missing that you'd like to make room for.`,
-        coachOpening: `Here's how you sorted things. Let's start with something you want to keep or have more of — what does it give you?`,
+        coachOpening: `Here's what you'd keep, leave, and make space for. Let's start with what you'd be most reluctant to lose — what does one of those give you?`,
         interaction: {
-          type: "card-sort",
-          instruction:
-            "For each one, how much do you want it in your retirement?",
-          buckets: [
-            "Want more of",
-            "Keep as is",
-            "Adapt it",
-            "Want less of",
-            "Leave behind",
-          ],
-          cards: [
-            "The daily routine and structure",
-            "Colleagues and work friendships",
-            "A sense of purpose",
-            "Status or recognition",
-            "Problem-solving and challenge",
-            "Learning new things",
-            "Being part of a team",
-            "Being needed",
-            "The income",
-            "Deadlines and pressure",
-            "The commute",
-            "A full diary",
-            "Responsibility",
-            "Travel",
-            "Time outdoors",
-            "Time with family",
-            "Freedom over your time",
-            "Creativity",
-            "Rest",
-            "Helping or contributing",
+          type: "keep-leave-gain",
+          sections: [
+            {
+              key: "keep",
+              title: "Reluctant to lose",
+              prompt:
+                "What about life now would you be most reluctant to lose?",
+              options: [
+                "Close relationships",
+                "A sense of purpose",
+                "Daily routine and structure",
+                "Being part of a team",
+                "Being needed",
+                "Financial security",
+                "Status or recognition",
+                "Problem-solving and challenge",
+                "Learning new things",
+                "Sources of enjoyment",
+              ],
+            },
+            {
+              key: "leave",
+              title: "Glad to leave behind",
+              prompt: "What would you be glad to leave behind?",
+              options: [
+                "The commute",
+                "Deadlines and pressure",
+                "Office politics",
+                "A packed diary",
+                "Always being available",
+                "Certain responsibilities",
+                "Early starts",
+                "Expectations that no longer fit",
+              ],
+            },
+            {
+              key: "gain",
+              title: "Want to make space for",
+              prompt: "What's been missing that you'd love to make room for?",
+              options: [
+                "Travel",
+                "Creativity",
+                "More time outdoors",
+                "Deeper friendships",
+                "More rest",
+                "Learning something new",
+                "Time with family",
+                "A sense of contribution",
+                "Freedom over your time",
+                "Looking after my health",
+              ],
+            },
           ],
         },
         sessionInstructions: `PURPOSE
-The person has gone through parts of their current and working life and said how much they want each in retirement — more of it, about the same, kept but in a changed form, less of it, or to leave it behind. Help them see retirement as both continuation and change, and understand what their work and current life actually provide. Still a light Imagine-stage module, but the material can be personal — go gently.
+Help the person explore retirement as both continuation and change — what they want to carry forward from their current life, what they're ready to let go of, and what they want the next chapter to make room for. By the end they should understand what work and their current lifestyle provide, and what they want more or less of.
 
 HOW TO RUN IT
-- Open from what they chose. Start with something they want to keep or have more of, and ask what it really gives them.
-- Notice tensions worth a light question — something they want more of that work has been the main source of, or a practical item that may carry an identity theme underneath (status, belonging, being needed, purpose).
-- Help them see that much of what they value isn't tied only to work, and consider how the things they want to keep might continue in a different form.
-- Don't frame work as a problem — leave room for appreciation as well as relief.
-- Keep it fairly short, and stay on what they sorted — don't branch into their day, week, or hopes and fears. Aim to close within roughly four to six exchanges.
+The person has just picked across three lists: what they'd be reluctant to lose, what they'd be glad to leave behind, and what they want to make space for. Open from those.
+- Start with what they'd be reluctant to lose, and draw out what those things actually give them — helping them see that much of what they value isn't tied only to work, even where work has been the main place it lives.
+- Touch on what they're glad to leave behind, but don't frame work as a problem — leave room for appreciation as well as relief.
+- For things they want to keep, explore how they might continue or take a new form in retirement — the same need met a different way.
+- Notice themes that appear in more than one list, and identity themes beneath practical items (usefulness, status, belonging, purpose). Reflect them gently, without over-interpreting.
+- Keep it fairly short and stay on this; aim to close within roughly four to six exchanges.
 
 CLOSING
-Summarise what they want to carry forward, what they want more or less of, and what they're ready to leave — in their words. Note this builds on the day, the roles, and the week, and that next you'll look at their hopes and fears for retirement.
+Summarise what they want to carry into retirement, what they're ready to leave, and the opportunities they hope to make space for — in their words. Note two more modules remain in Imagine, and that this is building towards their Retirement Life Plan.
 
 WATCH FOR
-- Identity themes beneath the practical items — notice and name gently, without over-interpreting.
-- Someone who only sees relief or only sees loss — make room for both.`,
+- Hidden benefits of work they may not have consciously recognised.
+- Expressions of loss, relief, anticipation, or unfinished ambition.
+- Identity themes beneath practical items — name gently, don't over-interpret.`,
       },
       {
         id: "1.5",
