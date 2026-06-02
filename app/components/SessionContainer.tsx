@@ -12,6 +12,7 @@ import RolePicker, {
   rolePickerSummaryText,
 } from "./RolePicker";
 import Sliders, { SlidersSummary, slidersSummaryText } from "./Sliders";
+import CardSort, { CardSortSummary, cardSortSummaryText } from "./CardSort";
 import type { Interaction, BuildResult } from "@/lib/modules";
 import {
   getCompletedIds,
@@ -40,6 +41,8 @@ function summarizeBuild(result: BuildResult): string {
       return rolePickerSummaryText(result);
     case "sliders":
       return slidersSummaryText(result);
+    case "card-sort":
+      return cardSortSummaryText(result);
     default:
       return "";
   }
@@ -59,6 +62,9 @@ function InteractionSummary({ result }: { result: BuildResult }) {
       break;
     case "sliders":
       body = <SlidersSummary result={result} />;
+      break;
+    case "card-sort":
+      body = <CardSortSummary result={result} />;
       break;
     default:
       body = null;
@@ -581,6 +587,8 @@ function InteractionStep({
       return <RolePicker interaction={interaction} onFinish={onFinish} />;
     case "sliders":
       return <Sliders interaction={interaction} onFinish={onFinish} />;
+    case "card-sort":
+      return <CardSort interaction={interaction} onFinish={onFinish} />;
     default:
       return (
         <section style={styles.placeholderStep}>[interaction coming soon]</section>

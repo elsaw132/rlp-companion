@@ -29,10 +29,20 @@ export type SlidersInteraction = {
   seasonal: { prompt: string; options: string[] };
 };
 
+// A card sort: drop parts of working/current life into a few buckets (keep,
+// leave behind, want more of), with room to add your own.
+export type CardSortInteraction = {
+  type: "card-sort";
+  instruction: string;
+  buckets: string[];
+  cards: string[];
+};
+
 export type Interaction =
   | DayBuilderInteraction
   | RolePickerInteraction
-  | SlidersInteraction;
+  | SlidersInteraction
+  | CardSortInteraction;
 
 // What the person actually built in an interaction step. Stored (as JSON) so
 // the conversation can show it back and a refresh keeps it. The union grows
@@ -61,10 +71,19 @@ export type SlidersResult = {
   seasonal: { prompt: string; answer: string | null };
 };
 
+export type CardSortResult = {
+  type: "card-sort";
+  // The bucket names, in order, so the summary renders from the result alone.
+  buckets: string[];
+  // Bucket name → the cards sorted into it, in order. Unsorted cards are left out.
+  assigned: Record<string, string[]>;
+};
+
 export type BuildResult =
   | DayBuilderResult
   | RolePickerResult
-  | SlidersResult;
+  | SlidersResult
+  | CardSortResult;
 
 export type Module = {
   id: string;
@@ -333,24 +352,51 @@ WATCH FOR
         durationMin: 15,
         contentType: "text",
         contentValue: `[Placeholder — reading/video to come.] Retirement is a change, but it's also a continuation. This module is about what you'd like to carry forward from your working life, what you're ready to leave behind, and what's been missing that you'd like to make room for.`,
-        coachOpening: `Retirement isn't only what you're moving toward — it's also what you're leaving, and what you carry with you. Thinking about your life now, not just your job: what would you be most reluctant to lose?`,
-        sessionInstructions: `PURPOSE OF THIS MODULE
-Help the person see retirement as both a continuation and a change — identifying what they want to carry forward, what they're ready to let go of, and what's been missing that retirement might create room for. By the end they should understand more clearly what work and their current life provide, and what they want more or less of next.
+        coachOpening: `Here's how you've sorted things. Let's start with something you want to keep — what does it give you that you'd want to hold on to?`,
+        interaction: {
+          type: "card-sort",
+          instruction:
+            "Sort each part of your working life — and a few things you might want more of — into where it belongs.",
+          buckets: ["Keep", "Leave behind", "Want more of"],
+          cards: [
+            "The daily routine and structure",
+            "Colleagues and work friendships",
+            "A sense of purpose",
+            "Status or recognition",
+            "Problem-solving and challenge",
+            "Learning new things",
+            "Being part of a team",
+            "Being needed",
+            "The income",
+            "Deadlines and pressure",
+            "The commute",
+            "A full diary",
+            "Responsibility",
+            "Travel",
+            "Time outdoors",
+            "Time with family",
+            "Freedom over your time",
+            "Creativity",
+            "Rest",
+            "Helping or contributing",
+          ],
+        },
+        sessionInstructions: `PURPOSE
+The person has sorted parts of their current and working life into keep / leave behind / want more of. Help them see retirement as both continuation and change, and understand what their work and current life actually provide. This is still a light Imagine-stage module, but the material can be more personal — go gently.
 
 HOW TO RUN IT
-- Connect to the picture they've built so far. Start by looking at their current life broadly — the wider patterns, commitments, and experiences that shape daily life, not only the job.
-- Move through three parts, one question at a time:
-  1) What they would be reluctant to lose — relationships, routines, opportunities, skills, responsibilities, sources of enjoyment, parts of their identity.
-  2) What they would be pleased to leave behind — pressure, commuting, workplace politics, time constraints, expectations that no longer serve them.
-  3) What feels missing now, and what retirement might create space for — new interests, deeper relationships, more freedom, creativity, learning, contribution.
-- As themes emerge, help them notice that much of what they value isn't tied only to work. Close by considering how the things they want to keep might continue, in a different form, in retirement.
+- Open from their sort. Start with something they chose to keep, and ask what it really gives them.
+- Notice tensions worth a light question — anything in both "keep" and "want more of," or a practical card that may carry an identity theme underneath (status, belonging, being needed, purpose).
+- Help them see that much of what they value isn't tied only to work, and consider how the things they want to keep might continue in a different form.
+- Don't frame work as a problem — leave room for appreciation as well as relief.
+- Keep it fairly short, and stay on what they sorted — don't branch into their day, week, or hopes and fears. Aim to reach your close within roughly four to six exchanges.
 
 CLOSING
-Summarise what they want to carry into retirement, what they're ready to leave, and what they hope to make room for, in their own words.
+Summarise what they want to carry into retirement, what they're ready to leave, and what they want to make room for, in their words. Note this builds on the day, the roles, and the week, and that next you'll look at their hopes and fears for retirement.
 
 WATCH FOR
-- Don't frame work as a problem — many people have mixed feelings about leaving. Leave room for appreciation as well as relief; don't assume retirement is an escape from something negative.
-- Watch for identity themes — usefulness, status, belonging, purpose — surfacing beneath the practical points. Notice and name these gently, without over-interpreting.`,
+- Identity themes beneath the practical cards — notice and name gently, without over-interpreting.
+- Someone who only sees relief or only sees loss — make room for both.`,
       },
       {
         id: "1.5",
