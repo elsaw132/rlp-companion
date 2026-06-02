@@ -13,6 +13,10 @@ type ChatRequest = {
   onboardingContext: string;
   priorReflections: string;
   sessionContent: string;
+  // A readable summary of whatever the person built in this module's
+  // interaction step (e.g. the day builder). Empty/omitted when the module
+  // has no interaction.
+  interactionSummary?: string;
 };
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -25,15 +29,24 @@ function buildSystemPrompt(body: ChatRequest): string {
     .replace("{priorReflections}", body.priorReflections)
     .replace("{sessionContent}", body.sessionContent);
 
-  return [
+  const sections = [
     filled,
     "",
     "THIS MODULE'S INSTRUCTIONS",
     body.sessionInstructions,
+  ];
+
+  if (body.interactionSummary && body.interactionSummary.trim()) {
+    sections.push("", "WHAT THEY BUILT IN THIS MODULE:", body.interactionSummary);
+  }
+
+  sections.push(
     "",
     "You have already opened this conversation by saying, word for word:",
-    `"${body.coachOpening}"`,
-  ].join("\n");
+    `"${body.coachOpening}"`
+  );
+
+  return sections.join("\n");
 }
 
 export async function POST(request: Request) {

@@ -27,14 +27,16 @@ const hoverCss = `
   }
 `;
 
-// Clears only this module's saved conversation, then reloads so it starts
-// fresh from Vita's opening. Onboarding is left intact.
+// Clears this module's saved conversation and any built interaction (e.g. the
+// day builder), then reloads so it starts fresh from the reading. Onboarding is
+// left intact.
 export function ResetModuleLink({ sessionId }: { sessionId: string }) {
   const { user } = useUser();
 
   function handleRestart() {
     if (!user) return;
     localStorage.removeItem(`rlp_session_${user.id}_${sessionId}`);
+    localStorage.removeItem(`rlp_build_${user.id}_${sessionId}`);
     window.location.reload();
   }
 

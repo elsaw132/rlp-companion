@@ -3,6 +3,17 @@
 // Private field (Vita only, never shown to the user): sessionInstructions.
 // Readings/videos are placeholders for now — replace contentValue when the real content is ready.
 
+// An optional step between the reading and the conversation, where the person
+// builds something Vita then opens from. Only "day-builder" exists so far; the
+// union is ready to grow as new interaction types are added.
+export type DayBuilderInteraction = {
+  type: "day-builder";
+  parts: string[];
+  categories: { name: string; activities: string[] }[];
+};
+
+export type Interaction = DayBuilderInteraction;
+
 export type Module = {
   id: string;
   title: string;
@@ -12,6 +23,7 @@ export type Module = {
   contentValue: string;
   coachOpening: string;
   sessionInstructions: string;
+  interaction?: Interaction;
 };
 
 export type Stage = {
@@ -36,23 +48,117 @@ export const STAGES: Stage[] = [
         durationMin: 15,
         contentType: "text",
         contentValue: `[Placeholder — the short intro video and reading for this module are still to come.] Before you can plan a retirement, it helps to be able to picture one. Not the big milestones — just an ordinary day. In a moment, Vita will walk you through one: a Tuesday in October, a few years from now. There are no right answers, and nothing to work out.`,
-        coachOpening: `Let's start somewhere concrete — an ordinary Tuesday in October, a few years into your retirement. Don't worry about getting it "right"; begin with whatever comes easily. What time do you wake up?`,
-        sessionInstructions: `PURPOSE OF THIS MODULE
-Help the person picture one specific, ordinary day in their retirement so it starts to feel real — often for the first time. This is generative and imaginative: there are no right answers and nothing to analyse. By the end they should have a clearer felt sense of what they want their days to be like and what matters most.
+        coachOpening: `Here's the day you've put together. Let's talk it through — looking at the whole thing, which part are you most looking forward to?`,
+        interaction: {
+          type: "day-builder",
+          parts: ["Morning", "Afternoon", "Evening"],
+          categories: [
+            {
+              name: "Body & movement",
+              activities: [
+                "Walk",
+                "Run",
+                "Gym",
+                "Swim",
+                "Cycle",
+                "Yoga or stretch",
+                "Golf",
+                "A class",
+                "Dance",
+              ],
+            },
+            {
+              name: "Home & making",
+              activities: [
+                "Cook a proper meal",
+                "Bake",
+                "Gardening",
+                "DIY & repairs",
+                "A project",
+                "Crafts or sewing",
+                "Decorating",
+                "Sort & declutter",
+              ],
+            },
+            {
+              name: "People & connection",
+              activities: [
+                "Time with your partner",
+                "Family",
+                "Grandkids",
+                "See friends",
+                "Have people over",
+                "A call with someone far away",
+                "A club or group",
+                "Time on your own",
+              ],
+            },
+            {
+              name: "Mind & learning",
+              activities: [
+                "Read",
+                "A course or class",
+                "Learn a language",
+                "Play music",
+                "Write or journal",
+                "Puzzles or games",
+                "Look into something that interests you",
+              ],
+            },
+            {
+              name: "Out & about",
+              activities: [
+                "Coffee out",
+                "The market or shops",
+                "A walk somewhere new",
+                "Time in nature",
+                "A museum or gallery",
+                "A day trip",
+                "Away somewhere",
+              ],
+            },
+            {
+              name: "Purpose & contribution",
+              activities: [
+                "Volunteer",
+                "Mentor or advise",
+                "A bit of paid work",
+                "Help a cause you care about",
+                "Help family practically",
+              ],
+            },
+            {
+              name: "Rest & quiet",
+              activities: [
+                "A lie-in",
+                "Slow breakfast",
+                "Sit with a coffee",
+                "A nap",
+                "TV or a film",
+                "Music or radio",
+                "Potter about",
+                "Time in the garden",
+                "Do nothing much",
+              ],
+            },
+          ],
+        },
+        sessionInstructions: `PURPOSE
+The person has just built an ordinary Tuesday in their retirement from a palette of activities. Bring that day to life and find what matters in it — don't re-gather it. Generative and imaginative; no right answers.
 
 HOW TO RUN IT
-- Open from an ordinary Tuesday in October, a few years into retirement. If they seem unsure, reassure them that's completely normal and to start with whatever comes easily.
-- Build the day roughly in order, one question at a time: waking (what time, where they are, the first thing they notice), then who's around, the morning, the afternoon, the evening. Keep it on ordinary lived moments — not achievements or bucket-list ambitions.
-- Once the day is built, turn gently to noticing: which part felt most appealing, which felt most important, and whether anything surprised them. Curiosity, not analysis.
-- Use the interpret-then-confirm move: offer back a pattern you notice, in their own words — for example, that time outdoors, an unhurried morning, and being near family keep appearing — and invite them to confirm, refine, or disagree. This is their first taste of you noticing and them steering.
-- Where useful, draw out a little more about the activities and people they mention, and pay attention to their preferred pace and to any emotional words or uncertainties.
+- Open by reading their day back warmly and specifically, then pick one part to start with — ideally something that looks like it matters to them.
+- Draw out the parts that carry weight: who's there, what a chosen activity actually looks like, the feel of the pace. Go deeper on a few things rather than touching every item.
+- Notice the rhythm — unhurried or full, solo or shared — and any warmth or hesitation.
+- Use interpret-then-confirm: offer back the shape you see and invite them to confirm, refine, or disagree.
+- Keep it light and fairly short — the build captured the breadth, so this is about meaning, not coverage.
 
 CLOSING
-Help them name what seems to matter most about the day they described, in their own language. Note warmly that this is the first piece of their Retirement Life Plan taking shape, and that next time you'll look at the roles they want to play.
+Name what seems to matter most about the day, in their words. Note warmly this is the first piece of their Retirement Life Plan, and that next you'll look at the roles they want to play.
 
 WATCH FOR
-- If they struggle to picture anything, reassure them it's exploratory, not a prediction, and steer toward one small concrete detail rather than the whole picture. If they keep returning to money worries, gently bring them back to the texture of the day — finances come much later in the programme.
-- If they offer very little, gently invite a bit more before closing; there needs to be enough of a picture to carry into the next module.`,
+- If the day looks thin or they seem unsure, gently draw out one part rather than pushing on all of it.
+- If they keep pulling toward money worries, bring them back to the texture of the day.`,
       },
       {
         id: "1.2",

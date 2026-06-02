@@ -2,6 +2,8 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
+import DayBuilder from "./DayBuilder";
+import type { Interaction } from "@/lib/modules";
 
 type ContentType = "text" | "video";
 
@@ -27,6 +29,9 @@ type SessionContainerProps = {
   // to contentValue and there are no module-specific instructions.
   sessionContent?: string;
   sessionInstructions?: string;
+  // Optional build step shown between the reading and the conversation. When
+  // absent, the module keeps the plain reading → conversation flow.
+  interaction?: Interaction;
 };
 
 const COACH_ERROR_REPLY =
@@ -105,33 +110,59 @@ export default function SessionContainer({
   coachOpening,
   sessionContent,
   sessionInstructions,
+  interaction,
 }: SessionContainerProps) {
   const { user } = useUser();
 
-  const [revealed, setRevealed] = useState(false);
+  // Where the person is in the module: the reading, the build step (only for
+  // modules with an interaction), then the conversation.
+  const [phase, setPhase] = useState<"reading" | "building" | "conversation">(
+    "reading"
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Readable summary of what they built in the interaction step, sent to Vita.
+  const [buildSummary, setBuildSummary] = useState<string | null>(null);
 
   const storageKey = user ? `rlp_session_${user.id}_${sessionId}` : null;
+  const buildKey = user ? `rlp_build_${user.id}_${sessionId}` : null;
 
-  // Load any saved conversation as soon as the user (and so the key) is known.
-  // We read during render rather than in an effect so the first paint already
-  // has the saved messages — no empty-then-refill second render. The setLoadedKey
-  // guard makes this run exactly once per key. localStorage is browser-only, so
-  // skip it during server rendering.
-  if (storageKey && storageKey !== loadedKey && typeof window !== "undefined") {
+  // Load any saved conversation and built day as soon as the user (and so the
+  // key) is known. We read during render rather than in an effect so the first
+  // paint already has the saved state — no empty-then-refill second render. The
+  // setLoadedKey guard makes this run exactly once per key. localStorage is
+  // browser-only, so skip it during server rendering.
+  if (
+    storageKey &&
+    buildKey &&
+    storageKey !== loadedKey &&
+    typeof window !== "undefined"
+  ) {
     setLoadedKey(storageKey);
+
+    let savedBuild: string | null = null;
+    try {
+      savedBuild = localStorage.getItem(buildKey);
+    } catch {
+      savedBuild = null;
+    }
+    if (savedBuild) setBuildSummary(savedBuild);
+
     try {
       const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const saved = JSON.parse(raw) as Message[];
-        if (Array.isArray(saved) && saved.length > 0) {
-          setMessages(saved);
-          setRevealed(true);
-        }
+      const saved = raw ? (JSON.parse(raw) as Message[]) : null;
+      if (Array.isArray(saved) && saved.length > 0) {
+        // A conversation is already underway — resume it.
+        setMessages(saved);
+        setPhase("conversation");
+      } else if (savedBuild) {
+        // They finished the build last time but hadn't started talking — seed
+        // Vita's opening and drop them into the conversation.
+        setMessages([{ role: "coach", text: coachOpening }]);
+        setPhase("conversation");
       }
     } catch {
       // ignore corrupt data — start fresh
@@ -145,12 +176,30 @@ export default function SessionContainer({
     localStorage.setItem(storageKey, JSON.stringify(messages));
   }, [messages, storageKey, loadedKey]);
 
-  // Open the conversation, seeding Vita's opening as the first bubble.
-  function handleReveal() {
-    setRevealed(true);
+  // Seed Vita's opening as the first bubble and show the conversation.
+  function startConversation() {
+    setPhase("conversation");
     setMessages((prev) =>
       prev.length === 0 ? [{ role: "coach", text: coachOpening }] : prev
     );
+  }
+
+  // After the reading: modules with an interaction go to the build step first;
+  // everything else goes straight to the conversation.
+  function handleReadingDone() {
+    if (interaction) {
+      setPhase("building");
+    } else {
+      startConversation();
+    }
+  }
+
+  // The person finished the build step. Save the summary so a refresh keeps it,
+  // then open the conversation.
+  function handleBuildFinish(summary: string) {
+    setBuildSummary(summary);
+    if (buildKey) localStorage.setItem(buildKey, summary);
+    startConversation();
   }
 
   async function handleSend() {
@@ -174,6 +223,7 @@ export default function SessionContainer({
           onboardingContext: buildOnboardingContext(user?.id),
           priorReflections: "No earlier modules completed yet.",
           sessionContent: sessionContent ?? contentValue,
+          interactionSummary: buildSummary ?? "",
         }),
       });
 
@@ -258,13 +308,13 @@ export default function SessionContainer({
           <p style={styles.bodyText}>{contentValue}</p>
         )}
 
-        {!revealed && (
+        {phase === "reading" && (
           <div style={styles.gateRow}>
             <button
               type="button"
               className="primary-btn"
               style={styles.primaryButton}
-              onClick={handleReveal}
+              onClick={handleReadingDone}
             >
               {gateLabel}
             </button>
@@ -272,8 +322,16 @@ export default function SessionContainer({
         )}
       </section>
 
+      {/* ZONE 2.5 — INTERACTION (only modules that have one) */}
+      {phase === "building" && interaction && (
+        <InteractionStep
+          interaction={interaction}
+          onFinish={handleBuildFinish}
+        />
+      )}
+
       {/* ZONE 3 — VITA + CONVERSATION */}
-      {revealed && (
+      {phase === "conversation" && (
         <section style={styles.conversationZone}>
           <div style={styles.vitaLockup}>
             <span style={styles.sun} aria-hidden="true">
@@ -328,6 +386,26 @@ export default function SessionContainer({
       )}
     </div>
   );
+}
+
+// Picks the right interaction UI for the module's interaction type. New types
+// get a case here; until then they fall back to a harmless placeholder so a
+// half-configured module never breaks the screen.
+function InteractionStep({
+  interaction,
+  onFinish,
+}: {
+  interaction: Interaction;
+  onFinish: (summary: string) => void;
+}) {
+  switch (interaction.type) {
+    case "day-builder":
+      return <DayBuilder interaction={interaction} onFinish={onFinish} />;
+    default:
+      return (
+        <section style={styles.placeholderStep}>[interaction coming soon]</section>
+      );
+  }
 }
 
 function CoachBubble({ text }: { text: string }) {
@@ -496,6 +574,15 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "13px 24px",
     minHeight: "48px",
     cursor: "pointer",
+  },
+
+  placeholderStep: {
+    paddingTop: "36px",
+    marginTop: "8px",
+    borderTop: "1px solid var(--border)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    color: "var(--text-muted)",
   },
 
   // ZONE 3 — Vita + conversation

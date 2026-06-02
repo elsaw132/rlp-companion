@@ -51,6 +51,7 @@ export default async function SessionPage({
         contentValue={mod.contentValue}
         coachOpening={mod.coachOpening}
         sessionInstructions={mod.sessionInstructions}
+        interaction={mod.interaction}
       />
 
       <div style={styles.nextWrap}>
