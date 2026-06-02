@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RLP Companion — Design System (Aviva theme)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand-primary:#013281;--brand-primary-hover:#01275F;--brand-primary-tint:#E8EDF1;--brand-on-primary:#fff;
+  --brand-band:#FFD101;--brand-on-band:#013281;
+  --warm-surface:#FBF7EC;--warm-surface-2:#FCF8EF;--warm-line:#EFE6D2;--coach-pill:#FFE36B;--coach-pill-text:#5A4300;--sun:#FBD24E;
+  --accent:#E06F1F;--accent-hover:#C75F16;--accent-strong:#B85C16;--accent-surface:#FEFEF4;--accent-line:#EAD9B0;
+  --ink:#16202E;--text:#3A3D44;--text-muted:#7C7F86;--text-faint:#A6A8AE;
+  --bg:#fff;--bg-alt:#FAFAF8;--surface:#fff;--border:#E9E9E4;--border-strong:#DCDCD6;
+  --success:#2F8B4E;--success-text:#2C7A46;--success-surface:#EAF5ED;--success-line:#BFE0C4;--muted-surface:#EFEEE9;
+  --info-surface:#ECF0FB;--info-line:#D6DFF4;--info-text:#16202E;
+  --ill-sky:#A4CCE5;--ill-sky-pale:#C9E0EE;--ill-hill:#5B9F4A;--ill-hill-deep:#3F7F36;--ill-path:#C7A53A;--ill-lavender:#D0CCEF;
+  --r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-pill:999px;
+  --shadow-sm:0 1px 2px rgba(16,32,46,.05),0 1px 3px rgba(16,32,46,.04);
+  --shadow-md:0 2px 6px rgba(16,32,46,.05),0 10px 28px rgba(16,32,46,.06);
+  --font-serif:"Source Serif 4","Lora",Georgia,serif;
+  --font-sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);color:var(--text);background:var(--bg-alt);line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto;padding:0 24px 96px}
+
+/* doc chrome */
+.doc-head{background:var(--ink);color:#fff;border-radius:0 0 20px 20px;padding:40px 36px 32px;margin-bottom:40px}
+.doc-eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:8px}
+.doc-title{font-family:var(--font-serif);font-size:34px;font-weight:600;line-height:1.15;margin-bottom:10px}
+.doc-sub{font-size:15px;color:rgba(255,255,255,.7);max-width:60ch}
+.doc-meta{display:flex;gap:28px;flex-wrap:wrap;margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,.14)}
+.doc-meta div{font-size:13px;color:rgba(255,255,255,.65)}
+.doc-meta strong{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.85);margin-bottom:3px}
+
+section{margin:0 0 56px}
+.sec-label{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:600;margin-bottom:6px}
+.sec-title{font-family:var(--font-serif);font-size:26px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.sec-intro{font-size:15px;color:var(--text-muted);max-width:66ch;margin-bottom:24px}
+.sub-title{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin:28px 0 14px}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:24px;box-shadow:var(--shadow-sm)}
+.grid{display:grid;gap:14px}
+.cols-2{grid-template-columns:repeat(2,1fr)}
+.cols-3{grid-template-columns:repeat(3,1fr)}
+.cols-4{grid-template-columns:repeat(4,1fr)}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.stack{display:flex;flex-direction:column;gap:18px}
+@media(max-width:680px){.cols-2,.cols-3,.cols-4{grid-template-columns:repeat(2,1fr)}}
+
+/* swatches */
+.sw{border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;background:#fff}
+.sw .chip{height:64px}
+.sw .meta{padding:9px 11px}
+.sw .nm{font-size:12.5px;font-weight:600;color:var(--ink)}
+.sw .hx{font-size:11.5px;color:var(--text-muted);font-variant-numeric:tabular-nums;margin-top:1px}
+.sw .tk{font-size:11px;color:var(--text-faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:2px}
+
+.note{font-size:13px;color:var(--text-muted);background:var(--bg-alt);border-left:3px solid var(--border-strong);border-radius:0 var(--r-xs) var(--r-xs) 0;padding:11px 14px;line-height:1.55;margin-top:14px}
+.note.warn{border-left-color:var(--accent);background:#FFF6EE;color:#7C3D0F}
+.note strong{color:var(--ink)}
+.note.warn strong{color:#7C3D0F}
+
+/* ============ COMPONENT REPLICAS ============ */
+
+/* buttons */
+.btn{font-family:var(--font-sans);font-size:15px;font-weight:600;border:none;border-radius:var(--r-sm);padding:13px 20px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;line-height:1;min-height:48px}
+.btn-navy{background:var(--brand-primary);color:#fff}
+.btn-navy:hover{background:var(--brand-primary-hover)}
+.btn-accent{background:var(--accent-strong);color:#fff}
+.btn-accent:hover{background:var(--accent-hover)}
+.btn-ghost{background:transparent;color:var(--brand-primary);border:1.5px solid var(--border-strong)}
+.btn-link{background:none;border:none;color:var(--brand-primary);font-weight:600;font-size:15px;cursor:pointer;padding:0;display:inline-flex;gap:6px;align-items:center}
+
+/* chips & badges */
+.chip-time{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-muted);background:#fff;border:1px solid var(--border);border-radius:var(--r-pill);padding:4px 11px;font-weight:500}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;border-radius:var(--r-pill);padding:6px 13px}
+.badge-complete{color:var(--success-text);background:#fff;border:1.5px solid var(--success-line)}
+.badge-notstarted{color:var(--text-muted);background:var(--muted-surface)}
+.eyebrow{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:600}
+
+/* stage circles */
+.steps{display:flex;align-items:center;gap:0}
+.step{display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;flex:1;position:relative}
+.step .dot{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;z-index:1}
+.step.done .dot{background:var(--brand-primary);color:#fff}
+.step.active .dot{background:var(--accent);color:#fff}
+.step.todo .dot{background:var(--border);color:var(--text-faint)}
+.step .cap{font-size:11.5px;color:var(--text-muted);font-weight:600}
+.step.active .cap{color:var(--ink)}
+.step:not(:last-child)::after{content:"";position:absolute;top:20px;left:50%;width:100%;height:2px;background:var(--border)}
+.step.done:not(:last-child)::after{background:var(--brand-primary)}
+
+/* radial */
+.radial{--p:38;width:72px;height:72px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(var(--brand-primary) calc(var(--p)*1%),var(--border) 0)}
+.radial::before{content:"";position:absolute;width:54px;height:54px;border-radius:50%;background:#fff}
+.radial span{position:relative;font-size:14px;font-weight:700;color:var(--brand-primary)}
+.radial-wrap{position:relative;display:inline-grid;place-items:center}
+
+/* nav item */
+.navlist{width:260px;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:8px;display:flex;flex-direction:column;gap:2px}
+.nav{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:var(--r-sm);cursor:pointer}
+.nav .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0}
+.nav.is-active{background:var(--brand-primary-tint)}
+.nav.is-active .n{background:var(--brand-primary);color:#fff}
+.nav .n--idle{background:#EBF1F8;color:var(--brand-primary)}
+.nav .t{font-size:15px;font-weight:600;color:var(--ink);line-height:1.25}
+.nav .s{font-size:12.5px;color:var(--text-muted)}
+.nav.is-idle .t{color:var(--text)}
+
+/* progress card */
+.pcard{width:300px;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:18px;box-shadow:var(--shadow-sm)}
+.pcard h4{font-size:15px;font-weight:700;color:var(--ink)}
+.pcard .lab{font-size:12.5px;color:var(--text-muted);margin-bottom:14px}
+
+/* hero card */
+.hero{display:grid;grid-template-columns:1.05fr .95fr;background:var(--warm-surface);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--warm-line);max-width:660px}
+.hero .body{padding:26px 26px 28px}
+.hero .vita{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.hero .vita .sun{width:34px;height:34px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:17px}
+.hero .vita .name{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--ink)}
+.coachpill{display:inline-block;background:var(--coach-pill);color:var(--coach-pill-text);font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-sm);margin-bottom:16px}
+.hero p.intro{font-size:15px;color:var(--text);line-height:1.6;margin-bottom:22px}
+.hero .ns-eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:2px}
+.hero .ns-title{font-family:var(--font-serif);font-size:23px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:16px}
+.hero .scene{background:linear-gradient(var(--ill-sky-pale),var(--ill-sky) 42%,var(--ill-hill) 60%,var(--ill-hill-deep));position:relative}
+.hero .scene .ball{position:absolute;right:22px;bottom:34%;width:11px;height:11px;border-radius:50%;background:#fff;opacity:.92}
+.hero .scene .cloud{position:absolute;width:64px;height:20px;background:rgba(255,255,255,.75);border-radius:20px;top:42px;right:40px}
+
+/* stage progress card */
+.spc{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:18px 20px;box-shadow:var(--shadow-sm);max-width:620px}
+.spc .sun{width:46px;height:46px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:22px;flex-shrink:0}
+.spc h4{font-size:15px;font-weight:700;color:var(--ink)}
+.spc p{font-size:13px;color:var(--text-muted);max-width:30ch}
+.spc .prog{margin-left:auto;text-align:right;min-width:150px}
+.spc .prog .pl{font-size:12.5px;color:var(--text-muted);margin-bottom:6px}
+.bar{height:6px;border-radius:var(--r-pill);background:var(--border);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--brand-primary);border-radius:var(--r-pill)}
+
+/* session card */
+.scard{display:grid;grid-template-columns:96px 1fr auto auto;gap:18px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:20px;box-shadow:var(--shadow-sm);max-width:660px}
+.scard.is-active{background:var(--accent-surface);border-color:var(--accent-line);box-shadow:var(--shadow-md)}
+.thumb{width:88px;height:72px;border-radius:var(--r-md);overflow:hidden}
+.thumb.sunrise{background:linear-gradient(var(--ill-sky-pale),var(--ill-hill) 70%);position:relative}
+.thumb.sunrise::after{content:"";position:absolute;top:14px;left:50%;transform:translateX(-50%);width:20px;height:20px;border-radius:50%;background:var(--sun)}
+.thumb.cal{background:#FCE7B8;display:grid;place-items:center}
+.thumb.cal::after{content:"";width:46px;height:34px;border-radius:6px;background:var(--coach-pill);box-shadow:inset 0 8px 0 #E7B53D}
+.thumb.mtn{background:#EEEAFB;position:relative;overflow:hidden}
+.thumb.mtn::after{content:"";position:absolute;bottom:0;left:14px;border-left:22px solid transparent;border-right:22px solid transparent;border-bottom:34px solid var(--ill-lavender)}
+.thumb.roles{background:#E7F2E2;display:grid;place-items:center}
+.thumb.roles::after{content:"";width:44px;height:30px;background:radial-gradient(circle at 30% 50%,var(--ill-hill) 12px,transparent 13px),radial-gradient(circle at 70% 50%,var(--ill-hill-deep) 12px,transparent 13px)}
+.scard .title{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--ink);line-height:1.2}
+.scard .desc{font-size:14px;color:var(--text-muted);margin-top:5px;max-width:30ch}
+
+/* info card */
+.info{display:flex;gap:18px;align-items:flex-start;background:var(--info-surface);border:1px solid var(--info-line);border-radius:var(--r-md);padding:22px 24px;max-width:620px}
+.info .av{width:42px;height:42px;border-radius:50%;background:#C9D7F2;display:grid;place-items:center;font-size:18px;flex-shrink:0}
+.info h4{font-family:var(--font-serif);font-size:18px;font-weight:600;color:var(--info-text);margin-bottom:5px}
+.info p{font-size:14px;color:var(--text);max-width:42ch}
+.info .lk{margin-left:auto;align-self:center}
+
+/* bubbles */
+.bubbles{max-width:560px;display:flex;flex-direction:column;gap:12px}
+.b-coach{align-self:flex-start;max-width:80%;background:var(--warm-surface);color:var(--ink);font-size:16px;line-height:1.6;padding:15px 19px;border-radius:18px 18px 18px 4px;border:1px solid var(--warm-line)}
+.b-user{align-self:flex-end;max-width:80%;background:#fff;color:var(--text);font-size:16px;line-height:1.6;padding:15px 19px;border-radius:18px 18px 4px 18px;border:1.5px solid var(--border-strong)}
+
+/* type specimens */
+.spec{border:1px solid var(--border);border-radius:var(--r-sm);padding:16px 18px;background:#fff}
+.spec .lbl{font-size:11px;color:var(--text-faint);font-family:ui-monospace,monospace;margin-bottom:8px}
+.t-display{font-family:var(--font-serif);font-size:34px;font-weight:600;color:var(--ink);line-height:1.15}
+.t-h2{font-family:var(--font-serif);font-size:22px;font-weight:600;color:var(--ink)}
+.t-title{font-family:var(--font-serif);font-size:20px;font-weight:600;color:var(--ink)}
+.t-section{font-size:18px;font-weight:700;color:var(--ink)}
+.t-body{font-size:16px;color:var(--text)}
+.t-sm{font-size:14px;color:var(--text-muted)}
+
+.scale-row{display:flex;align-items:baseline;gap:18px;padding:10px 0;border-bottom:1px solid var(--border)}
+.scale-row:last-child{border:none}
+.scale-row .k{width:120px;font-size:12px;font-family:ui-monospace,monospace;color:var(--text-muted);flex-shrink:0}
+</style>
+</head>
+<body>
+
+<header class="doc-head">
+  <div class="doc-eyebrow">RLP Companion · Internal · Chorus Life</div>
+  <div class="doc-title">Design System</div>
+  <div class="doc-sub">The complete visual language for the Retirement Life Planning Companion, drawn from the Aviva dashboard reference. Brand colours are a swappable layer; everything else is fixed across deployments.</div>
+  <div class="doc-meta">
+    <div><strong>Theme</strong>Aviva (white-label)</div>
+    <div><strong>Type</strong>Source Serif 4 · Inter</div>
+    <div><strong>Tokens</strong>tokens.css</div>
+    <div><strong>Version</strong>v1.0</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ============ COLOUR ============ -->
+<section>
+  <div class="sec-label">Foundations</div>
+  <h2 class="sec-title">Colour</h2>
+  <p class="sec-intro">Navy is the only interactive colour for completed and structural states. Orange is reserved exclusively for the <em>single current step</em> — if everything is orange, nothing is. Cream carries the coach's warmth; white carries everything else.</p>
+
+  <div class="sub-title">Brand — provider-themeable</div>
+  <div class="grid cols-4">
+    <div class="sw"><div class="chip" style="background:var(--brand-primary)"></div><div class="meta"><div class="nm">Navy</div><div class="hx">#013281</div><div class="tk">--brand-primary</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--brand-primary-tint)"></div><div class="meta"><div class="nm">Navy tint</div><div class="hx">#E8EDF1</div><div class="tk">--brand-primary-tint</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--brand-band)"></div><div class="meta"><div class="nm">Provider band</div><div class="hx">#FFD101</div><div class="tk">--brand-band</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--ink)"></div><div class="meta"><div class="nm">Ink</div><div class="hx">#16202E</div><div class="tk">--ink</div></div></div>
+  </div>
+
+  <div class="sub-title">Accent &amp; warmth — fixed</div>
+  <div class="grid cols-4">
+    <div class="sw"><div class="chip" style="background:var(--accent)"></div><div class="meta"><div class="nm">Accent</div><div class="hx">#E06F1F</div><div class="tk">--accent</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--accent-surface);border-bottom:1px solid var(--border)"></div><div class="meta"><div class="nm">Accent surface</div><div class="hx">#FEFEF4</div><div class="tk">--accent-surface</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--warm-surface);border-bottom:1px solid var(--border)"></div><div class="meta"><div class="nm">Warm surface</div><div class="hx">#FBF7EC</div><div class="tk">--warm-surface</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--coach-pill)"></div><div class="meta"><div class="nm">Coach pill</div><div class="hx">#FFE36B</div><div class="tk">--coach-pill</div></div></div>
+  </div>
+
+  <div class="sub-title">Status &amp; surfaces</div>
+  <div class="grid cols-4">
+    <div class="sw"><div class="chip" style="background:var(--success)"></div><div class="meta"><div class="nm">Success</div><div class="hx">#2F8B4E</div><div class="tk">--success</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--info-surface);border-bottom:1px solid var(--border)"></div><div class="meta"><div class="nm">Info (lavender)</div><div class="hx">#ECF0FB</div><div class="tk">--info-surface</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--muted-surface)"></div><div class="meta"><div class="nm">Muted surface</div><div class="hx">#EFEEE9</div><div class="tk">--muted-surface</div></div></div>
+    <div class="sw"><div class="chip" style="background:#fff;border-bottom:1px solid var(--border)"></div><div class="meta"><div class="nm">Surface</div><div class="hx">#FFFFFF</div><div class="tk">--surface</div></div></div>
+  </div>
+
+  <div class="sub-title">Text ramp</div>
+  <div class="grid cols-4">
+    <div class="sw"><div class="chip" style="background:var(--ink)"></div><div class="meta"><div class="nm">Ink (headings)</div><div class="hx">#16202E</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--text)"></div><div class="meta"><div class="nm">Body</div><div class="hx">#3A3D44</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--text-muted)"></div><div class="meta"><div class="nm">Muted</div><div class="hx">#7C7F86</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--text-faint)"></div><div class="meta"><div class="nm">Faint</div><div class="hx">#A6A8AE</div></div></div>
+  </div>
+</section>
+
+<!-- ============ TYPE ============ -->
+<section>
+  <div class="sec-label">Foundations</div>
+  <h2 class="sec-title">Typography</h2>
+  <p class="sec-intro">A serif for everything the user is meant to <em>feel</em> — the greeting, session titles, the things they've imagined. A clean sans for everything that's machinery — navigation, labels, buttons, status. The two never blur.</p>
+
+  <div class="stack">
+    <div class="spec"><div class="lbl">Source Serif 4 · 600 · --fs-display · greeting</div><div class="t-display">Good morning, Margaret</div></div>
+    <div class="spec"><div class="lbl">Source Serif 4 · 600 · --fs-title · session titles</div><div class="t-title">What you want to keep — and leave behind</div></div>
+    <div class="spec"><div class="lbl">Inter · 700 · --fs-section · section headers &amp; card labels</div><div class="t-section">Your steps in this stage</div></div>
+    <div class="spec"><div class="lbl">Inter · 400 · --fs-body · body copy (min 16px for reading content)</div><div class="t-body">Picture a specific day — who's around, what you do, what the day actually feels like. Often the first time someone pictures retirement rather than just thinking about it.</div></div>
+    <div class="spec"><div class="lbl">Inter · 500 · --fs-sm · descriptions &amp; secondary</div><div class="t-sm">Map a week that feels right — what stays constant, what changes?</div></div>
+    <div class="spec"><div class="lbl">Inter · 600 · --fs-eyebrow · UPPERCASE overline</div><div class="eyebrow">Your next step</div></div>
+  </div>
+
+  <div class="sub-title">Scale</div>
+  <div class="panel">
+    <div class="scale-row"><span class="k">--fs-display 34</span><span class="t-display" style="font-size:34px">Greeting</span></div>
+    <div class="scale-row"><span class="k">--fs-h2 22</span><span class="t-h2">Hero next-step title</span></div>
+    <div class="scale-row"><span class="k">--fs-title 20</span><span class="t-title">Session card title</span></div>
+    <div class="scale-row"><span class="k">--fs-section 18</span><span class="t-section">Section heading</span></div>
+    <div class="scale-row"><span class="k">--fs-body 16</span><span class="t-body">Body — reading content</span></div>
+    <div class="scale-row"><span class="k">--fs-sm 14</span><span class="t-sm">Secondary / descriptions</span></div>
+    <div class="scale-row"><span class="k">--fs-label 12.5</span><span style="font-size:12.5px;color:var(--text-muted)">Nav subtitle / small label</span></div>
+  </div>
+</section>
+
+<!-- ============ RADIUS / ELEVATION / SPACING ============ -->
+<section>
+  <div class="sec-label">Foundations</div>
+  <h2 class="sec-title">Radius, elevation &amp; spacing</h2>
+  <div class="grid cols-3">
+    <div class="panel">
+      <div class="sub-title" style="margin-top:0">Radius</div>
+      <div class="row">
+        <div style="width:64px;height:48px;background:var(--brand-primary-tint);border-radius:var(--r-sm)"></div>
+        <div style="width:64px;height:48px;background:var(--brand-primary-tint);border-radius:var(--r-md)"></div>
+        <div style="width:64px;height:48px;background:var(--brand-primary-tint);border-radius:var(--r-lg)"></div>
+        <div style="width:48px;height:48px;background:var(--brand-primary-tint);border-radius:var(--r-pill)"></div>
+      </div>
+      <div class="note">sm 10 · md 14 (cards) · lg 18 (hero) · pill (badges, avatar, bars)</div>
+    </div>
+    <div class="panel">
+      <div class="sub-title" style="margin-top:0">Elevation</div>
+      <div class="row">
+        <div style="width:90px;height:56px;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-sm)"></div>
+        <div style="width:90px;height:56px;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-md)"></div>
+      </div>
+      <div class="note">Cards use <strong>sm</strong>. Only the active step and hero lift to <strong>md</strong>.</div>
+    </div>
+    <div class="panel">
+      <div class="sub-title" style="margin-top:0">Spacing · 4px base</div>
+      <div class="row" style="align-items:flex-end;gap:6px">
+        <div style="width:16px;background:var(--accent);height:8px"></div>
+        <div style="width:16px;background:var(--accent);height:16px"></div>
+        <div style="width:16px;background:var(--accent);height:24px"></div>
+        <div style="width:16px;background:var(--accent);height:32px"></div>
+        <div style="width:16px;background:var(--accent);height:48px"></div>
+        <div style="width:16px;background:var(--accent);height:64px"></div>
+      </div>
+      <div class="note">8 · 16 · 24 · 32 · 48 · 64 — card padding is 20–24.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BUTTONS ============ -->
+<section>
+  <div class="sec-label">Components</div>
+  <h2 class="sec-title">Buttons</h2>
+  <p class="sec-intro">Navy is the standard primary action. Orange is used <em>only</em> on the current step's "Continue". A button is at least 48px tall.</p>
+  <div class="panel row" style="gap:18px">
+    <button class="btn btn-navy">Continue <span>→</span></button>
+    <button class="btn btn-accent">Continue <span>→</span></button>
+    <button class="btn btn-ghost">Back to home</button>
+    <button class="btn-link">View full progress <span>›</span></button>
+  </div>
+  <div class="note warn"><strong>Accessibility:</strong> the bright accent <code>#E06F1F</code> with white text only passes AA for large text. Button fills use <code>--accent-strong #B85C16</code> (shown above) so the white label meets 4.5:1. Keep the bright <code>--accent</code> for borders, the active dot, and surfaces — not behind small white text.</div>
+</section>
+
+<!-- ============ BADGES & CHIPS ============ -->
+<section>
+  <div class="sec-label">Components</div>
+  <h2 class="sec-title">Status, badges &amp; chips</h2>
+  <div class="panel row" style="gap:16px">
+    <span class="badge badge-complete">Complete ✓</span>
+    <span class="badge badge-notstarted">Not started</span>
+    <button class="btn btn-accent" style="min-height:42px;padding:10px 16px;font-size:14px">Continue →</button>
+    <span class="chip-time">🕐 15 min</span>
+    <span class="eyebrow">Your programme</span>
+  </div>
+  <div class="note">A session's status is shown by exactly one control: <strong>Complete</strong> (green outline), an <strong>orange Continue</strong> (the one active step), or <strong>Not started</strong> (grey, inert).</div>
+</section>
+
+<!-- ============ STAGE STEPPER + RADIAL + BAR ============ -->
+<section>
+  <div class="sec-label">Components</div>
+  <h2 class="sec-title">Progress</h2>
+  <div class="stack">
+    <div class="panel">
+      <div class="sub-title" style="margin-top:0">Five-stage arc</div>
+      <div class="steps">
+        <div class="step done"><div class="dot">✓</div><div class="cap">Imagine</div></div>
+        <div class="step active"><div class="dot">2</div><div class="cap">Explore</div></div>
+        <div class="step todo"><div class="dot">3</div><div class="cap">Understand</div></div>
+        <div class="step todo"><div class="dot">4</div><div class="cap">Plan</div></div>
+        <div class="step todo"><div class="dot">5</div><div class="cap">Act</div></div>
+      </div>
+    </div>
+    <div class="row" style="gap:24px;align-items:stretch">
+      <div class="panel" style="display:flex;align-items:center;gap:18px">
+        <div class="radial-wrap"><div class="radial" style="--p:38"><span>38%</span></div></div>
+        <div style="font-size:14px;color:var(--text-muted);max-width:24ch">Clarity score — navy fill on a neutral track. Rewards reflection, not speed.</div>
+      </div>
+      <div class="panel" style="flex:1;min-width:240px">
+        <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:8px">2 of 4 steps complete</div>
+        <div class="bar"><i style="width:50%"></i></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ NAV ============ -->
+<section>
+  <div class="sec-label">Components</div>
+  <h2 class="sec-title">Sidebar navigation</h2>
+  <div class="panel" style="display:inline-block;background:transparent;border:none;box-shadow:none;padding:0">
+    <div class="navlist">
+      <div class="nav is-active"><div class="n">1</div><div><div class="t">Imagine</div><div class="s">Picture your future</div></div></div>
+      <div class="nav is-idle"><div class="n n--idle">2</div><div><div class="t">Explore</div><div class="s">Discover possibilities</div></div></div>
+      <div class="nav is-idle"><div class="n n--idle">3</div><div><div class="t">Understand</div><div class="s">Know your options</div></div></div>
+    </div>
+  </div>
+  <div class="note">Active item: navy-tint background, solid navy numeral. Idle: pale numeral, no background. Subtitle is muted and always present.</div>
+</section>
+
+<!-- ============ HERO ============ -->
+<section>
+  <div class="sec-label">Components</div>
+  <h2 class="sec-title">Coach “next step” hero</h2>
+  <p class="sec-intro">The emotional centre of the dashboard: Vita speaks, references what the user shared, and hands them their single next step. Warm cream body, soft illustrated scene, navy action.</p>
+  <div class="hero">
+    <div class="body">
+      <div class="vita"><div class="sun">☀️</div><div class="name">Vita</div></div>
+      <div class="coachpill">Your retirement coach</div>
+      <p class="intro">Based on what you've shared so far, having freedom in your mornings and time outdoors matters to you.</p>
+      <div class="ns-eyebrow">Your next step</div>
+      <div class="ns-title">Your ideal week</div>
+      <div class="row" style="gap:14px"><span class="chip-time">🕐 15 min</span></div>
+      <div style="margin-top:18px"><button class="btn btn-navy">Continue →</button></div>
+    </div>
+    <div class="scene"><div class="cloud"></div><div class="ball"></div></div>
+  </div>
+</section>
+
+<!-- ============ STAGE PROGRESS CARD ============ -->
+<section>
+  <div class="sec-label">Components</div>
+  <h2 class="sec-title">Stage progress card</h2>
+  <div class="spc">
+    <div class="sun">☀️</div>
+    <div>
+      <h4>Stage 1 of 5 · Imagine your future</h4>
+      <p>Picture your future in a way that feels real and inspiring.</p>
+    </div>
+    <div class="prog">
+      <div class="pl">2 of 4 steps complete</div>
+      <div class="bar"><i style="width:50%"></i></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SESSION CARDS ============ -->
+<section>
+  <div class="sec-label">Components</div>
+  <h2 class="sec-title">Session cards</h2>
+  <p class="sec-intro">Three states. Only one card in the whole list is active at a time — it gets the cream surface, the warm border, the lift, and the orange Continue.</p>
+  <div class="stack">
+    <div class="scard">
+      <div class="thumb sunrise"></div>
+      <div><div class="title">A day in the life</div><div class="desc">Picture a specific day — who's around, what does the day feel like?</div></div>
+      <span class="chip-time">🕐 15 min</span>
+      <span class="badge badge-complete">Complete ✓</span>
+    </div>
+    <div class="scard is-active">
+      <div class="thumb cal"></div>
+      <div><div class="title">Your ideal week</div><div class="desc">Map a week that feels right — what stays constant, what changes?</div></div>
+      <span class="chip-time">🕐 15 min</span>
+      <button class="btn btn-accent" style="min-height:44px">Continue →</button>
+    </div>
+    <div class="scard">
+      <div class="thumb mtn"></div>
+      <div><div class="title">Hopes and fears</div><div class="desc">What are you most looking forward to — and what quietly worries you?</div></div>
+      <span class="chip-time">🕐 15 min</span>
+      <span class="badge badge-notstarted">Not started</span>
+    </div>
+    <div class="scard">
+      <div class="thumb roles"></div>
+      <div><div class="title">The roles you want to play</div><div class="desc">Partner, grandparent, creator, mentor — which roles feel most important?</div></div>
+      <span class="chip-time">🕐 15 min</span>
+      <span class="badge badge-notstarted">Not started</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INFO CARD ============ -->
+<section>
+  <div class="sec-label">Components</div>
+  <h2 class="sec-title">Encouragement card</h2>
+  <div class="info">
+    <div class="av">🌀</div>
+    <div>
+      <h4>You're building something meaningful</h4>
+      <p>Vita will help you step back and review your picture before you move on to the next stage.</p>
+    </div>
+    <a class="btn-link lk">About your journey →</a>
+  </div>
+  <div class="note">Lavender info surface — used for orientation and reassurance, never for actions the user must take. Quiet by design.</div>
+</section>
+
+<!-- ============ BUBBLES ============ -->
+<section>
+  <div class="sec-label">Components · extends the system</div>
+  <h2 class="sec-title">Conversation bubbles</h2>
+  <p class="sec-intro">Not shown in the dashboard mock — derived from the same palette for the session screen. Vita speaks in warm cream; the user replies in bordered white. One question at a time.</p>
+  <div class="bubbles">
+    <div class="b-coach">A single day gives us a snapshot. A week gives us a rhythm. When you picture a really good week in retirement — what's the one thing you'd want every week to have in it?</div>
+    <div class="b-user">Probably a long walk somewhere green. And no alarm clock.</div>
+    <div class="b-coach">The walk and the no-alarm both point at the same thing — mornings that belong to you. Hold onto that. Is that every day, or are there days you'd happily get up early for?</div>
+  </div>
+</section>
+
+<!-- ============ PRINCIPLES ============ -->
+<section>
+  <div class="sec-label">Using the system</div>
+  <h2 class="sec-title">Six rules to hold the look together</h2>
+  <div class="panel">
+    <div class="t-body" style="margin-bottom:12px"><strong style="color:var(--ink)">1. Orange is the cursor.</strong> Exactly one orange element on screen — the current step. Everything done is navy; everything future is grey.</div>
+    <div class="t-body" style="margin-bottom:12px"><strong style="color:var(--ink)">2. Serif feels, sans functions.</strong> If a user is meant to feel it, it's serif. If it's a control or a label, it's sans.</div>
+    <div class="t-body" style="margin-bottom:12px"><strong style="color:var(--ink)">3. Cream is the coach.</strong> Warm surfaces appear only where Vita is present or speaking. The rest of the app is white.</div>
+    <div class="t-body" style="margin-bottom:12px"><strong style="color:var(--ink)">4. Lift is meaningful.</strong> Most cards sit flat with a hairline. Shadow signals "this is where you are."</div>
+    <div class="t-body" style="margin-bottom:12px"><strong style="color:var(--ink)">5. The band is theirs.</strong> The yellow header and logo are the provider's. Never put product chrome in the band.</div>
+    <div class="t-body"><strong style="color:var(--ink)">6. Calm, not clinical.</strong> Generous spacing, gentle illustration, no dense data, no progress shame.</div>
+  </div>
+</section>
+
+<p style="text-align:center;font-size:12px;color:var(--text-faint);margin-top:40px">RLP Companion — Design System v1.0 · Aviva reference theme · Powered by Chorus Life</p>
+
+</div>
+</body>
+</html>
