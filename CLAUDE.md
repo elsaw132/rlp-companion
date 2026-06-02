@@ -51,8 +51,14 @@ conversation works, not a production app. Built by a non-technical founder.
 
 ## Data conventions (localStorage)
 - Onboarding: key `rlp_onboarding_[userId]` → JSON `{ partner, horizon, motivation }`
+  (`motivation` is one of the four set values, or `null` if the user skipped)
 - Session conversations: key `rlp_session_[userId]_[sessionId]`
 - Keep these patterns consistent — later features read from them.
+
+## Terminology
+- The user-facing term for the short units within a stage is **"module"**, not
+  "session". (Internally the route is still `/session/[id]`, but all visible copy
+  and labels say "module".)
 
 ## Voice (applies to all user-facing copy, and to Vita)
 - Warm, curious, specific. Plain language. Sounds like someone genuinely
@@ -62,6 +68,7 @@ conversation works, not a production app. Built by a non-technical founder.
 - Never say: "that's wonderful", "great answer", "I hear you",
   "let's explore that together".
 - Vita is an AI coach, and is never implied to be human.
+- Vita's voice and method live in lib/coachBasePrompt.ts (COACH_BASE_PROMPT) — the single source of truth for how Vita talks. Don't edit or paraphrase it unless asked.
 
 ## Commands
 - `npm run dev` — start the dev server at http://localhost:3000
