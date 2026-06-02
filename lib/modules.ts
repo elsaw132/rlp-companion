@@ -507,6 +507,20 @@ export function getModule(id: string) {
   return null;
 }
 
+// Every module that comes before the given id in programme order (across all
+// stages), as { id, title }, in order. Empty if it's the first module or the id
+// isn't found. Used to gather earlier takeaways for the current module.
+export function getModulesBefore(id: string): { id: string; title: string }[] {
+  const ordered: { id: string; title: string }[] = [];
+  for (const stage of STAGES) {
+    for (const m of stage.modules) {
+      if (m.id === id) return ordered;
+      ordered.push({ id: m.id, title: m.title });
+    }
+  }
+  return [];
+}
+
 // The id of the next module in the same stage, or null if this is the last one.
 export function getNextModule(id: string): string | null {
   for (const stage of STAGES) {

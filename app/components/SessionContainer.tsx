@@ -21,6 +21,11 @@ import {
   getCompletedIds,
   markModuleComplete,
 } from "@/lib/progress";
+import {
+  buildPriorReflections,
+  hasPriorTakeaways,
+  saveTakeaway,
+} from "@/lib/takeaways";
 
 type ContentType = "text" | "video";
 
@@ -270,21 +275,17 @@ export default function SessionContainer({
     localStorage.setItem(storageKey, JSON.stringify(messages));
   }, [messages, storageKey, loadedKey]);
 
-  // Show the conversation. Modules with an interaction leave messages empty so
-  // the opening effect can generate Vita's first line from what they built;
-  // everything else seeds the module's fixed opening as the first bubble.
+  // Show the conversation. The opening effect seeds Vita's first message — a
+  // dynamic, drawn-from-context one when there's something to draw on, or the
+  // module's fixed line otherwise.
   function startConversation() {
     setPhase("conversation");
-    if (interaction) return;
-    setMessages((prev) =>
-      prev.length === 0 ? [{ role: "coach", text: coachOpening }] : prev
-    );
   }
 
-  // Generate Vita's first message for an interaction module: one model call
-  // with a hidden priming turn, asking her to react to what they built. The
-  // module's fixed coachOpening is the fallback if the call fails.
-  async function generateOpening(result: BuildResult) {
+  // Generate Vita's first message with one model call and a hidden priming turn:
+  // she reacts to what they built and/or draws on earlier modules. The module's
+  // fixed coachOpening is the fallback if the call fails.
+  async function generateOpening() {
     setSending(true);
     setError(null);
     try {
@@ -297,9 +298,9 @@ export default function SessionContainer({
           coachOpening,
           sessionInstructions: sessionInstructions ?? "",
           onboardingContext: buildOnboardingContext(user?.id),
-          priorReflections: "No earlier modules completed yet.",
+          priorReflections: buildPriorReflections(user?.id, sessionId),
           sessionContent: sessionContent ?? contentValue,
-          interactionSummary: summarizeBuild(result),
+          interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
         }),
       });
 
@@ -315,19 +316,67 @@ export default function SessionContainer({
     }
   }
 
-  // When an interaction module enters the conversation with no messages yet,
-  // generate Vita's dynamic opening exactly once.
+  // After a module completes, generate a short takeaway of what emerged and
+  // store it for later modules to draw on. Runs in the background, so it never
+  // blocks the done state. If generation fails, fall back to the interaction
+  // summary if there is one; otherwise store nothing.
+  async function generateAndStoreTakeaway(fullMessages: Message[]) {
+    if (!user) return;
+    const interactionSummary = buildResult ? summarizeBuild(buildResult) : "";
+
+    const store = (text: string) => {
+      if (!text.trim() || !user) return;
+      saveTakeaway(user.id, {
+        moduleId: sessionId,
+        moduleTitle: sessionTitle,
+        text: text.trim(),
+        savedAt: new Date().toISOString(),
+      });
+    };
+
+    try {
+      const res = await fetch("/api/takeaway", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: fullMessages,
+          moduleTitle: sessionTitle,
+          interactionSummary,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Takeaway request failed: ${res.status}`);
+
+      const data = (await res.json()) as { takeaway: string };
+      store(data.takeaway || interactionSummary);
+    } catch {
+      store(interactionSummary);
+    }
+  }
+
+  // Seed Vita's opening. Open dynamically whenever there's something to draw on
+  // — an interaction output OR earlier takeaways — otherwise use the fixed line.
+  async function seedOpening() {
+    if (buildResult || (user && hasPriorTakeaways(user.id, sessionId))) {
+      await generateOpening();
+    } else {
+      setMessages([{ role: "coach", text: coachOpening }]);
+    }
+  }
+
+  // When a module enters the conversation with no messages yet, seed Vita's
+  // opening exactly once.
   useEffect(() => {
     if (phase !== "conversation") return;
     if (messages.length > 0) return;
-    if (!interaction || !buildResult) return;
+    if (!user) return; // wait for Clerk to load the user before deciding
     if (openingRequested.current) return;
     openingRequested.current = true;
-    void generateOpening(buildResult);
-    // generateOpening reads current props/state but only ever runs once per
-    // mount, guarded by the ref above.
+    void seedOpening();
+    // seedOpening reads current props/state but only ever runs once per mount,
+    // guarded by the ref above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, messages.length, interaction, buildResult]);
+  }, [phase, messages.length, buildResult, user]);
 
   // After the reading: modules with an interaction go to the build step first;
   // everything else goes straight to the conversation.
@@ -371,7 +420,7 @@ export default function SessionContainer({
           coachOpening: actualOpening,
           sessionInstructions: sessionInstructions ?? "",
           onboardingContext: buildOnboardingContext(user?.id),
-          priorReflections: "No earlier modules completed yet.",
+          priorReflections: buildPriorReflections(user?.id, sessionId),
           sessionContent: sessionContent ?? contentValue,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
         }),
@@ -388,7 +437,11 @@ export default function SessionContainer({
         ? data.reply.replaceAll(MODULE_COMPLETE_MARKER, "").trimEnd()
         : data.reply;
 
-      setMessages([...conversation, { role: "coach", text: replyText }]);
+      const finalMessages: Message[] = [
+        ...conversation,
+        { role: "coach", text: replyText },
+      ];
+      setMessages(finalMessages);
 
       if (isClosing && user) {
         markModuleComplete(user.id, sessionId);
@@ -399,6 +452,9 @@ export default function SessionContainer({
         // Vita has signed off — return to the finished state even if they had
         // chosen to keep talking.
         setReopened(false);
+        // Capture the takeaway in the background — don't block the done state.
+        // Re-closing after "keep talking" regenerates and overwrites it.
+        void generateAndStoreTakeaway(finalMessages);
       }
     } catch {
       // Roll the user's bubble back off the conversation and hand their words

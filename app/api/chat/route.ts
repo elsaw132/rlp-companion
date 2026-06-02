@@ -46,7 +46,7 @@ function buildSystemPrompt(body: ChatRequest): string {
   if (body.isOpening) {
     sections.push(
       "",
-      "This is the very start of the conversation, and you are speaking first. Open with a short, warm first message that reacts to something specific in what they built (named above under WHAT THEY BUILT) and asks one question. No greeting, no preamble, no welcome — just engage directly with what they made."
+      "This is the very start of the conversation, and you are speaking first. Open with a short, warm first message and ask one question — no greeting, no preamble, no welcome. If this module had a build step, react to something specific in what they made (under WHAT THEY BUILT above). Otherwise, open by gently drawing on the picture they've built in earlier modules where it's relevant — following this module's own brief and tone. Engage directly; don't recap everything back to them."
     );
     return sections.join("\n");
   }
