@@ -1,5 +1,6 @@
+import Link from "next/link";
 import SessionContainer from "../../components/SessionContainer";
-import { getModule } from "@/lib/modules";
+import { getModule, getNextModule } from "@/lib/modules";
 
 export default async function SessionPage({
   params,
@@ -20,8 +21,20 @@ export default async function SessionPage({
   const { module: mod, stageNumber, stageName, totalStages, modulesInStage } =
     found;
 
+  // Next module in this stage, or back to the dashboard if this is the last one.
+  const nextId = getNextModule(mod.id);
+  const nextHref = nextId ? `/session/${nextId}` : "/home";
+
   return (
     <main style={{ minHeight: "100vh", background: "var(--bg-alt)" }}>
+      <style>{navCss}</style>
+
+      <div style={styles.navBar}>
+        <Link href="/home" className="ghost-link" style={styles.ghostLink}>
+          ← Your modules
+        </Link>
+      </div>
+
       <SessionContainer
         sessionId={mod.id}
         stageNumber={stageNumber}
@@ -37,11 +50,38 @@ export default async function SessionPage({
         coachOpening={mod.coachOpening}
         sessionInstructions={mod.sessionInstructions}
       />
+
+      <div style={{ ...styles.navBar, ...styles.navBarBottom }}>
+        <Link href={nextHref} className="ghost-link" style={styles.ghostLink}>
+          Next module →
+        </Link>
+      </div>
     </main>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  navBar: {
+    width: "100%",
+    maxWidth: "var(--content-max)",
+    margin: "0 auto",
+    padding: "20px 24px 0",
+    display: "flex",
+    justifyContent: "flex-start",
+  },
+  navBarBottom: {
+    paddingTop: "0",
+    paddingBottom: "48px",
+    justifyContent: "flex-end",
+  },
+  ghostLink: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    color: "var(--brand-primary)",
+    textDecoration: "none",
+    padding: "8px 4px",
+  },
   notFoundPage: {
     minHeight: "100vh",
     background: "var(--bg-alt)",
@@ -57,3 +97,12 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--ink)",
   },
 };
+
+const navCss = `
+  .ghost-link:hover { text-decoration: underline; }
+  .ghost-link:focus-visible {
+    outline: none;
+    border-radius: var(--r-sm);
+    box-shadow: var(--focus-ring);
+  }
+`;

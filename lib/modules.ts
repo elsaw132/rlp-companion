@@ -210,3 +210,15 @@ export function getModule(id: string) {
   }
   return null;
 }
+
+// The id of the next module in the same stage, or null if this is the last one.
+export function getNextModule(id: string): string | null {
+  for (const stage of STAGES) {
+    const index = stage.modules.findIndex((m) => m.id === id);
+    if (index !== -1) {
+      const next = stage.modules[index + 1];
+      return next ? next.id : null;
+    }
+  }
+  return null;
+}

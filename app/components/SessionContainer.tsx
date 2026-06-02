@@ -113,6 +113,7 @@ export default function SessionContainer({
   const [input, setInput] = useState("");
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const storageKey = user ? `rlp_session_${user.id}_${sessionId}` : null;
 
@@ -160,6 +161,7 @@ export default function SessionContainer({
     setMessages(conversation);
     setInput("");
     setSending(true);
+    setError(null);
 
     try {
       const res = await fetch("/api/chat", {
@@ -181,9 +183,12 @@ export default function SessionContainer({
       setMessages([...conversation, { role: "coach", text: data.reply }]);
     } catch {
       // Roll the user's bubble back off the conversation and hand their words
-      // back to the composer, so retrying doesn't post the message twice.
-      setMessages([...messages, { role: "coach", text: COACH_ERROR_REPLY }]);
+      // back to the composer, so retrying is clean. The error is a transient
+      // notice only — never added to the conversation or saved to localStorage,
+      // so it can't be replayed to the API as one of Vita's turns.
+      setMessages(messages);
       setInput(text);
+      setError(COACH_ERROR_REPLY);
     } finally {
       setSending(false);
     }
@@ -289,6 +294,12 @@ export default function SessionContainer({
             {sending && <TypingBubble />}
           </div>
 
+          {error && (
+            <div style={styles.errorNotice} role="status">
+              {error}
+            </div>
+          )}
+
           <div style={styles.composer}>
             <input
               type="text"
@@ -296,7 +307,10 @@ export default function SessionContainer({
               style={styles.input}
               placeholder="Type your message…"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (error) setError(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSend();
               }}
@@ -564,6 +578,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "var(--fs-body)",
     lineHeight: "var(--lh-body)",
     maxWidth: "380px",
+  },
+  errorNotice: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    color: "var(--text-muted)",
+    margin: "0 2px -6px",
   },
   composer: {
     display: "flex",
