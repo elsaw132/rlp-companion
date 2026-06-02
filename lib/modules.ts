@@ -20,7 +20,19 @@ export type RolePickerInteraction = {
   groups: { name: string; options: string[] }[];
 };
 
-export type Interaction = DayBuilderInteraction | RolePickerInteraction;
+// Sliders: set where an ideal week sits on a few spectrums, plus one small
+// single-select about seasonal variation.
+export type SlidersInteraction = {
+  type: "sliders";
+  instruction: string;
+  spectrums: { left: string; right: string }[];
+  seasonal: { prompt: string; options: string[] };
+};
+
+export type Interaction =
+  | DayBuilderInteraction
+  | RolePickerInteraction
+  | SlidersInteraction;
 
 // What the person actually built in an interaction step. Stored (as JSON) so
 // the conversation can show it back and a refresh keeps it. The union grows
@@ -40,7 +52,19 @@ export type RolePickerResult = {
   starred: string[];
 };
 
-export type BuildResult = DayBuilderResult | RolePickerResult;
+export type SlidersResult = {
+  type: "sliders";
+  // Each spectrum carries its own labels and the 0–100 position set, so the
+  // summary can be rendered from the result alone (no need for the interaction).
+  spectrums: { left: string; right: string; position: number }[];
+  // The seasonal question and the option chosen (null if left unanswered).
+  seasonal: { prompt: string; answer: string | null };
+};
+
+export type BuildResult =
+  | DayBuilderResult
+  | RolePickerResult
+  | SlidersResult;
 
 export type Module = {
   id: string;
@@ -265,26 +289,41 @@ WATCH FOR
         durationMin: 15,
         contentType: "text",
         contentValue: `[Placeholder — reading/video to come.] A single day shows what appeals to you; a whole week shows what sustains you. This module is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.`,
-        coachOpening: `A single day shows what appeals to you; a week shows what sustains you. Picture a good week in your retirement, across all seven days. To start broadly — are some days quite different from others, or do they tend to share a shape?`,
-        sessionInstructions: `PURPOSE OF THIS MODULE
-Help the person move beyond a single imagined day to the rhythm, balance, and structure they want their retirement to have. By the end they should have a clearer sense of how their time is spread across a typical week and how much routine, variety, and flexibility feels right.
+        coachOpening: `Here's the balance you've set for your ideal week. Picture a good week shaped like this — what does it actually look like?`,
+        interaction: {
+          type: "sliders",
+          instruction:
+            "Set where your ideal week sits on each of these — there's no right answer, just what feels like you.",
+          spectrums: [
+            { left: "Lots of routine", right: "Lots of spontaneity" },
+            { left: "Mostly on my own", right: "Mostly with others" },
+            { left: "Full and busy", right: "Slow and restful" },
+            { left: "Familiar and steady", right: "New and varied" },
+            { left: "Planned ahead", right: "Decided on the day" },
+          ],
+          seasonal: {
+            prompt: "Does your ideal week change much with the seasons?",
+            options: ["A lot", "A little", "Not really"],
+          },
+        },
+        sessionInstructions: `PURPOSE
+The person has set where their ideal week sits on a few spectrums about time, structure, and balance. Help them find the rhythm and balance they want — their relationship with time, not a calendar. This is a light Imagine-stage module — keep it short and stay on the shape of the week.
 
 HOW TO RUN IT
-- Connect to the day they imagined and the roles they named. Introduce the idea that a single day reveals what appeals to us, but a week reveals what sustains us. You are not building a timetable — you are finding the shape of the week through conversation.
-- Open broadly on their imagined week: are some days very different from others? do certain things happen regularly? what gives the week structure? what brings variety or spontaneity? is there time for joy, and for rest?
-- Help them weigh the balances: time alone versus with others, activity versus rest, planned commitments versus open space, familiar routines versus new experiences.
-- Once a broad rhythm has emerged, introduce that retirement may look different across the year, and invite them to consider seasonal variation — more time outdoors in summer, travel at certain times, different routines in winter.
-- As patterns emerge, offer them back and help them notice what seems most important.
-
-Note: you are not helping them design a calendar. You are helping them discover their relationship with time and with structure.
+- Open from where they set the sliders — read the balance back briefly and check it feels right.
+- Help them picture what a good week actually looks like given that balance: what stays regular, what brings variety, where the rest is, where the people are.
+- Watch for tensions in their settings (leaning toward routine and spontaneity at once, say) and surface them lightly as a question, not a verdict.
+- Bring in the seasonal answer they gave — how the week might shift across the year.
+- Keep it light: don't plan the week hour by hour, and don't branch into the roles they want, what they'd keep or leave, or hopes and fears — those are other modules.
+- Aim to reach your close within roughly four to six exchanges.
 
 CLOSING
-Name the rhythms, commitments, and freedoms that give their week its distinctive shape, and reiterate that each module builds on the last and their plan is growing in detail.
+Name what gives their week its shape — the rhythms, the balance of busy and restful, time alone and with others — in their words. Note this builds on the day and the roles, and that next you'll look at what they want to keep from their current life and what to leave behind.
 
 WATCH FOR
-- The "every day is Saturday" assumption — some imagine retirement as complete freedom with no commitments. Meet this with curiosity rather than challenge, and help them consider what might provide rhythm, purpose, or connection over time.
-- Over-scheduling — some recreate a working week in disguise, filling every day. Gently invite them to consider whether there's enough space for flexibility, rest, and spontaneity.
-- Welcome moments where they revise a first answer ("I thought I wanted… actually…"). That's a sign they're building new understanding, not just answering — encourage it.`,
+- The "every day is Saturday" pull — meet it with curiosity, and help them consider what gives the week rhythm and purpose.
+- Over-filling the week — gently check there's room for rest and spontaneity.
+- Welcome revisions ("I thought I wanted… actually…") — that's them building understanding.`,
       },
       {
         id: "1.4",
