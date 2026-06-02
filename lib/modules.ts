@@ -357,7 +357,13 @@ WATCH FOR
           type: "card-sort",
           instruction:
             "For each one, how much do you want it in your retirement?",
-          buckets: ["Want more of", "Keep as is", "Want less of", "Leave behind"],
+          buckets: [
+            "Want more of",
+            "Keep as is",
+            "Adapt it",
+            "Want less of",
+            "Leave behind",
+          ],
           cards: [
             "The daily routine and structure",
             "Colleagues and work friendships",
@@ -382,7 +388,7 @@ WATCH FOR
           ],
         },
         sessionInstructions: `PURPOSE
-The person has gone through parts of their current and working life and said how much they want each in retirement — more of it, about the same, less of it, or to leave it behind. Help them see retirement as both continuation and change, and understand what their work and current life actually provide. Still a light Imagine-stage module, but the material can be personal — go gently.
+The person has gone through parts of their current and working life and said how much they want each in retirement — more of it, about the same, kept but in a changed form, less of it, or to leave it behind. Help them see retirement as both continuation and change, and understand what their work and current life actually provide. Still a light Imagine-stage module, but the material can be personal — go gently.
 
 HOW TO RUN IT
 - Open from what they chose. Start with something they want to keep or have more of, and ask what it really gives them.
