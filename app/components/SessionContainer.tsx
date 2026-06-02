@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import DayBuilder, {
   DayBuilderSummary,
@@ -24,6 +24,11 @@ type ContentType = "text" | "video";
 // It's stripped before display and before storage, so it never shows and never
 // re-enters the conversation history.
 const MODULE_COMPLETE_MARKER = "[[MODULE_COMPLETE]]";
+
+// A hidden user turn that only exists to make Vita speak first when generating
+// her dynamic opening. It is never rendered as a bubble or saved — it lives in
+// the API request alone.
+const OPENING_PRIMER = "(I've just finished the activity — please open.)";
 
 // The readable sentence Vita reads, derived from whatever they built. Switches
 // on interaction type so each future type can describe its own result.
@@ -182,6 +187,9 @@ export default function SessionContainer({
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Guards the one-time dynamic-opening call so it can't fire twice (e.g. under
+  // React's double-invoked effects in development).
+  const openingRequested = useRef(false);
   // What they built in the interaction step — shown back to them and summarised
   // for Vita.
   const [buildResult, setBuildResult] = useState<BuildResult | null>(null);
@@ -232,9 +240,9 @@ export default function SessionContainer({
         setMessages(saved);
         setPhase("conversation");
       } else if (savedBuild) {
-        // They finished the build last time but hadn't started talking — seed
-        // Vita's opening and drop them into the conversation.
-        setMessages([{ role: "coach", text: coachOpening }]);
+        // They finished the build last time but hadn't started talking. Drop
+        // them into the conversation with no messages yet — the opening effect
+        // generates Vita's first line from what they built.
         setPhase("conversation");
       }
     } catch {
@@ -249,13 +257,64 @@ export default function SessionContainer({
     localStorage.setItem(storageKey, JSON.stringify(messages));
   }, [messages, storageKey, loadedKey]);
 
-  // Seed Vita's opening as the first bubble and show the conversation.
+  // Show the conversation. Modules with an interaction leave messages empty so
+  // the opening effect can generate Vita's first line from what they built;
+  // everything else seeds the module's fixed opening as the first bubble.
   function startConversation() {
     setPhase("conversation");
+    if (interaction) return;
     setMessages((prev) =>
       prev.length === 0 ? [{ role: "coach", text: coachOpening }] : prev
     );
   }
+
+  // Generate Vita's first message for an interaction module: one model call
+  // with a hidden priming turn, asking her to react to what they built. The
+  // module's fixed coachOpening is the fallback if the call fails.
+  async function generateOpening(result: BuildResult) {
+    setSending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", text: OPENING_PRIMER }],
+          isOpening: true,
+          coachOpening,
+          sessionInstructions: sessionInstructions ?? "",
+          onboardingContext: buildOnboardingContext(user?.id),
+          priorReflections: "No earlier modules completed yet.",
+          sessionContent: sessionContent ?? contentValue,
+          interactionSummary: summarizeBuild(result),
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Opening request failed: ${res.status}`);
+
+      const data = (await res.json()) as { reply: string };
+      const text = data.reply.replaceAll(MODULE_COMPLETE_MARKER, "").trim();
+      setMessages([{ role: "coach", text: text || coachOpening }]);
+    } catch {
+      setMessages([{ role: "coach", text: coachOpening }]);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // When an interaction module enters the conversation with no messages yet,
+  // generate Vita's dynamic opening exactly once.
+  useEffect(() => {
+    if (phase !== "conversation") return;
+    if (messages.length > 0) return;
+    if (!interaction || !buildResult) return;
+    if (openingRequested.current) return;
+    openingRequested.current = true;
+    void generateOpening(buildResult);
+    // generateOpening reads current props/state but only ever runs once per
+    // mount, guarded by the ref above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, messages.length, interaction, buildResult]);
 
   // After the reading: modules with an interaction go to the build step first;
   // everything else goes straight to the conversation.
@@ -285,13 +344,18 @@ export default function SessionContainer({
     setSending(true);
     setError(null);
 
+    // The opening can be Vita's dynamically generated first line, so tell the
+    // API what she actually said rather than the fixed fallback.
+    const actualOpening =
+      messages.find((m) => m.role === "coach")?.text ?? coachOpening;
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: conversation,
-          coachOpening,
+          coachOpening: actualOpening,
           sessionInstructions: sessionInstructions ?? "",
           onboardingContext: buildOnboardingContext(user?.id),
           priorReflections: "No earlier modules completed yet.",

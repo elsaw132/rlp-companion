@@ -289,7 +289,7 @@ WATCH FOR
         durationMin: 15,
         contentType: "text",
         contentValue: `[Placeholder — reading/video to come.] A single day shows what appeals to you; a whole week shows what sustains you. This module is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.`,
-        coachOpening: `Here's the balance you've set for your ideal week. Picture a good week shaped like this — what does it actually look like?`,
+        coachOpening: `Here's the balance you've set for your ideal week. Which of these did you feel most strongly about?`,
         interaction: {
           type: "sliders",
           instruction:

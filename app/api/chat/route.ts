@@ -17,6 +17,9 @@ type ChatRequest = {
   // interaction step (e.g. the day builder). Empty/omitted when the module
   // has no interaction.
   interactionSummary?: string;
+  // True only for the one call that generates Vita's first message, where she
+  // opens by reacting to what they built rather than using a fixed line.
+  isOpening?: boolean;
 };
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -38,6 +41,14 @@ function buildSystemPrompt(body: ChatRequest): string {
 
   if (body.interactionSummary && body.interactionSummary.trim()) {
     sections.push("", "WHAT THEY BUILT IN THIS MODULE:", body.interactionSummary);
+  }
+
+  if (body.isOpening) {
+    sections.push(
+      "",
+      "This is the very start of the conversation, and you are speaking first. Open with a short, warm first message that reacts to something specific in what they built (named above under WHAT THEY BUILT) and asks one question. No greeting, no preamble, no welcome — just engage directly with what they made."
+    );
+    return sections.join("\n");
   }
 
   sections.push(
