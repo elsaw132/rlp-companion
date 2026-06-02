@@ -19,15 +19,59 @@ type SessionContainerProps = {
   modulesCompleted: number;
   sessionTitle: string;
   sessionDescription: string;
+  durationMin: number;
   contentType: ContentType;
   contentValue: string;
   coachOpening: string;
+  // Wired into the page in a later step. Until then sessionContent falls back
+  // to contentValue and there are no module-specific instructions.
+  sessionContent?: string;
+  sessionInstructions?: string;
 };
 
-const COACH_PLACEHOLDER_REPLY = "[coach reply will go here]";
+const COACH_ERROR_REPLY =
+  "Sorry — something went wrong reaching Vita. Please try again in a moment.";
 
-// No duration prop exists yet — placeholder until one is added.
-const PLACEHOLDER_DURATION = "5 min";
+type OnboardingAnswers = {
+  partner?: string;
+  horizon?: string;
+  motivation?: string | null;
+};
+
+// Turn the saved onboarding answers into a short sentence Vita can read.
+function buildOnboardingContext(userId?: string): string {
+  if (!userId) return "Nothing recorded yet.";
+
+  let answers: OnboardingAnswers = {};
+  try {
+    const raw = localStorage.getItem(`rlp_onboarding_${userId}`);
+    if (raw) answers = JSON.parse(raw) as OnboardingAnswers;
+  } catch {
+    return "Nothing recorded yet.";
+  }
+
+  const parts: string[] = [];
+
+  if (answers.partner === "Me and my partner") {
+    parts.push("They're planning their retirement with a partner");
+  } else if (answers.partner === "Just me") {
+    parts.push("They're planning their retirement on their own");
+  }
+
+  if (answers.horizon === "Not sure") {
+    parts.push("they're not yet sure how far off retirement is");
+  } else if (answers.horizon) {
+    parts.push(`retirement is roughly ${answers.horizon} away`);
+  }
+
+  let sentence = parts.length ? parts.join(", ") + "." : "";
+
+  if (answers.motivation) {
+    sentence += `${sentence ? " " : ""}What prompted them to start: ${answers.motivation.toLowerCase()}.`;
+  }
+
+  return sentence.trim() || "Nothing recorded yet.";
+}
 
 function youtubeEmbedUrl(url: string): string {
   try {
@@ -55,22 +99,30 @@ export default function SessionContainer({
   modulesCompleted,
   sessionTitle,
   sessionDescription,
+  durationMin,
   contentType,
   contentValue,
   coachOpening,
+  sessionContent,
+  sessionInstructions,
 }: SessionContainerProps) {
   const { user } = useUser();
 
   const [revealed, setRevealed] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [loaded, setLoaded] = useState(false);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   const storageKey = user ? `rlp_session_${user.id}_${sessionId}` : null;
 
-  // Load any saved conversation once the user is known.
-  useEffect(() => {
-    if (!storageKey) return;
+  // Load any saved conversation as soon as the user (and so the key) is known.
+  // We read during render rather than in an effect so the first paint already
+  // has the saved messages — no empty-then-refill second render. The setLoadedKey
+  // guard makes this run exactly once per key. localStorage is browser-only, so
+  // skip it during server rendering.
+  if (storageKey && storageKey !== loadedKey && typeof window !== "undefined") {
+    setLoadedKey(storageKey);
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
@@ -83,14 +135,14 @@ export default function SessionContainer({
     } catch {
       // ignore corrupt data — start fresh
     }
-    setLoaded(true);
-  }, [storageKey]);
+  }
 
-  // Persist the conversation after every change.
+  // Persist the conversation after every change, but only once we've loaded any
+  // existing conversation for this key (otherwise we'd overwrite it with []).
   useEffect(() => {
-    if (!storageKey || !loaded) return;
+    if (!storageKey || storageKey !== loadedKey) return;
     localStorage.setItem(storageKey, JSON.stringify(messages));
-  }, [messages, storageKey, loaded]);
+  }, [messages, storageKey, loadedKey]);
 
   // Open the conversation, seeding Vita's opening as the first bubble.
   function handleReveal() {
@@ -100,15 +152,41 @@ export default function SessionContainer({
     );
   }
 
-  function handleSend() {
+  async function handleSend() {
     const text = input.trim();
-    if (!text) return;
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text },
-      { role: "coach", text: COACH_PLACEHOLDER_REPLY },
-    ]);
+    if (!text || sending) return;
+
+    const conversation: Message[] = [...messages, { role: "user", text }];
+    setMessages(conversation);
     setInput("");
+    setSending(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: conversation,
+          coachOpening,
+          sessionInstructions: sessionInstructions ?? "",
+          onboardingContext: buildOnboardingContext(user?.id),
+          priorReflections: "No earlier modules completed yet.",
+          sessionContent: sessionContent ?? contentValue,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Chat request failed: ${res.status}`);
+
+      const data = (await res.json()) as { reply: string };
+      setMessages([...conversation, { role: "coach", text: data.reply }]);
+    } catch {
+      // Roll the user's bubble back off the conversation and hand their words
+      // back to the composer, so retrying doesn't post the message twice.
+      setMessages([...messages, { role: "coach", text: COACH_ERROR_REPLY }]);
+      setInput(text);
+    } finally {
+      setSending(false);
+    }
   }
 
   const isVideo = contentType === "video";
@@ -157,7 +235,7 @@ export default function SessionContainer({
           </span>
           <span style={styles.durationChip}>
             <span aria-hidden="true">🕐</span>
-            {PLACEHOLDER_DURATION}
+            {durationMin} min
           </span>
         </div>
 
@@ -208,6 +286,7 @@ export default function SessionContainer({
                 <UserBubble key={i} text={m.text} />
               )
             )}
+            {sending && <TypingBubble />}
           </div>
 
           <div style={styles.composer}>
@@ -241,6 +320,18 @@ function CoachBubble({ text }: { text: string }) {
   return (
     <div style={styles.coachRow}>
       <div style={styles.coachBubble}>{text}</div>
+    </div>
+  );
+}
+
+function TypingBubble() {
+  return (
+    <div style={styles.coachRow}>
+      <div style={{ ...styles.coachBubble, ...styles.typingBubble }}>
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+      </div>
     </div>
   );
 }
@@ -453,6 +544,12 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: "85%",
     textAlign: "left",
   },
+  typingBubble: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    padding: "18px",
+  },
   userRow: {
     display: "flex",
     justifyContent: "flex-end",
@@ -511,5 +608,19 @@ const focusCss = `
   .composer-input:focus-visible {
     border-color: var(--brand-primary);
     box-shadow: var(--focus-ring);
+  }
+  .typing-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    display: inline-block;
+    animation: typing-bounce 1.2s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes typing-bounce {
+    0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+    30% { opacity: 1; transform: translateY(-3px); }
   }
 `;

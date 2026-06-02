@@ -1,10 +1,5 @@
 import SessionContainer from "../../components/SessionContainer";
-
-const DUMMY_CONTENT =
-  "Most people picture retirement as a single event — a date in the diary, a " +
-  "leaving card, the last commute. But it's really a long stretch of ordinary " +
-  "days, and what fills those days is yours to decide. As you read, notice " +
-  "which part of it you find yourself lingering on.";
+import { getModule } from "@/lib/modules";
 
 export default async function SessionPage({
   params,
@@ -12,22 +7,53 @@ export default async function SessionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const found = getModule(id);
+
+  if (!found) {
+    return (
+      <main style={styles.notFoundPage}>
+        <p style={styles.notFoundText}>Module not found</p>
+      </main>
+    );
+  }
+
+  const { module: mod, stageNumber, stageName, totalStages, modulesInStage } =
+    found;
 
   return (
     <main style={{ minHeight: "100vh", background: "var(--bg-alt)" }}>
       <SessionContainer
-        sessionId={id}
-        stageNumber={1}
-        totalStages={5}
-        stageName="Imagine"
-        modulesInStage={6}
-        modulesCompleted={1}
-        sessionTitle="Your everyday, reimagined"
-        sessionDescription="A short read, then a conversation about the shape of your days."
-        contentType="text"
-        contentValue={DUMMY_CONTENT}
-        coachOpening="Good to be back. Which part of that did you find yourself lingering on?"
+        sessionId={mod.id}
+        stageNumber={stageNumber}
+        totalStages={totalStages}
+        stageName={stageName}
+        modulesInStage={modulesInStage}
+        modulesCompleted={0}
+        sessionTitle={mod.title}
+        sessionDescription={mod.description}
+        durationMin={mod.durationMin}
+        contentType={mod.contentType}
+        contentValue={mod.contentValue}
+        coachOpening={mod.coachOpening}
+        sessionInstructions={mod.sessionInstructions}
       />
     </main>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  notFoundPage: {
+    minHeight: "100vh",
+    background: "var(--bg-alt)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "48px 24px",
+  },
+  notFoundText: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-h2)",
+    fontWeight: 600,
+    color: "var(--ink)",
+  },
+};
