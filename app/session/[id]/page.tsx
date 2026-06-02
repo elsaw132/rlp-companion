@@ -53,8 +53,8 @@ export default async function SessionPage({
         sessionInstructions={mod.sessionInstructions}
       />
 
-      <div style={{ ...styles.navBar, ...styles.navBarBottom }}>
-        <Link href={nextHref} className="ghost-link" style={styles.ghostLink}>
+      <div style={styles.nextWrap}>
+        <Link href={nextHref} className="next-button" style={styles.nextButton}>
           Next module →
         </Link>
       </div>
@@ -72,10 +72,31 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
   },
-  navBarBottom: {
-    paddingTop: "0",
-    paddingBottom: "48px",
-    justifyContent: "flex-end",
+  nextWrap: {
+    width: "100%",
+    maxWidth: "var(--content-max)",
+    margin: "0 auto",
+    padding: "8px 24px 48px",
+    display: "flex",
+    justifyContent: "center",
+  },
+  nextButton: {
+    width: "100%",
+    maxWidth: "320px",
+    minHeight: "48px",
+    boxSizing: "border-box",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "var(--brand-primary)",
+    color: "var(--brand-on-primary)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-body)",
+    fontWeight: 600,
+    borderRadius: "var(--r-sm)",
+    padding: "13px 20px",
+    textDecoration: "none",
+    boxShadow: "var(--shadow-sm)",
   },
   ghostLink: {
     fontFamily: "var(--font-sans)",
@@ -106,6 +127,11 @@ const navCss = `
   .ghost-link:focus-visible {
     outline: none;
     border-radius: var(--r-sm);
+    box-shadow: var(--focus-ring);
+  }
+  .next-button:hover { background: var(--brand-primary-hover); }
+  .next-button:focus-visible {
+    outline: none;
     box-shadow: var(--focus-ring);
   }
 `;
