@@ -7,6 +7,10 @@ import DayBuilder, {
   DayBuilderSummary,
   dayBuilderSummaryText,
 } from "./DayBuilder";
+import RolePicker, {
+  RolePickerSummary,
+  rolePickerSummaryText,
+} from "./RolePicker";
 import type { Interaction, BuildResult } from "@/lib/modules";
 import {
   getCompletedIds,
@@ -26,6 +30,8 @@ function summarizeBuild(result: BuildResult): string {
   switch (result.type) {
     case "day-builder":
       return dayBuilderSummaryText(result);
+    case "role-picker":
+      return rolePickerSummaryText(result);
     default:
       return "";
   }
@@ -39,6 +45,9 @@ function InteractionSummary({ result }: { result: BuildResult }) {
   switch (result.type) {
     case "day-builder":
       body = <DayBuilderSummary result={result} />;
+      break;
+    case "role-picker":
+      body = <RolePickerSummary result={result} />;
       break;
     default:
       body = null;
@@ -498,6 +507,8 @@ function InteractionStep({
   switch (interaction.type) {
     case "day-builder":
       return <DayBuilder interaction={interaction} onFinish={onFinish} />;
+    case "role-picker":
+      return <RolePicker interaction={interaction} onFinish={onFinish} />;
     default:
       return (
         <section style={styles.placeholderStep}>[interaction coming soon]</section>

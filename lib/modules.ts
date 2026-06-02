@@ -12,7 +12,15 @@ export type DayBuilderInteraction = {
   categories: { name: string; activities: string[] }[];
 };
 
-export type Interaction = DayBuilderInteraction;
+// A role picker: choose meaningful roles from grouped options, star a few as
+// most alive.
+export type RolePickerInteraction = {
+  type: "role-picker";
+  instruction: string;
+  groups: { name: string; options: string[] }[];
+};
+
+export type Interaction = DayBuilderInteraction | RolePickerInteraction;
 
 // What the person actually built in an interaction step. Stored (as JSON) so
 // the conversation can show it back and a refresh keeps it. The union grows
@@ -24,7 +32,15 @@ export type DayBuilderResult = {
   assigned: Record<string, string[]>;
 };
 
-export type BuildResult = DayBuilderResult;
+export type RolePickerResult = {
+  type: "role-picker";
+  // Roles selected, in the order they were picked.
+  picked: string[];
+  // The subset starred as most alive (up to three).
+  starred: string[];
+};
+
+export type BuildResult = DayBuilderResult | RolePickerResult;
 
 export type Module = {
   id: string;
@@ -180,23 +196,66 @@ WATCH FOR
         durationMin: 15,
         contentType: "text",
         contentValue: `[Placeholder — reading/video to come.] A day is made of activities, but a life is shaped by the roles we play — partner, friend, grandparent, mentor, maker, and more. This module is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.`,
-        coachOpening: `Last time you pictured a day; now let's think about who you want to be in it. A retirement life is shaped as much by the roles we play as by what we do — partner, grandparent, mentor, maker, traveller, and plenty more. Which role feels most alive to you when you imagine your retirement?`,
-        sessionInstructions: `PURPOSE OF THIS MODULE
-Help the person identify the roles and identities they want to carry into retirement or take up for the first time. By the end they should have a clearer sense of who they want to be in retirement, not just how they want to spend their time.
+        coachOpening: `Here are the roles you've picked out. Let's start with one that feels most alive to you right now — what draws you to it?`,
+        interaction: {
+          type: "role-picker",
+          instruction:
+            "Pick the roles that feel most alive to you — then star the two or three that matter most right now.",
+          groups: [
+            {
+              name: "Relationships",
+              options: [
+                "Partner",
+                "Parent",
+                "Grandparent",
+                "Friend",
+                "Sibling",
+                "Neighbour",
+                "Carer",
+                "Host",
+              ],
+            },
+            {
+              name: "Contribution",
+              options: [
+                "Mentor",
+                "Volunteer",
+                "Helper",
+                "Leader",
+                "Adviser",
+                "Campaigner",
+              ],
+            },
+            {
+              name: "Growth & expression",
+              options: [
+                "Learner",
+                "Creator or maker",
+                "Traveller",
+                "Sportsperson or team player",
+                "Performer",
+                "Storyteller",
+                "Gardener",
+              ],
+            },
+          ],
+        },
+        sessionInstructions: `PURPOSE
+The person has chosen the roles that feel meaningful to them and starred a few as most alive. Help them understand who they want to be in retirement, not just how they'll spend time. This is a light Imagine-stage module — keep it short and stay on the roles.
 
 HOW TO RUN IT
-- Open by briefly connecting to the day they pictured last time, then introduce that a retirement day is made of activities but a retirement life is shaped by roles — and that retirement is a chance to choose which parts of themselves to express more fully.
-- Offer a range of possible roles as examples, not a checklist: partner, friend, grandparent, mentor, learner, volunteer, sports or team player, creator, host, traveller, carer, community member. Invite them to add roles of their own.
-- Invite them to name the roles that feel most attractive, meaningful, or energising. Take each chosen role one at a time, asking what appeals about it and how it might show up in everyday life.
-- Help them tell the difference between an activity and the role underneath it — a wish to travel may be the role of explorer; helping grandchildren may be the role of mentor, guide, or carer.
-- Once you've been through several, offer back the patterns you notice and invite them to say which roles feel most important, most established, or newly emerging.
+- Open from their starred roles. Take those first, one at a time: what appeals about it, and how it might show up in an ordinary week.
+- Help them tell the difference between an activity and the role beneath it (wanting to travel may be the role of explorer; helping grandchildren may be mentor, guide, or carer).
+- Offer back the thread connecting their roles, and invite them to confirm or adjust.
+- Keep it light: a couple of roles explored, not all of them. Don't go deep into specific plans, and don't branch into their ideal week, what they'd keep or leave, or hopes and fears — those are other modules.
+- Aim to reach your close within roughly four to six exchanges.
 
 CLOSING
-Name a small number of roles that seem likely to give their retirement shape and meaning, in their words, and note the thread that connects them.
+Name a small number of roles likely to give their retirement shape and meaning, in their words, and the thread connecting them. Note this builds on the day they pictured, and that next you'll look at the rhythm of their ideal week.
 
 WATCH FOR
-- Activities described as roles — stay curious and gently get underneath them without correcting or challenging.
-- Some people struggle to see past their professional identity — help them find other roles they've played across life, without implying that work roles are unimportant or should be abandoned.`,
+- Activities chosen as if they were roles — get underneath them gently, without correcting.
+- Someone who can only see their professional identity — help them find other roles they've played across life, without implying work roles don't matter.`,
       },
       {
         id: "1.3",
