@@ -3,8 +3,11 @@
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import DayBuilder from "./DayBuilder";
-import type { Interaction } from "@/lib/modules";
+import DayBuilder, {
+  DayBuilderSummary,
+  dayBuilderSummaryText,
+} from "./DayBuilder";
+import type { Interaction, BuildResult } from "@/lib/modules";
 import {
   getCompletedIds,
   markModuleComplete,
@@ -16,6 +19,32 @@ type ContentType = "text" | "video";
 // It's stripped before display and before storage, so it never shows and never
 // re-enters the conversation history.
 const MODULE_COMPLETE_MARKER = "[[MODULE_COMPLETE]]";
+
+// The readable sentence Vita reads, derived from whatever they built. Switches
+// on interaction type so each future type can describe its own result.
+function summarizeBuild(result: BuildResult): string {
+  switch (result.type) {
+    case "day-builder":
+      return dayBuilderSummaryText(result);
+    default:
+      return "";
+  }
+}
+
+// The read-only recap shown above Vita's first message, kept visible for the
+// whole conversation. Switches on type, like the interaction renderer; the
+// neutral card wrapper is shared across types.
+function InteractionSummary({ result }: { result: BuildResult }) {
+  let body: React.ReactNode;
+  switch (result.type) {
+    case "day-builder":
+      body = <DayBuilderSummary result={result} />;
+      break;
+    default:
+      body = null;
+  }
+  return <section style={styles.summaryCard}>{body}</section>;
+}
 
 type Message = {
   role: "coach" | "user";
@@ -138,8 +167,9 @@ export default function SessionContainer({
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Readable summary of what they built in the interaction step, sent to Vita.
-  const [buildSummary, setBuildSummary] = useState<string | null>(null);
+  // What they built in the interaction step — shown back to them and summarised
+  // for Vita.
+  const [buildResult, setBuildResult] = useState<BuildResult | null>(null);
   // Whether this module is finished, and how many in the stage are finished.
   const [completed, setCompleted] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
@@ -167,13 +197,17 @@ export default function SessionContainer({
     );
     if (completedIds.includes(sessionId)) setCompleted(true);
 
-    let savedBuild: string | null = null;
+    let savedBuild: BuildResult | null = null;
     try {
-      savedBuild = localStorage.getItem(buildKey);
+      const raw = localStorage.getItem(buildKey);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === "object" && "type" in parsed) {
+        savedBuild = parsed as BuildResult;
+      }
     } catch {
       savedBuild = null;
     }
-    if (savedBuild) setBuildSummary(savedBuild);
+    if (savedBuild) setBuildResult(savedBuild);
 
     try {
       const raw = localStorage.getItem(storageKey);
@@ -218,11 +252,11 @@ export default function SessionContainer({
     }
   }
 
-  // The person finished the build step. Save the summary so a refresh keeps it,
+  // The person finished the build step. Save the result so a refresh keeps it,
   // then open the conversation.
-  function handleBuildFinish(summary: string) {
-    setBuildSummary(summary);
-    if (buildKey) localStorage.setItem(buildKey, summary);
+  function handleBuildFinish(result: BuildResult) {
+    setBuildResult(result);
+    if (buildKey) localStorage.setItem(buildKey, JSON.stringify(result));
     startConversation();
   }
 
@@ -247,7 +281,7 @@ export default function SessionContainer({
           onboardingContext: buildOnboardingContext(user?.id),
           priorReflections: "No earlier modules completed yet.",
           sessionContent: sessionContent ?? contentValue,
-          interactionSummary: buildSummary ?? "",
+          interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
         }),
       });
 
@@ -370,6 +404,11 @@ export default function SessionContainer({
         />
       )}
 
+      {/* ZONE 2.75 — WHAT THEY BUILT (kept visible through the conversation) */}
+      {phase === "conversation" && interaction && buildResult && (
+        <InteractionSummary result={buildResult} />
+      )}
+
       {/* ZONE 3 — VITA + CONVERSATION */}
       {phase === "conversation" && (
         <section style={styles.conversationZone}>
@@ -454,7 +493,7 @@ function InteractionStep({
   onFinish,
 }: {
   interaction: Interaction;
-  onFinish: (summary: string) => void;
+  onFinish: (result: BuildResult) => void;
 }) {
   switch (interaction.type) {
     case "day-builder":
@@ -641,6 +680,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-sm)",
     color: "var(--text-muted)",
+  },
+  summaryCard: {
+    background: "var(--bg)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-lg)",
+    padding: "20px 24px",
+    boxShadow: "var(--shadow-sm)",
   },
 
   // ZONE 3 — Vita + conversation

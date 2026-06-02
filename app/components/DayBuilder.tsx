@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { DayBuilderInteraction } from "@/lib/modules";
+import type { DayBuilderInteraction, DayBuilderResult } from "@/lib/modules";
 
 // Emoji stand-ins for activity images. Unknown activities (including the
 // person's own additions) fall back to a neutral dot.
@@ -65,18 +65,22 @@ function iconFor(activity: string): string {
   return ACTIVITY_ICONS[activity] ?? "•";
 }
 
+// The parts of the day they actually filled in, in the day's natural order.
+function filledParts(result: DayBuilderResult): string[] {
+  return result.parts.filter((part) => (result.assigned[part]?.length ?? 0) > 0);
+}
+
 // Turn the assembled day into the readable sentence Vita opens from. Empty
 // parts are skipped, e.g. "Morning: Slow breakfast, Run. Evening: Family."
-function buildSummary(parts: string[], assigned: Record<string, string[]>): string {
-  return parts
-    .filter((part) => (assigned[part]?.length ?? 0) > 0)
-    .map((part) => `${part}: ${assigned[part].join(", ")}.`)
+export function dayBuilderSummaryText(result: DayBuilderResult): string {
+  return filledParts(result)
+    .map((part) => `${part}: ${result.assigned[part].join(", ")}.`)
     .join(" ");
 }
 
 type DayBuilderProps = {
   interaction: DayBuilderInteraction;
-  onFinish: (summary: string) => void;
+  onFinish: (result: DayBuilderResult) => void;
 };
 
 export default function DayBuilder({ interaction, onFinish }: DayBuilderProps) {
@@ -224,7 +228,9 @@ export default function DayBuilder({ interaction, onFinish }: DayBuilderProps) {
             ...(total === 0 ? styles.finishButtonDisabled : null),
           }}
           disabled={total === 0}
-          onClick={() => onFinish(buildSummary(parts, assigned))}
+          onClick={() =>
+            onFinish({ type: "day-builder", parts, assigned })
+          }
         >
           Talk it through with Vita →
         </button>
@@ -273,6 +279,79 @@ export default function DayBuilder({ interaction, onFinish }: DayBuilderProps) {
     </section>
   );
 }
+
+// Read-only recap of the built day, shown above Vita's first message and kept
+// visible through the conversation. Same icon + label chips as the builder,
+// but inert. The neutral card wrapper is provided by the caller.
+export function DayBuilderSummary({ result }: { result: DayBuilderResult }) {
+  return (
+    <>
+      <p style={summaryStyles.heading}>Your day</p>
+      <div style={summaryStyles.grid}>
+        {filledParts(result).map((part) => (
+          <div key={part} style={summaryStyles.column}>
+            <p style={summaryStyles.partName}>{part}</p>
+            <div style={summaryStyles.chipWrap}>
+              {result.assigned[part].map((activity) => (
+                <span key={activity} style={summaryStyles.chip}>
+                  <span aria-hidden="true">{iconFor(activity)}</span>
+                  {activity}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+const summaryStyles: Record<string, React.CSSProperties> = {
+  heading: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 700,
+    color: "var(--ink)",
+    margin: "0 0 14px",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "16px",
+  },
+  column: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+  },
+  partName: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    color: "var(--text-muted)",
+    margin: 0,
+  },
+  chipWrap: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+  },
+  chip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    background: "var(--bg-alt)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-pill)",
+    padding: "6px 12px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 500,
+    color: "var(--text)",
+  },
+};
 
 const styles: Record<string, React.CSSProperties> = {
   wrap: {

@@ -14,6 +14,18 @@ export type DayBuilderInteraction = {
 
 export type Interaction = DayBuilderInteraction;
 
+// What the person actually built in an interaction step. Stored (as JSON) so
+// the conversation can show it back and a refresh keeps it. The union grows
+// alongside Interaction as new types are added.
+export type DayBuilderResult = {
+  type: "day-builder";
+  parts: string[];
+  // Part name (e.g. "Morning") → the activities they put there, in order.
+  assigned: Record<string, string[]>;
+};
+
+export type BuildResult = DayBuilderResult;
+
 export type Module = {
   id: string;
   title: string;
