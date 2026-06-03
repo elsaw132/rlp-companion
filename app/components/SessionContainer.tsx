@@ -21,7 +21,7 @@ import QualitiesPicker, {
   qualitiesPickerSummaryText,
 } from "./QualitiesPicker";
 import type { InteractionMode } from "./InteractionShell";
-import type { Interaction, BuildResult } from "@/lib/modules";
+import type { ContentBlock, Interaction, BuildResult } from "@/lib/modules";
 import {
   getCompletedIds,
   markModuleComplete,
@@ -31,8 +31,6 @@ import {
   hasPriorTakeaways,
   saveTakeaway,
 } from "@/lib/takeaways";
-
-type ContentType = "text" | "video";
 
 // Vita appends this to her closing message so we know the module is finished.
 // It's stripped before display and before storage, so it never shows and never
@@ -126,11 +124,11 @@ type SessionContainerProps = {
   sessionTitle: string;
   sessionDescription: string;
   durationMin: number;
-  contentType: ContentType;
-  contentValue: string;
+  // The primer shown before the conversation, as ordered text/video blocks.
+  primer: ContentBlock[];
   coachOpening: string;
   // Wired into the page in a later step. Until then sessionContent falls back
-  // to contentValue and there are no module-specific instructions.
+  // to the primer's text, and there are no module-specific instructions.
   sessionContent?: string;
   sessionInstructions?: string;
   // Optional build step shown between the reading and the conversation. When
@@ -210,14 +208,20 @@ export default function SessionContainer({
   sessionTitle,
   sessionDescription,
   durationMin,
-  contentType,
-  contentValue,
+  primer,
   coachOpening,
   sessionContent,
   sessionInstructions,
   interaction,
 }: SessionContainerProps) {
   const { user } = useUser();
+
+  // The readable text Vita draws on — the primer's text blocks, joined. Video
+  // blocks have no readable text, so they're skipped.
+  const primerText = primer
+    .filter((b): b is Extract<ContentBlock, { type: "text" }> => b.type === "text")
+    .map((b) => b.value)
+    .join("\n\n");
 
   // Where the person is in the module: the reading, the build step (only for
   // modules with an interaction), the conversation, then optionally back into
@@ -331,7 +335,7 @@ export default function SessionContainer({
           sessionInstructions: sessionInstructions ?? "",
           onboardingContext: buildOnboardingContext(user?.id),
           priorReflections: buildPriorReflections(user?.id, sessionId),
-          sessionContent: sessionContent ?? contentValue,
+          sessionContent: sessionContent ?? primerText,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
         }),
       });
@@ -485,7 +489,7 @@ export default function SessionContainer({
           sessionInstructions: sessionInstructions ?? "",
           onboardingContext: buildOnboardingContext(user?.id),
           priorReflections: buildPriorReflections(user?.id, sessionId),
-          sessionContent: sessionContent ?? contentValue,
+          sessionContent: sessionContent ?? primerText,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
           editAcknowledgement,
         }),
@@ -538,10 +542,17 @@ export default function SessionContainer({
     }
   }
 
-  const isVideo = contentType === "video";
-  const labelIcon = isVideo ? "🎬" : "📖";
-  const labelText = isVideo ? "Watch this" : "Read this";
-  const gateLabel = isVideo ? "I've watched this →" : "I've read this →";
+  // Label and gate wording flex with the primer's makeup: text-only reads,
+  // video-only watches, and any mix gets neutral "Continue" wording.
+  const allText = primer.every((b) => b.type === "text");
+  const allVideo = primer.every((b) => b.type === "video");
+  const labelIcon = allVideo ? "🎬" : "📖";
+  const labelText = allVideo ? "Watch this" : allText ? "Read this" : "Take a look";
+  const gateLabel = allVideo
+    ? "I've watched this →"
+    : allText
+      ? "I've read this →"
+      : "Continue →";
 
   return (
     <div style={styles.container}>
@@ -588,18 +599,22 @@ export default function SessionContainer({
           </span>
         </div>
 
-        {isVideo ? (
-          <div style={styles.videoFrame}>
-            <iframe
-              src={youtubeEmbedUrl(contentValue)}
-              title={sessionTitle || "Session video"}
-              style={styles.videoIframe}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-        ) : (
-          <p style={styles.bodyText}>{contentValue}</p>
+        {primer.map((block, i) =>
+          block.type === "video" ? (
+            <div key={i} style={styles.videoFrame}>
+              <iframe
+                src={youtubeEmbedUrl(block.url)}
+                title={sessionTitle || "Session video"}
+                style={styles.videoIframe}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          ) : (
+            <p key={i} style={styles.bodyText}>
+              {block.value}
+            </p>
+          )
         )}
 
         {phase === "reading" && (

@@ -54,8 +54,7 @@ export default async function SessionPage({
         sessionTitle={mod.title}
         sessionDescription={mod.description}
         durationMin={mod.durationMin}
-        contentType={mod.contentType}
-        contentValue={mod.contentValue}
+        primer={mod.primer}
         coachOpening={mod.coachOpening}
         sessionInstructions={mod.sessionInstructions}
         interaction={mod.interaction}

@@ -1,7 +1,7 @@
 // Stage and module content for the RLP Companion.
-// User-facing fields: title, description, contentType, contentValue, coachOpening.
+// User-facing fields: title, description, primer (ordered text/video blocks), coachOpening.
 // Private field (Vita only, never shown to the user): sessionInstructions.
-// Readings/videos are placeholders for now — replace contentValue when the real content is ready.
+// Readings/videos are placeholders for now — replace the primer blocks when the real content is ready.
 
 // An optional step between the reading and the conversation, where the person
 // builds something Vita then opens from. Only "day-builder" exists so far; the
@@ -105,13 +105,21 @@ export type BuildResult =
   | KeepLeaveGainResult
   | QualitiesPickerResult;
 
+// A single block in a module's primer — the content shown before the
+// conversation. Primers are an ordered list, so any mix is possible:
+// text→video, video→text, text→video→text, and so on. A plain text-only or
+// video-only primer is just a one-block list.
+export type ContentBlock =
+  | { type: "text"; value: string }
+  | { type: "video"; url: string };
+
 export type Module = {
   id: string;
   title: string;
   description: string;
   durationMin: number;
-  contentType: "text" | "video";
-  contentValue: string;
+  // The primer shown before the conversation, rendered in order.
+  primer: ContentBlock[];
   coachOpening: string;
   sessionInstructions: string;
   interaction?: Interaction;
@@ -163,8 +171,13 @@ export const STAGES: Stage[] = [
         description:
           "A guided picture of one ordinary day in your future — a Tuesday in October, a few years from now.",
         durationMin: 15,
-        contentType: "text",
-        contentValue: `[Placeholder — the short intro video and reading for this module are still to come.] Before you can plan a retirement, it helps to be able to picture one. Not the big milestones — just an ordinary day. In a moment, Vita will walk you through one: a Tuesday in October, a few years from now. There are no right answers, and nothing to work out.`,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — the short intro video and reading for this module are still to come.] Before you can plan a retirement, it helps to be able to picture one. Not the big milestones — just an ordinary day. In a moment, Vita will walk you through one: a Tuesday in October, a few years from now. There are no right answers, and nothing to work out.`,
+          },
+          { type: "video", url: "https://www.youtube.com/watch?v=SvEeJigbOwo" },
+        ],
         coachOpening: `Here's the day you've put together. Let's talk it through — looking at the whole thing, which part are you most looking forward to?`,
         interaction: {
           type: "day-builder",
@@ -285,8 +298,12 @@ WATCH FOR
         description:
           "Beyond what you'll do — who you want to be. The roles that give your retirement shape and meaning.",
         durationMin: 15,
-        contentType: "text",
-        contentValue: `[Placeholder — reading/video to come.] A day is made of activities, but a life is shaped by the roles we play — partner, friend, grandparent, mentor, maker, and more. This module is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.`,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — reading/video to come.] A day is made of activities, but a life is shaped by the roles we play — partner, friend, grandparent, mentor, maker, and more. This module is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.`,
+          },
+        ],
         coachOpening: `Here are the roles you've picked out. Let's start with one that feels most alive to you right now — what draws you to it?`,
         interaction: {
           type: "role-picker",
@@ -356,8 +373,12 @@ WATCH FOR
         description:
           "A day is a snapshot; a week is a rhythm. The shape, balance, and pace you want across your time.",
         durationMin: 15,
-        contentType: "text",
-        contentValue: `[Placeholder — reading/video to come.] A single day shows what appeals to you; a whole week shows what sustains you. This module is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.`,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — reading/video to come.] A single day shows what appeals to you; a whole week shows what sustains you. This module is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.`,
+          },
+        ],
         coachOpening: `Here's the balance you've set for your ideal week. Which of these did you feel most strongly about?`,
         interaction: {
           type: "sliders",
@@ -400,8 +421,12 @@ WATCH FOR
         description:
           "Retirement as continuation and change — what you'll carry forward, and what you're ready to set down.",
         durationMin: 15,
-        contentType: "text",
-        contentValue: `[Placeholder — reading/video to come.] Retirement is a change, but it's also a continuation. This module is about what you'd like to carry forward from your working life, what you're ready to leave behind, and what's been missing that you'd like to make room for.`,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — reading/video to come.] Retirement is a change, but it's also a continuation. This module is about what you'd like to carry forward from your working life, what you're ready to leave behind, and what's been missing that you'd like to make room for.`,
+          },
+        ],
         coachOpening: `Here's what you'd keep, leave, and make space for. Let's start with what you'd be most reluctant to lose — what does one of those give you?`,
         interaction: {
           type: "keep-leave-gain",
@@ -483,8 +508,12 @@ WATCH FOR
         description:
           "Both sides of the picture — what you're hoping for and what you're worried about, held with equal weight.",
         durationMin: 15,
-        contentType: "text",
-        contentValue: `[Placeholder — reading/video to come.] Most people come to retirement with a mix of excitement and worry — and both are worth taking seriously. This module makes space for your hopes and your fears side by side, with neither one rushed or talked away.`,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — reading/video to come.] Most people come to retirement with a mix of excitement and worry — and both are worth taking seriously. This module makes space for your hopes and your fears side by side, with neither one rushed or talked away.`,
+          },
+        ],
         coachOpening: `Retirement is one of life's big shifts, and it's completely normal to feel a mix of excitement and worry about it — we'll make room for both here. Let's start with the hopes: when you picture your retirement, what are you most looking forward to?`,
         sessionInstructions: `PURPOSE
 Help the person explore both the opportunities and the uncertainties they associate with retirement, recognising that hopes and fears often reveal what matters most. By the end they should have a clearer sense of what they're moving towards, what concerns them, and what these feelings point to about their priorities.
@@ -511,8 +540,12 @@ WATCH FOR
         description:
           "Zooming out from what you'll do to who you'll be — an integrated picture of yourself in retirement.",
         durationMin: 15,
-        contentType: "text",
-        contentValue: `[Placeholder — reading/video to come.] You've pictured the days, the roles, the rhythm, and the hopes. This last module in Imagine steps back to the person at the centre of it all — the version of yourself you're becoming.`,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — reading/video to come.] You've pictured the days, the roles, the rhythm, and the hopes. This last module in Imagine steps back to the person at the centre of it all — the version of yourself you're becoming.`,
+          },
+        ],
         coachOpening: `You've picked out a few qualities that feel like the person you want to grow into. Picture yourself a few years from now, living as that person — where do you notice one of those showing up?`,
         interaction: {
           type: "qualities-picker",
