@@ -117,11 +117,22 @@ export type Module = {
   interaction?: Interaction;
 };
 
+// A brief framing moment shown once, the first time a stage becomes the user's
+// current stage — what this stage is for, in Vita's voice. Optional: only
+// stages with real copy show one. body is rendered as separate paragraphs.
+export type StageIntro = {
+  heading: string;
+  body: string[];
+  buttonLabel: string;
+};
+
 export type Stage = {
   number: number;
   name: string;
   // One-line label shown under the stage name in the sidebar nav.
   subtitle: string;
+  // Shown once on first forward entry into the stage; omit until copy exists.
+  intro?: StageIntro;
   modules: Module[];
 };
 
@@ -136,6 +147,15 @@ export const STAGES: Stage[] = [
     number: 1,
     name: "Imagine",
     subtitle: "Picture your future",
+    intro: {
+      heading: "Let's start by imagining",
+      body: [
+        "Before you can plan a retirement, it helps to be able to picture one. These first few modules are for exactly that — getting a vivid sense of what your retirement could actually look like.",
+        "There's no right answer here, and nothing to get perfect. This is a first sketch — something you'll come back to, deepen, and reshape as you move through the later stages.",
+        "Take the modules in any order, at whatever pace suits you.",
+      ],
+      buttonLabel: "Let's begin",
+    },
     modules: [
       {
         id: "1.1",

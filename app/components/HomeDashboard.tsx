@@ -11,8 +11,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { STAGES, TOTAL_STAGES } from "@/lib/modules";
-import { getCompletedIds } from "@/lib/progress";
+import { getCompletedIds, getActiveStageNumber } from "@/lib/progress";
+import { getStageIntrosSeen, markStageIntroSeen } from "@/lib/stageIntro";
 import { getTakeaway } from "@/lib/takeaways";
+import StageIntro from "./StageIntro";
 
 // The soft illustrated thumbnail per module, by position within the stage —
 // matches the order in the reference (sunrise, roles, cal, keep, mtn, future).
@@ -38,17 +40,48 @@ export default function HomeDashboard() {
   // The stage the person is currently looking at. null means "follow the current
   // stage"; clicking a finished stage (in the nav or the arc) pins it to a number.
   const [viewedStage, setViewedStage] = useState<number | null>(null);
+  // The stage number whose intro to show as a full-screen framing moment before
+  // the dashboard, or null. Set once on load, when the current stage has an
+  // intro the person hasn't seen yet (first forward entry only).
+  const [introStage, setIntroStage] = useState<number | null>(null);
 
   // Read completion once Clerk resolves the user. Done during render (not an
   // effect) so the first client paint matches the server (empty), then fills in.
   // localStorage and the time-based greeting are browser-only, so guard for it.
   if (user && !loaded && typeof window !== "undefined") {
     setLoaded(true);
-    setCompleted(getCompletedIds(user.id));
+    const ids = getCompletedIds(user.id);
+    setCompleted(ids);
     setGreeting(greetingWord());
     setHasStage1Summary(
       localStorage.getItem(`rlp_stage1_summary_${user.id}`) !== null
     );
+    // Show the current stage's intro once, the first time it's the active stage.
+    // Tying it to the current stage (not the viewed one) means navigating back to
+    // a finished stage never re-triggers it, and anyone already past a stage
+    // won't suddenly see that stage's intro.
+    const currentStage = getActiveStageNumber(ids);
+    const stage = STAGES.find((s) => s.number === currentStage);
+    if (stage?.intro && !getStageIntrosSeen(user.id).includes(currentStage)) {
+      setIntroStage(currentStage);
+    }
+  }
+
+  // The framing moment takes over the screen before anything else. Continuing
+  // records it as seen so it never shows again, then reveals the dashboard.
+  if (introStage !== null) {
+    const stage = STAGES.find((s) => s.number === introStage);
+    if (stage) {
+      return (
+        <StageIntro
+          stage={stage}
+          onContinue={() => {
+            if (user) markStageIntroSeen(user.id, introStage);
+            setIntroStage(null);
+          }}
+        />
+      );
+    }
   }
 
   const firstName = user?.firstName || user?.fullName?.split(" ")[0] || "there";
@@ -63,11 +96,7 @@ export default function HomeDashboard() {
 
   // The stage the person is "on": the one holding the next step, or — if every
   // built module is complete — the first stage that isn't fully finished.
-  const firstUnfinished = STAGES.find(
-    (s) => !(s.modules.length > 0 && s.modules.every((m) => completed.includes(m.id)))
-  );
-  const activeStageNumber =
-    nextModule?.stageNumber ?? firstUnfinished?.number ?? TOTAL_STAGES;
+  const activeStageNumber = getActiveStageNumber(completed);
   const activeStage =
     STAGES.find((s) => s.number === activeStageNumber) ?? STAGES[0];
 
