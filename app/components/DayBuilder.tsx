@@ -238,10 +238,14 @@ export default function DayBuilder({
 
       <FinishControls
         mode={mode}
-        disabled={total === 0}
+        disabled={total < 3}
         onFinish={() => onFinish({ type: "day-builder", parts, assigned })}
         onCancel={onCancel}
-        hint={total === 0 ? "Add at least one thing to your day." : undefined}
+        hint={
+          total < 3
+            ? "Picture a few moments from the day — maybe something from the morning, the afternoon, and the evening. Add at least three to begin."
+            : undefined
+        }
       />
 
       {/* Part picker — appears after tapping an activity */}
