@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ProviderBand from "../components/ProviderBand";
 import { markOnboardingComplete } from "@/lib/onboarding";
+import { getPreferredName, setPreferredName } from "@/lib/displayName";
 
 type Answers = {
   partner: string;
@@ -35,9 +36,19 @@ export default function OnboardingPage() {
 
   const [step, setStep] = useState(1);
   const [understood, setUnderstood] = useState(false);
+  const [name, setName] = useState("");
+  const [nameInit, setNameInit] = useState(false);
   const [partner, setPartner] = useState("");
   const [horizon, setHorizon] = useState("");
   const [motivation, setMotivation] = useState("");
+
+  // Pre-fill the name field once Clerk resolves: any preferred name they've
+  // already set, else Clerk's firstName. Leaves it blank when there's nothing —
+  // the field is optional and the greeting falls back gracefully.
+  if (user && !nameInit) {
+    setNameInit(true);
+    setName(getPreferredName(user.id) || user.firstName || "");
+  }
 
   function save(answers: Partial<Answers>) {
     if (!user) return;
@@ -78,9 +89,14 @@ export default function OnboardingPage() {
         <div className="column">
           {step === 1 && (
             <Welcome
+              name={name}
+              setName={setName}
               understood={understood}
               setUnderstood={setUnderstood}
-              onContinue={() => setStep(2)}
+              onContinue={() => {
+                if (user && name.trim()) setPreferredName(user.id, name.trim());
+                setStep(2);
+              }}
             />
           )}
 
@@ -139,10 +155,14 @@ export default function OnboardingPage() {
 }
 
 function Welcome({
+  name,
+  setName,
   understood,
   setUnderstood,
   onContinue,
 }: {
+  name: string;
+  setName: (v: string) => void;
   understood: boolean;
   setUnderstood: (v: boolean) => void;
   onContinue: () => void;
@@ -174,6 +194,21 @@ function Welcome({
           advice — what Vita&apos;s good at is asking the right questions and
           helping you make sense of your own answers.
         </p>
+
+        <div className="name-field">
+          <label className="name-label" htmlFor="preferred-name">
+            First — what should I call you?
+          </label>
+          <input
+            id="preferred-name"
+            type="text"
+            className="name-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="The name you'd like me to use"
+            autoComplete="given-name"
+          />
+        </div>
 
         <label className="checkbox-row">
           <input
@@ -283,6 +318,12 @@ const css = `
 .rlp-onb .hero-heading{font-family:var(--font-serif);font-size:var(--fs-display);font-weight:600;color:var(--ink);line-height:1.2;margin:0 0 18px}
 .rlp-onb .step-heading{font-family:var(--font-serif);font-size:var(--fs-h2);font-weight:600;color:var(--ink);line-height:1.3;margin:0 0 26px}
 .rlp-onb .paragraph{font-family:var(--font-sans);font-size:var(--fs-body);line-height:var(--lh-body);color:var(--text);margin:0 0 18px;max-width:58ch}
+
+.rlp-onb .name-field{display:flex;flex-direction:column;gap:8px;margin:0 0 20px}
+.rlp-onb .name-label{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;color:var(--ink)}
+.rlp-onb .name-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;min-height:52px;font-family:var(--font-sans);font-size:var(--fs-body);color:var(--text);box-sizing:border-box;transition:border-color .15s ease,box-shadow .15s ease}
+.rlp-onb .name-input:hover{border-color:var(--border-strong)}
+.rlp-onb .name-input:focus-visible{border-color:var(--brand-primary);box-shadow:var(--focus-ring)}
 
 .rlp-onb .checkbox-row{display:flex;align-items:flex-start;gap:12px;margin:8px 0 26px;cursor:pointer;background:var(--warm-surface-2);border:1px solid var(--warm-line);border-radius:var(--r-md);padding:14px 16px}
 .rlp-onb .checkbox-row input{width:20px;height:20px;margin-top:1px;accent-color:var(--brand-primary);flex-shrink:0;cursor:pointer}

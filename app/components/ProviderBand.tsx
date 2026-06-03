@@ -6,17 +6,13 @@
 // All text/icons on the band are navy (--brand-on-band).
 
 import { useUser } from "@clerk/nextjs";
+import { getDisplayName } from "@/lib/displayName";
 
 // The provider whose brand the band carries. This is the one piece that swaps
 // per provider; the brand colours (yellow band, navy) stay as they are.
 const PROVIDER_NAME = "Lionsgate Pensions";
 
 type ClerkUser = ReturnType<typeof useUser>["user"];
-
-function firstNameOf(user: ClerkUser): string {
-  if (!user) return "";
-  return user.firstName || user.fullName?.split(" ")[0] || "";
-}
 
 // The avatar initials: first + last initial, falling back to the first initial
 // alone, then the first letter of the email if there's no name at all.
@@ -33,7 +29,7 @@ function initialsOf(user: ClerkUser): string {
 
 export default function ProviderBand() {
   const { user } = useUser();
-  const name = firstNameOf(user);
+  const name = getDisplayName(user?.id, user);
   const initials = initialsOf(user);
 
   return (

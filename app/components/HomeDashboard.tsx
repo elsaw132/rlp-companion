@@ -13,6 +13,7 @@ import { useUser } from "@clerk/nextjs";
 import { STAGES, TOTAL_STAGES } from "@/lib/modules";
 import { getCompletedIds, getActiveStageNumber } from "@/lib/progress";
 import { isOnboardingComplete } from "@/lib/onboarding";
+import { getDisplayName } from "@/lib/displayName";
 import { getStageIntrosSeen, markStageIntroSeen } from "@/lib/stageIntro";
 import { getTakeaway } from "@/lib/takeaways";
 import StageIntro from "./StageIntro";
@@ -33,6 +34,9 @@ export default function HomeDashboard() {
   const router = useRouter();
   const [completed, setCompleted] = useState<string[]>([]);
   const [greeting, setGreeting] = useState("Good morning");
+  // The resolved name for the greeting, or null when none is known — in which
+  // case the greeting shows the time of day alone, never "there".
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   // Whether the Stage 1 picture has been generated and confirmed (saved under
   // rlp_stage1_summary_[userId]). Controls whether the Imagine view shows the
@@ -79,6 +83,7 @@ export default function HomeDashboard() {
     const ids = getCompletedIds(user.id);
     setCompleted(ids);
     setGreeting(greetingWord());
+    setDisplayName(getDisplayName(user.id, user));
     setHasStage1Summary(
       localStorage.getItem(`rlp_stage1_summary_${user.id}`) !== null
     );
@@ -109,8 +114,6 @@ export default function HomeDashboard() {
       );
     }
   }
-
-  const firstName = user?.firstName || user?.fullName?.split(" ")[0] || "there";
 
   // Every module in programme order, tagged with its stage number.
   const allModules = STAGES.flatMap((s) =>
@@ -262,7 +265,8 @@ export default function HomeDashboard() {
           <div className="col">
             {/* GREETING */}
             <h1 className="greeting">
-              {greeting}, {firstName}
+              {greeting}
+              {displayName ? `, ${displayName}` : ""}
             </h1>
             <p className="greet-sub">
               You&apos;re on Stage {activeStageNumber} of {TOTAL_STAGES} —{" "}

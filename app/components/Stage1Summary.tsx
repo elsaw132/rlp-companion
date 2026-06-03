@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { STAGES } from "@/lib/modules";
 import { getTakeaway } from "@/lib/takeaways";
+import { getDisplayName } from "@/lib/displayName";
 
 const summaryKey = (userId: string) => `rlp_stage1_summary_${userId}`;
 
@@ -55,12 +56,15 @@ export default function Stage1Summary() {
   const [error, setError] = useState<string | null>(null);
   const [whatOff, setWhatOff] = useState("");
   const [loaded, setLoaded] = useState(false);
+  // The name to address them by in the intro line, or null to drop it.
+  const [displayName, setDisplayName] = useState<string | null>(null);
 
   // Once Clerk resolves the user, either show the already-saved picture or
   // generate a fresh one. Done in render (guarded) so the first paint matches
   // the server, then fills in — the same pattern the dashboard uses.
   if (user && !loaded && typeof window !== "undefined") {
     setLoaded(true);
+    setDisplayName(getDisplayName(user.id, user));
     const saved = getSavedSummary(user.id);
     if (saved) {
       setSummary(saved.text);
@@ -137,9 +141,10 @@ export default function Stage1Summary() {
             <div className="eyebrow">Stage 1 · Imagine</div>
             <h1 className="title">The picture you&apos;ve started to build</h1>
             <p className="intro">
-              Here&apos;s the picture you&apos;ve started to build. It
-              doesn&apos;t need to be perfect or final — it&apos;s something to
-              react to and shape as you move through the next stages.
+              {displayName ? `${displayName}, here` : "Here"}&apos;s the picture
+              you&apos;ve started to build. It doesn&apos;t need to be perfect or
+              final — it&apos;s something to react to and shape as you move
+              through the next stages.
             </p>
 
             {generating ? (
