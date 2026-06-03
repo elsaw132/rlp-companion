@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SlidersInteraction, SlidersResult } from "@/lib/modules";
+import { FinishControls, type EditableProps } from "./InteractionShell";
 
 const MIDPOINT = 50;
 
@@ -38,15 +39,25 @@ export function slidersSummaryText(result: SlidersResult): string {
 type SlidersProps = {
   interaction: SlidersInteraction;
   onFinish: (result: SlidersResult) => void;
-};
+} & EditableProps<SlidersResult>;
 
-export default function Sliders({ interaction, onFinish }: SlidersProps) {
+export default function Sliders({
+  interaction,
+  onFinish,
+  mode = "create",
+  initial,
+  onCancel,
+}: SlidersProps) {
   const { instruction, spectrums, seasonal } = interaction;
 
+  // In edit mode, start each slider where they left it (matched by position)
+  // and restore the seasonal answer; otherwise the midpoint and no answer.
   const [positions, setPositions] = useState<number[]>(() =>
-    spectrums.map(() => MIDPOINT)
+    spectrums.map((_, i) => initial?.spectrums[i]?.position ?? MIDPOINT)
   );
-  const [season, setSeason] = useState<string | null>(null);
+  const [season, setSeason] = useState<string | null>(
+    initial?.seasonal.answer ?? null
+  );
 
   function setPosition(index: number, value: number) {
     setPositions((prev) => prev.map((p, i) => (i === index ? value : p)));
@@ -106,29 +117,23 @@ export default function Sliders({ interaction, onFinish }: SlidersProps) {
         </div>
       </div>
 
-      <div style={styles.finishRow}>
-        <button
-          type="button"
-          className="finish-btn"
-          style={styles.finishButton}
-          onClick={() =>
-            onFinish({
-              type: "sliders",
-              spectrums: spectrums.map((s, i) => ({
-                left: s.left,
-                right: s.right,
-                position: positions[i],
-              })),
-              seasonal: { prompt: seasonal.prompt, answer: season },
-            })
-          }
-        >
-          Talk it through with Vita →
-        </button>
-        <p style={styles.finishHint}>
-          Slide each one to where your week feels right.
-        </p>
-      </div>
+      <FinishControls
+        mode={mode}
+        disabled={false}
+        onFinish={() =>
+          onFinish({
+            type: "sliders",
+            spectrums: spectrums.map((s, i) => ({
+              left: s.left,
+              right: s.right,
+              position: positions[i],
+            })),
+            seasonal: { prompt: seasonal.prompt, answer: season },
+          })
+        }
+        onCancel={onCancel}
+        hint="Slide each one to where your week feels right."
+      />
     </section>
   );
 }
@@ -212,33 +217,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid var(--brand-primary)",
     color: "var(--ink)",
     fontWeight: 600,
-  },
-  finishRow: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "10px",
-    paddingTop: "8px",
-  },
-  finishButton: {
-    width: "100%",
-    maxWidth: "360px",
-    minHeight: "48px",
-    background: "var(--brand-primary)",
-    color: "var(--brand-on-primary)",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-body)",
-    fontWeight: 600,
-    border: "none",
-    borderRadius: "var(--r-sm)",
-    padding: "13px 24px",
-    cursor: "pointer",
-  },
-  finishHint: {
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-sm)",
-    color: "var(--text-muted)",
-    margin: 0,
   },
 };
 
@@ -377,9 +355,8 @@ const slidersCss = `
   }
   .week-slider:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
   .week-slider:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ring); }
-  .season-chip:focus-visible, .finish-btn:focus-visible {
+  .season-chip:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
   }
-  .finish-btn:not(:disabled):hover { background: var(--brand-primary-hover); }
 `;

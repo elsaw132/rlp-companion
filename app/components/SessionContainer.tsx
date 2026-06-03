@@ -20,6 +20,7 @@ import QualitiesPicker, {
   QualitiesPickerSummary,
   qualitiesPickerSummaryText,
 } from "./QualitiesPicker";
+import type { InteractionMode } from "./InteractionShell";
 import type { Interaction, BuildResult } from "@/lib/modules";
 import {
   getCompletedIds,
@@ -65,7 +66,13 @@ function summarizeBuild(result: BuildResult): string {
 // The read-only recap shown above Vita's first message, kept visible for the
 // whole conversation. Switches on type, like the interaction renderer; the
 // neutral card wrapper is shared across types.
-function InteractionSummary({ result }: { result: BuildResult }) {
+function InteractionSummary({
+  result,
+  onEdit,
+}: {
+  result: BuildResult;
+  onEdit: () => void;
+}) {
   let body: React.ReactNode;
   switch (result.type) {
     case "day-builder":
@@ -86,7 +93,19 @@ function InteractionSummary({ result }: { result: BuildResult }) {
     default:
       body = null;
   }
-  return <section style={styles.summaryCard}>{body}</section>;
+  return (
+    <section style={styles.summaryCard}>
+      {body}
+      <button
+        type="button"
+        className="edit-link"
+        style={styles.editLink}
+        onClick={onEdit}
+      >
+        Edit your selections ›
+      </button>
+    </section>
+  );
 }
 
 type Message = {
@@ -201,10 +220,11 @@ export default function SessionContainer({
   const { user } = useUser();
 
   // Where the person is in the module: the reading, the build step (only for
-  // modules with an interaction), then the conversation.
-  const [phase, setPhase] = useState<"reading" | "building" | "conversation">(
-    "reading"
-  );
+  // modules with an interaction), the conversation, then optionally back into
+  // "editing" to adjust earlier picks without losing the conversation.
+  const [phase, setPhase] = useState<
+    "reading" | "building" | "conversation" | "editing"
+  >("reading");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
@@ -216,6 +236,9 @@ export default function SessionContainer({
   // What they built in the interaction step — shown back to them and summarised
   // for Vita.
   const [buildResult, setBuildResult] = useState<BuildResult | null>(null);
+  // Set when the person saves changed selections mid-conversation. The next
+  // chat call tells Vita to acknowledge the change once, then this clears.
+  const [editAckPending, setEditAckPending] = useState(false);
   // Whether this module is finished, and how many in the stage are finished.
   const [completed, setCompleted] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
@@ -405,6 +428,31 @@ export default function SessionContainer({
     startConversation();
   }
 
+  // Re-open the interaction to adjust earlier picks, pre-filled from what they
+  // built. The conversation is untouched and waiting underneath.
+  function handleEditStart() {
+    setPhase("editing");
+  }
+
+  // Leave edit mode without changing anything — back to the conversation as it
+  // was.
+  function handleEditCancel() {
+    setPhase("conversation");
+  }
+
+  // Save adjusted picks: update the stored result and the visible summary, keep
+  // the conversation, and — only if the picks actually changed and a
+  // conversation is already underway — flag the next turn so Vita acknowledges
+  // the change once.
+  function handleEditSave(result: BuildResult) {
+    const changed =
+      !buildResult || JSON.stringify(buildResult) !== JSON.stringify(result);
+    setBuildResult(result);
+    if (buildKey) localStorage.setItem(buildKey, JSON.stringify(result));
+    if (changed && messages.length > 0) setEditAckPending(true);
+    setPhase("conversation");
+  }
+
   async function handleSend() {
     const text = input.trim();
     if (!text || sending) return;
@@ -420,6 +468,13 @@ export default function SessionContainer({
     const actualOpening =
       messages.find((m) => m.role === "coach")?.text ?? coachOpening;
 
+    // If they just saved changed selections, ask Vita to acknowledge the change
+    // once in her next reply, then carry on. Fires for this one call only.
+    const editAcknowledgement =
+      editAckPending && buildResult
+        ? `The person has just gone back and adjusted their earlier selections. Their current selections are now: ${summarizeBuild(buildResult)}. In one natural sentence, briefly acknowledge that they've made a change, then carry on from where the conversation was — do not restart, re-ask, or re-explain.`
+        : "";
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -432,6 +487,7 @@ export default function SessionContainer({
           priorReflections: buildPriorReflections(user?.id, sessionId),
           sessionContent: sessionContent ?? contentValue,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
+          editAcknowledgement,
         }),
       });
 
@@ -451,6 +507,10 @@ export default function SessionContainer({
         { role: "coach", text: replyText },
       ];
       setMessages(finalMessages);
+
+      // The acknowledgement instruction fired on this call — clear it so it
+      // doesn't repeat on later turns.
+      if (editAckPending) setEditAckPending(false);
 
       if (isClosing && user) {
         markModuleComplete(user.id, sessionId);
@@ -564,9 +624,20 @@ export default function SessionContainer({
         />
       )}
 
+      {/* ZONE 2.6 — EDITING (re-opened interaction, pre-filled) */}
+      {phase === "editing" && interaction && (
+        <InteractionStep
+          interaction={interaction}
+          onFinish={handleEditSave}
+          mode="edit"
+          initial={buildResult ?? undefined}
+          onCancel={handleEditCancel}
+        />
+      )}
+
       {/* ZONE 2.75 — WHAT THEY BUILT (kept visible through the conversation) */}
       {phase === "conversation" && interaction && buildResult && (
-        <InteractionSummary result={buildResult} />
+        <InteractionSummary result={buildResult} onEdit={handleEditStart} />
       )}
 
       {/* ZONE 3 — VITA + CONVERSATION */}
@@ -659,21 +730,69 @@ export default function SessionContainer({
 function InteractionStep({
   interaction,
   onFinish,
+  mode = "create",
+  initial,
+  onCancel,
 }: {
   interaction: Interaction;
   onFinish: (result: BuildResult) => void;
+  mode?: InteractionMode;
+  // The stored result to pre-fill from in edit mode. Its type always matches
+  // the interaction type, so each case narrows it with a cast.
+  initial?: BuildResult;
+  onCancel?: () => void;
 }) {
   switch (interaction.type) {
     case "day-builder":
-      return <DayBuilder interaction={interaction} onFinish={onFinish} />;
+      return (
+        <DayBuilder
+          interaction={interaction}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "day-builder" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
     case "role-picker":
-      return <RolePicker interaction={interaction} onFinish={onFinish} />;
+      return (
+        <RolePicker
+          interaction={interaction}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "role-picker" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
     case "sliders":
-      return <Sliders interaction={interaction} onFinish={onFinish} />;
+      return (
+        <Sliders
+          interaction={interaction}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "sliders" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
     case "keep-leave-gain":
-      return <KeepLeaveGain interaction={interaction} onFinish={onFinish} />;
+      return (
+        <KeepLeaveGain
+          interaction={interaction}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "keep-leave-gain" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
     case "qualities-picker":
-      return <QualitiesPicker interaction={interaction} onFinish={onFinish} />;
+      return (
+        <QualitiesPicker
+          interaction={interaction}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "qualities-picker" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
     default:
       return (
         <section style={styles.placeholderStep}>[interaction coming soon]</section>
@@ -864,6 +983,20 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "20px 24px",
     boxShadow: "var(--shadow-sm)",
   },
+  editLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    marginTop: "18px",
+    background: "none",
+    border: "none",
+    padding: "2px 0",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    color: "var(--brand-primary)",
+    cursor: "pointer",
+  },
 
   // ZONE 3 — Vita + conversation
   conversationZone: {
@@ -1046,6 +1179,12 @@ const focusCss = `
   }
   .keep-talking-link:hover { color: var(--text); }
   .keep-talking-link:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--r-sm);
+  }
+  .edit-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .edit-link:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
     border-radius: var(--r-sm);

@@ -5,6 +5,7 @@ import type {
   QualitiesPickerInteraction,
   QualitiesPickerResult,
 } from "@/lib/modules";
+import { FinishControls, type EditableProps } from "./InteractionShell";
 
 const MAX_PICKS = 5;
 
@@ -26,16 +27,23 @@ export function qualitiesPickerSummaryText(
 type QualitiesPickerProps = {
   interaction: QualitiesPickerInteraction;
   onFinish: (result: QualitiesPickerResult) => void;
-};
+} & EditableProps<QualitiesPickerResult>;
 
 export default function QualitiesPicker({
   interaction,
   onFinish,
+  mode = "create",
+  initial,
+  onCancel,
 }: QualitiesPickerProps) {
   const { instruction, options } = interaction;
 
-  const [picked, setPicked] = useState<string[]>([]);
-  const [extras, setExtras] = useState<string[]>([]);
+  // In edit mode, pre-fill the earlier picks; any pick that isn't a listed
+  // option is restored as an extra so it reappears as a chip.
+  const [picked, setPicked] = useState<string[]>(initial?.picked ?? []);
+  const [extras, setExtras] = useState<string[]>(() =>
+    initial ? initial.picked.filter((p) => !options.includes(p)) : []
+  );
   const [draft, setDraft] = useState("");
 
   function toggle(option: string) {
@@ -123,25 +131,17 @@ export default function QualitiesPicker({
         </button>
       </div>
 
-      <div style={styles.finishRow}>
-        <button
-          type="button"
-          className="finish-btn"
-          style={{
-            ...styles.finishButton,
-            ...(picked.length === 0 ? styles.finishButtonDisabled : null),
-          }}
-          disabled={picked.length === 0}
-          onClick={() => onFinish({ type: "qualities-picker", picked })}
-        >
-          Talk it through with Vita →
-        </button>
-        <p style={styles.finishHint}>
-          {picked.length === 0
+      <FinishControls
+        mode={mode}
+        disabled={picked.length === 0}
+        onFinish={() => onFinish({ type: "qualities-picker", picked })}
+        onCancel={onCancel}
+        hint={
+          picked.length === 0
             ? "Pick at least one to carry forward."
-            : "A few that feel most like you are enough."}
-        </p>
-      </div>
+            : "A few that feel most like you are enough."
+        }
+      />
     </section>
   );
 }
@@ -240,38 +240,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "not-allowed",
     color: "var(--text-muted)",
   },
-  finishRow: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "10px",
-    paddingTop: "8px",
-  },
-  finishButton: {
-    width: "100%",
-    maxWidth: "360px",
-    minHeight: "48px",
-    background: "var(--brand-primary)",
-    color: "var(--brand-on-primary)",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-body)",
-    fontWeight: 600,
-    border: "none",
-    borderRadius: "var(--r-sm)",
-    padding: "13px 24px",
-    cursor: "pointer",
-  },
-  finishButtonDisabled: {
-    background: "var(--muted-surface)",
-    color: "var(--text-muted)",
-    cursor: "not-allowed",
-  },
-  finishHint: {
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-sm)",
-    color: "var(--text-muted)",
-    margin: 0,
-  },
 };
 
 // Read-only recap shown above Vita's first message and kept visible through the
@@ -326,8 +294,7 @@ const summaryStyles: Record<string, React.CSSProperties> = {
 };
 
 const qualitiesPickerCss = `
-  .quality-chip:focus-visible, .custom-add:focus-visible,
-  .finish-btn:focus-visible {
+  .quality-chip:focus-visible, .custom-add:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
   }
@@ -335,5 +302,4 @@ const qualitiesPickerCss = `
     border-color: var(--brand-primary);
     box-shadow: var(--focus-ring);
   }
-  .finish-btn:not(:disabled):hover { background: var(--brand-primary-hover); }
 `;

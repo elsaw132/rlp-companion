@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DayBuilderInteraction, DayBuilderResult } from "@/lib/modules";
+import { FinishControls, type EditableProps } from "./InteractionShell";
 
 // Emoji stand-ins for activity images. Unknown activities (including the
 // person's own additions) fall back to a neutral dot.
@@ -81,15 +82,31 @@ export function dayBuilderSummaryText(result: DayBuilderResult): string {
 type DayBuilderProps = {
   interaction: DayBuilderInteraction;
   onFinish: (result: DayBuilderResult) => void;
-};
+} & EditableProps<DayBuilderResult>;
 
-export default function DayBuilder({ interaction, onFinish }: DayBuilderProps) {
+export default function DayBuilder({
+  interaction,
+  onFinish,
+  mode = "create",
+  initial,
+  onCancel,
+}: DayBuilderProps) {
   const { parts, categories } = interaction;
 
   const emptyDay = () =>
     Object.fromEntries(parts.map((p) => [p, [] as string[]]));
 
-  const [assigned, setAssigned] = useState<Record<string, string[]>>(emptyDay);
+  // In edit mode, start from the day they already built (custom activities
+  // come back as their own chips); otherwise an empty day.
+  const [assigned, setAssigned] = useState<Record<string, string[]>>(() => {
+    const base = emptyDay();
+    if (initial) {
+      for (const part of parts) {
+        if (initial.assigned[part]) base[part] = [...initial.assigned[part]];
+      }
+    }
+    return base;
+  });
   const [pending, setPending] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
@@ -219,25 +236,13 @@ export default function DayBuilder({ interaction, onFinish }: DayBuilderProps) {
         ))}
       </div>
 
-      <div style={styles.finishRow}>
-        <button
-          type="button"
-          className="finish-btn"
-          style={{
-            ...styles.finishButton,
-            ...(total === 0 ? styles.finishButtonDisabled : null),
-          }}
-          disabled={total === 0}
-          onClick={() =>
-            onFinish({ type: "day-builder", parts, assigned })
-          }
-        >
-          Talk it through with Vita →
-        </button>
-        {total === 0 && (
-          <p style={styles.finishHint}>Add at least one thing to your day.</p>
-        )}
-      </div>
+      <FinishControls
+        mode={mode}
+        disabled={total === 0}
+        onFinish={() => onFinish({ type: "day-builder", parts, assigned })}
+        onCancel={onCancel}
+        hint={total === 0 ? "Add at least one thing to your day." : undefined}
+      />
 
       {/* Part picker — appears after tapping an activity */}
       {pending && (
@@ -509,39 +514,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
 
-  finishRow: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "10px",
-    paddingTop: "8px",
-  },
-  finishButton: {
-    width: "100%",
-    maxWidth: "360px",
-    minHeight: "48px",
-    background: "var(--brand-primary)",
-    color: "var(--brand-on-primary)",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-body)",
-    fontWeight: 600,
-    border: "none",
-    borderRadius: "var(--r-sm)",
-    padding: "13px 24px",
-    cursor: "pointer",
-  },
-  finishButtonDisabled: {
-    background: "var(--muted-surface)",
-    color: "var(--text-muted)",
-    cursor: "not-allowed",
-  },
-  finishHint: {
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-sm)",
-    color: "var(--text-muted)",
-    margin: 0,
-  },
-
   // Part-picker dialog
   overlay: {
     position: "fixed",
@@ -609,7 +581,7 @@ const styles: Record<string, React.CSSProperties> = {
 const builderCss = `
   .tile:hover { border-color: var(--brand-primary); box-shadow: var(--shadow-md); }
   .tile:focus-visible, .day-chip:focus-visible, .custom-add:focus-visible,
-  .part-btn:focus-visible, .cancel-btn:focus-visible, .finish-btn:focus-visible {
+  .part-btn:focus-visible, .cancel-btn:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
   }
@@ -619,5 +591,4 @@ const builderCss = `
   }
   .day-chip:hover { border-color: var(--brand-primary); }
   .part-btn:hover { background: var(--brand-primary-hover); }
-  .finish-btn:not(:disabled):hover { background: var(--brand-primary-hover); }
 `;

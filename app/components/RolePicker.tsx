@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { RolePickerInteraction, RolePickerResult } from "@/lib/modules";
+import { FinishControls, type EditableProps } from "./InteractionShell";
 
 const MAX_STARRED = 3;
 
@@ -20,14 +21,28 @@ export function rolePickerSummaryText(result: RolePickerResult): string {
 type RolePickerProps = {
   interaction: RolePickerInteraction;
   onFinish: (result: RolePickerResult) => void;
-};
+} & EditableProps<RolePickerResult>;
 
-export default function RolePicker({ interaction, onFinish }: RolePickerProps) {
+export default function RolePicker({
+  interaction,
+  onFinish,
+  mode = "create",
+  initial,
+  onCancel,
+}: RolePickerProps) {
   const { instruction, groups } = interaction;
 
-  const [selected, setSelected] = useState<string[]>([]);
-  const [starred, setStarred] = useState<string[]>([]);
-  const [extras, setExtras] = useState<Record<string, string[]>>({});
+  // In edit mode, pre-fill the earlier picks. Custom roles (any pick that isn't
+  // one of the listed options) are restored as extras under the first group so
+  // they reappear as chips.
+  const knownOptions = new Set(groups.flatMap((g) => g.options));
+  const [selected, setSelected] = useState<string[]>(initial?.picked ?? []);
+  const [starred, setStarred] = useState<string[]>(initial?.starred ?? []);
+  const [extras, setExtras] = useState<Record<string, string[]>>(() => {
+    if (!initial || !groups[0]) return {};
+    const customs = initial.picked.filter((r) => !knownOptions.has(r));
+    return customs.length ? { [groups[0].name]: customs } : {};
+  });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   function toggleSelect(role: string) {
@@ -151,27 +166,19 @@ export default function RolePicker({ interaction, onFinish }: RolePickerProps) {
         })}
       </div>
 
-      <div style={styles.finishRow}>
-        <button
-          type="button"
-          className="finish-btn"
-          style={{
-            ...styles.finishButton,
-            ...(selected.length === 0 ? styles.finishButtonDisabled : null),
-          }}
-          disabled={selected.length === 0}
-          onClick={() =>
-            onFinish({ type: "role-picker", picked: selected, starred })
-          }
-        >
-          Talk it through with Vita →
-        </button>
-        <p style={styles.finishHint}>
-          {selected.length === 0
+      <FinishControls
+        mode={mode}
+        disabled={selected.length === 0}
+        onFinish={() =>
+          onFinish({ type: "role-picker", picked: selected, starred })
+        }
+        onCancel={onCancel}
+        hint={
+          selected.length === 0
             ? "Pick at least one role to carry forward."
-            : "Star up to three that feel most alive."}
-        </p>
-      </div>
+            : "Star up to three that feel most alive."
+        }
+      />
     </section>
   );
 }
@@ -277,38 +284,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     flexShrink: 0,
   },
-  finishRow: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "10px",
-    paddingTop: "8px",
-  },
-  finishButton: {
-    width: "100%",
-    maxWidth: "360px",
-    minHeight: "48px",
-    background: "var(--brand-primary)",
-    color: "var(--brand-on-primary)",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-body)",
-    fontWeight: 600,
-    border: "none",
-    borderRadius: "var(--r-sm)",
-    padding: "13px 24px",
-    cursor: "pointer",
-  },
-  finishButtonDisabled: {
-    background: "var(--muted-surface)",
-    color: "var(--text-muted)",
-    cursor: "not-allowed",
-  },
-  finishHint: {
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-sm)",
-    color: "var(--text-muted)",
-    margin: 0,
-  },
 };
 
 // Read-only recap shown above Vita's first message and kept visible through the
@@ -376,8 +351,7 @@ const summaryStyles: Record<string, React.CSSProperties> = {
 };
 
 const rolePickerCss = `
-  .role-chip:focus-visible, .star-btn:focus-visible, .custom-add:focus-visible,
-  .finish-btn:focus-visible {
+  .role-chip:focus-visible, .star-btn:focus-visible, .custom-add:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
   }
@@ -386,5 +360,4 @@ const rolePickerCss = `
     box-shadow: var(--focus-ring);
   }
   .star-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .finish-btn:not(:disabled):hover { background: var(--brand-primary-hover); }
 `;

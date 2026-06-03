@@ -20,6 +20,10 @@ type ChatRequest = {
   // True only for the one call that generates Vita's first message, where she
   // opens by reacting to what they built rather than using a fixed line.
   isOpening?: boolean;
+  // Set for the single turn right after the person re-opened the interaction
+  // and saved changed picks: a one-off instruction telling Vita to acknowledge
+  // the change once and carry on. Empty/omitted otherwise.
+  editAcknowledgement?: string;
 };
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -61,6 +65,10 @@ function buildSystemPrompt(body: ChatRequest): string {
     "You have already opened this conversation by saying, word for word:",
     `"${body.coachOpening}"`
   );
+
+  if (body.editAcknowledgement && body.editAcknowledgement.trim()) {
+    sections.push("", body.editAcknowledgement);
+  }
 
   return sections.join("\n");
 }
