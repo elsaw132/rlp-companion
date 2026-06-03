@@ -207,6 +207,26 @@ export default function HomeDashboard() {
               {activeStage.name}.
             </p>
 
+            {/* STAGE 1 PICTURE — appears once all six Imagine modules are done.
+                A first sketch of their retirement they own and can keep shaping. */}
+            {isStageDone(STAGES[0]) && (
+              <Link className="picture-card" href="/stage/1">
+                <span className="pc-icon" aria-hidden="true">
+                  ✦
+                </span>
+                <span className="pc-body">
+                  <span className="pc-title">Your Stage 1 picture is ready</span>
+                  <span className="pc-sub">
+                    A first sketch of the retirement you&apos;ve started to
+                    imagine — yours to shape as you go.
+                  </span>
+                </span>
+                <span className="pc-chev" aria-hidden="true">
+                  ›
+                </span>
+              </Link>
+            )}
+
             {/* STAGE ARC */}
             <div className="steps">
               {STAGES.map((s) => {
@@ -444,6 +464,14 @@ const homeCss = `
 
 .rlp-home .greeting{font-family:var(--font-serif);font-size:34px;font-weight:600;color:var(--ink);line-height:1.15;margin-bottom:6px}
 .rlp-home .greet-sub{font-size:14px;color:var(--text-muted);margin-bottom:28px}
+
+.rlp-home .picture-card{display:flex;align-items:center;gap:16px;background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-lg);box-shadow:var(--shadow-md);padding:20px 22px;margin-bottom:28px;cursor:pointer;transition:box-shadow .15s ease,border-color .15s ease}
+.rlp-home .picture-card:hover{box-shadow:var(--shadow-lg,var(--shadow-md));border-color:var(--brand-primary)}
+.rlp-home .picture-card .pc-icon{width:42px;height:42px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:19px;flex-shrink:0;color:var(--ink)}
+.rlp-home .picture-card .pc-body{display:flex;flex-direction:column;gap:4px;min-width:0}
+.rlp-home .picture-card .pc-title{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--ink);line-height:1.2}
+.rlp-home .picture-card .pc-sub{font-size:14px;color:var(--text-muted);line-height:1.5}
+.rlp-home .picture-card .pc-chev{margin-left:auto;font-size:24px;line-height:1;color:var(--text-muted);flex-shrink:0}
 
 .rlp-home .steps{display:flex;align-items:flex-start;gap:0;margin-bottom:32px}
 .rlp-home .step{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;flex:1;position:relative;background:none;border:none;font-family:inherit;padding:0}
