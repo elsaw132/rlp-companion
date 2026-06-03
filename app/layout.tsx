@@ -1,4 +1,4 @@
-import { ClerkProvider, SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -21,26 +21,31 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
-          <header className="flex justify-between items-center px-6 py-4 border-b">
-            <span className="font-semibold">rlp-companion</span>
-            <div className="flex gap-3 items-center">
-              <Show when="signed-out">
-                <SignInButton />
-                <SignUpButton />
-              </Show>
-              <Show when="signed-in">
-                <UserButton />
-              </Show>
-            </div>
-          </header>
           {children}
+          {/* Global feedback button — fixed bottom-right on every screen. */}
           <a
             href="https://tally.so"
             target="_blank"
             rel="noopener noreferrer"
-            className="fixed bottom-4 right-4 bg-black text-white text-sm px-4 py-2 rounded-full shadow-lg hover:bg-gray-800 transition-colors"
+            style={{
+              position: "fixed",
+              right: "22px",
+              bottom: "22px",
+              background: "var(--ink)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "var(--r-pill)",
+              padding: "11px 18px",
+              fontSize: "13px",
+              fontWeight: 600,
+              boxShadow: "var(--shadow-md)",
+              display: "flex",
+              alignItems: "center",
+              gap: "7px",
+              zIndex: 20,
+            }}
           >
-            Share feedback
+            💬 Feedback
           </a>
         </ClerkProvider>
       </body>

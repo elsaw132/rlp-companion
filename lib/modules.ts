@@ -120,16 +120,22 @@ export type Module = {
 export type Stage = {
   number: number;
   name: string;
+  // One-line label shown under the stage name in the sidebar nav.
+  subtitle: string;
   modules: Module[];
 };
 
-// The full programme has five stages; only Stage 1 (Imagine) content exists so far.
+// The full programme has five stages; only Stage 1 (Imagine) content exists so
+// far. Stages 2–5 are listed here (name + subtitle) so the dashboard can render
+// the full sidebar nav and the five-stage arc from one source; their modules
+// arrays stay empty until that content is built.
 export const TOTAL_STAGES = 5;
 
 export const STAGES: Stage[] = [
   {
     number: 1,
     name: "Imagine",
+    subtitle: "Picture your future",
     modules: [
       {
         id: "1.1",
@@ -536,6 +542,30 @@ WATCH FOR
 - Respect uncertainty — a partial or evolving picture of the future self is entirely valid.`,
       },
     ],
+  },
+  {
+    number: 2,
+    name: "Explore",
+    subtitle: "Go deeper, area by area",
+    modules: [],
+  },
+  {
+    number: 3,
+    name: "Understand",
+    subtitle: "What matters most",
+    modules: [],
+  },
+  {
+    number: 4,
+    name: "Plan",
+    subtitle: "Shape the years ahead",
+    modules: [],
+  },
+  {
+    number: 5,
+    name: "Act",
+    subtitle: "Turn it into next steps",
+    modules: [],
   },
 ];
 

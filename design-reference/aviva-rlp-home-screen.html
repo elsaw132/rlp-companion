@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RLP Companion — Home screen (Aviva theme)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* BRAND LAYER — swappable per provider */
+  --brand-primary:#013281;--brand-primary-hover:#01275F;--brand-primary-tint:#E8EDF1;--brand-on-primary:#fff;
+  --brand-band:#FFD101;--brand-on-band:#013281;
+  /* PRODUCT LAYER — fixed across deployments */
+  --warm-surface:#FBF7EC;--warm-surface-2:#FCF8EF;--warm-line:#EFE6D2;--coach-pill:#FFE36B;--coach-pill-text:#5A4300;--sun:#FBD24E;
+  --accent:#E06F1F;--accent-hover:#C75F16;--accent-strong:#B85C16;--accent-surface:#FEFEF4;--accent-line:#EAD9B0;
+  --ink:#16202E;--text:#3A3D44;--text-muted:#7C7F86;--text-faint:#A6A8AE;
+  --bg:#fff;--bg-alt:#FAFAF8;--surface:#fff;--border:#E9E9E4;--border-strong:#DCDCD6;
+  --success:#2F8B4E;--success-text:#2C7A46;--success-surface:#EAF5ED;--success-line:#BFE0C4;--muted-surface:#EFEEE9;
+  --info-surface:#ECF0FB;--info-line:#D6DFF4;--info-text:#16202E;
+  --ill-sky:#A4CCE5;--ill-sky-pale:#C9E0EE;--ill-hill:#5B9F4A;--ill-hill-deep:#3F7F36;--ill-path:#C7A53A;--ill-lavender:#D0CCEF;
+  --r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-pill:999px;
+  --shadow-sm:0 1px 2px rgba(16,32,46,.05),0 1px 3px rgba(16,32,46,.04);
+  --shadow-md:0 2px 6px rgba(16,32,46,.05),0 10px 28px rgba(16,32,46,.06);
+  --focus-ring:0 0 0 3px rgba(1,50,129,.35);
+  --header-h:68px;--sidebar-w:280px;--content-max:720px;
+  --font-serif:"Source Serif 4","Lora",Georgia,serif;
+  --font-sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);font-size:16px;line-height:1.6;color:var(--text);background:var(--bg-alt);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
+
+/* ── HEADER (provider band) ── */
+.band{height:var(--header-h);background:var(--brand-band);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:10}
+.band .logo{font-family:var(--font-serif);font-weight:700;font-size:23px;color:var(--brand-on-band);letter-spacing:-.01em}
+.band .right{display:flex;align-items:center;gap:20px}
+.band .support{font-size:14px;font-weight:600;color:var(--brand-on-band);display:flex;align-items:center;gap:6px}
+.band .user{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:var(--brand-on-band)}
+.band .avatar{width:34px;height:34px;border-radius:50%;background:var(--brand-primary);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700}
+
+/* ── SHELL ── */
+.shell{display:flex;align-items:flex-start;max-width:1180px;margin:0 auto}
+.sidebar{width:var(--sidebar-w);flex-shrink:0;padding:28px 20px 40px;border-right:1px solid var(--border);min-height:calc(100vh - var(--header-h));position:sticky;top:var(--header-h)}
+.main{flex:1;min-width:0;padding:34px 40px 80px;display:flex;justify-content:center}
+.col{width:100%;max-width:var(--content-max)}
+
+/* ── SIDEBAR NAV ── */
+.side-eyebrow{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:600;padding:0 12px;margin-bottom:10px}
+.navlist{display:flex;flex-direction:column;gap:4px;margin-bottom:28px}
+.nav{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:var(--r-sm);cursor:pointer}
+.nav:hover{background:var(--bg-alt)}
+.nav.is-active{background:var(--brand-primary-tint)}
+.nav.is-active:hover{background:var(--brand-primary-tint)}
+.nav .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0}
+.nav.is-active .n{background:var(--brand-primary);color:#fff}
+.nav .n--idle{background:#EBF1F8;color:var(--brand-primary)}
+.nav .n--done{background:var(--brand-primary);color:#fff}
+.nav > span:last-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.nav .t{display:block;font-size:15px;font-weight:600;color:var(--ink);line-height:1.25}
+.nav.is-idle .t{color:var(--text)}
+.nav .s{display:block;font-size:12px;color:var(--text-muted);line-height:1.35}
+
+/* ── CLARITY RADIAL (sidebar) ── */
+.clarity{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:18px;box-shadow:var(--shadow-sm);text-align:center}
+.radial-wrap{position:relative;display:inline-grid;place-items:center;margin-bottom:10px}
+.radial{--p:33;width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--brand-primary) calc(var(--p)*1%),var(--border) 0)}
+.radial::before{content:"";position:absolute;width:58px;height:58px;border-radius:50%;background:#fff}
+.radial span{position:relative;font-size:16px;font-weight:700;color:var(--brand-primary)}
+.clarity .lab{font-size:13px;font-weight:600;color:var(--ink)}
+.clarity .sub{font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.45}
+
+/* ── GREETING ── */
+.greeting{font-family:var(--font-serif);font-size:34px;font-weight:600;color:var(--ink);line-height:1.15;margin-bottom:6px}
+.greet-sub{font-size:14px;color:var(--text-muted);margin-bottom:28px}
+
+/* ── STAGE ARC ── */
+.steps{display:flex;align-items:flex-start;gap:0;margin-bottom:32px}
+.step{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;flex:1;position:relative}
+.step .dot{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;z-index:1}
+.step.done .dot{background:var(--brand-primary);color:#fff}
+.step.active .dot{background:var(--accent);color:#fff}
+.step.todo .dot{background:var(--border);color:var(--text-faint)}
+.step .cap{font-size:11.5px;color:var(--text-muted);font-weight:600}
+.step.active .cap{color:var(--ink)}
+.step:not(:last-child)::after{content:"";position:absolute;top:20px;left:50%;width:100%;height:2px;background:var(--border)}
+.step.done:not(:last-child)::after{background:var(--brand-primary)}
+
+/* ── HERO (coach next-step) ── */
+.hero{display:grid;grid-template-columns:1.05fr .95fr;background:var(--warm-surface);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--warm-line);box-shadow:var(--shadow-md);margin-bottom:34px}
+.hero .body{padding:28px 28px 30px}
+.hero .vita{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.hero .vita .sun{width:36px;height:36px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:18px}
+.hero .vita .name{font-family:var(--font-serif);font-size:20px;font-weight:600;color:var(--ink)}
+.coachpill{display:inline-block;background:var(--coach-pill);color:var(--coach-pill-text);font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-sm);margin-bottom:16px}
+.hero p.intro{font-size:15px;color:var(--text);line-height:1.6;margin-bottom:22px}
+.hero .ns-eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:3px}
+.hero .ns-title{font-family:var(--font-serif);font-size:23px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:18px}
+.hero .ctarow{display:flex;align-items:center;gap:14px}
+.hero .scene{background:linear-gradient(var(--ill-sky-pale),var(--ill-sky) 42%,var(--ill-hill) 60%,var(--ill-hill-deep));position:relative}
+.hero .scene .sun-ill{position:absolute;right:30px;top:34px;width:42px;height:42px;border-radius:50%;background:radial-gradient(circle,#FFF3CF,var(--sun));box-shadow:0 0 30px rgba(251,210,78,.6)}
+.hero .scene .cloud{position:absolute;width:64px;height:18px;background:rgba(255,255,255,.7);border-radius:20px;top:74px;right:54px}
+.hero .scene .cloud.two{width:44px;top:104px;right:120px;opacity:.6}
+
+/* ── BUTTONS ── */
+.btn{font-size:15px;font-weight:600;border:none;border-radius:var(--r-sm);padding:13px 20px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;line-height:1;min-height:48px}
+.btn-navy{background:var(--brand-primary);color:#fff}
+.btn-navy:hover{background:var(--brand-primary-hover)}
+.btn-accent{background:var(--accent-strong);color:#fff}
+.btn-accent:hover{background:var(--accent-hover)}
+.btn-ghost{background:transparent;color:var(--brand-primary);border:1.5px solid var(--border-strong)}
+.chip-time{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-muted);background:#fff;border:1px solid var(--border);border-radius:var(--r-pill);padding:5px 12px;font-weight:500;white-space:nowrap}
+
+/* ── SECTION HEAD + STAGE PROGRESS ── */
+.sec-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:4px}
+.sec-head{font-size:18px;font-weight:700;color:var(--ink)}
+.sec-prog{font-size:13px;color:var(--text-muted);white-space:nowrap}
+.bar{height:6px;border-radius:var(--r-pill);background:var(--border);overflow:hidden;margin:10px 0 20px}
+.bar i{display:block;height:100%;width:33%;background:var(--brand-primary);border-radius:var(--r-pill)}
+
+/* ── SESSION CARDS ── */
+.cards{display:flex;flex-direction:column;gap:12px;margin-bottom:34px}
+.scard{display:grid;grid-template-columns:88px minmax(0,1fr) auto auto;gap:18px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:18px;box-shadow:var(--shadow-sm)}
+.scard.is-active{background:var(--accent-surface);border-color:var(--accent-line);box-shadow:var(--shadow-md)}
+.scard.is-locked{opacity:.62}
+.scard > div:not(.thumb){min-width:0}
+.thumb{width:88px;height:72px;border-radius:var(--r-md);overflow:hidden;position:relative;flex-shrink:0}
+.thumb.sunrise{background:linear-gradient(var(--ill-sky-pale),var(--ill-hill) 70%)}
+.thumb.sunrise::after{content:"";position:absolute;top:14px;left:50%;transform:translateX(-50%);width:20px;height:20px;border-radius:50%;background:var(--sun)}
+.thumb.roles{background:#E7F2E2;display:grid;place-items:center}
+.thumb.roles::after{content:"";width:44px;height:30px;background:radial-gradient(circle at 30% 50%,var(--ill-hill) 12px,transparent 13px),radial-gradient(circle at 70% 50%,var(--ill-hill-deep) 12px,transparent 13px)}
+.thumb.cal{background:#FCE7B8;display:grid;place-items:center}
+.thumb.cal::after{content:"";width:46px;height:34px;border-radius:6px;background:var(--coach-pill);box-shadow:inset 0 8px 0 #E7B53D}
+.thumb.keep{background:#EFEAFB;display:grid;place-items:center}
+.thumb.keep::after{content:"";width:40px;height:40px;border-radius:50%;border:6px solid var(--ill-lavender);border-right-color:transparent;transform:rotate(40deg)}
+.thumb.mtn{background:#EEEAFB;position:relative;overflow:hidden}
+.thumb.mtn::after{content:"";position:absolute;bottom:0;left:50%;transform:translateX(-50%);border-left:22px solid transparent;border-right:22px solid transparent;border-bottom:34px solid var(--ill-lavender)}
+.thumb.future{background:linear-gradient(135deg,#DDEAF4,#C9D9CC)}
+.thumb.future::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 70% 30%,rgba(251,210,78,.7) 10px,transparent 11px)}
+.scard .title{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--ink);line-height:1.2}
+.scard .desc{font-size:14px;color:var(--text-muted);margin-top:5px;max-width:34ch}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;border-radius:var(--r-pill);padding:7px 14px;white-space:nowrap}
+.badge-complete{color:var(--success-text);background:#fff;border:1.5px solid var(--success-line)}
+.badge-notstarted{color:var(--text-muted);background:var(--muted-surface)}
+
+/* ── ENCOURAGEMENT (lavender) ── */
+.info{display:flex;gap:18px;align-items:flex-start;background:var(--info-surface);border:1px solid var(--info-line);border-radius:var(--r-md);padding:22px 24px;margin-bottom:30px}
+.info .av{width:42px;height:42px;border-radius:50%;background:#C9D7F2;display:grid;place-items:center;font-size:18px;flex-shrink:0}
+.info h4{font-family:var(--font-serif);font-size:18px;font-weight:600;color:var(--info-text);margin-bottom:5px}
+.info p{font-size:14px;color:var(--text);max-width:52ch;line-height:1.55}
+.info .lk{margin-left:auto;align-self:center;font-size:15px;font-weight:600;color:var(--brand-primary);white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+
+/* ── RESET ── */
+.reset{text-align:center;font-size:13px;color:var(--text-faint)}
+.reset button{background:none;border:none;color:var(--text-muted);font-size:13px;text-decoration:underline;cursor:pointer}
+
+/* ── FLOATING FEEDBACK ── */
+.fb{position:fixed;right:22px;bottom:22px;background:var(--ink);color:#fff;border:none;border-radius:var(--r-pill);padding:11px 18px;font-size:13px;font-weight:600;box-shadow:var(--shadow-md);cursor:pointer;display:flex;align-items:center;gap:7px;z-index:20}
+
+/* ── load motion (gentle) ── */
+@media (prefers-reduced-motion:no-preference){
+  .col > *{animation:rise .5s ease both}
+  .col > *:nth-child(1){animation-delay:.02s}.col > *:nth-child(2){animation-delay:.07s}
+  .col > *:nth-child(3){animation-delay:.12s}.col > *:nth-child(4){animation-delay:.17s}
+  .col > *:nth-child(5){animation-delay:.22s}.col > *:nth-child(n+6){animation-delay:.27s}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+}
+
+@media (max-width:880px){
+  .sidebar{display:none}
+  .main{padding:24px 18px 80px}
+  .hero{grid-template-columns:1fr}
+  .hero .scene{min-height:120px}
+  .greeting{font-size:28px}
+  .scard{
+    grid-template-columns:64px minmax(0,1fr) auto;
+    grid-template-rows:auto auto;
+    column-gap:14px;row-gap:12px;align-items:start;
+  }
+  .scard .thumb{grid-column:1;grid-row:1 / span 2;width:64px;height:64px}
+  .scard > div:not(.thumb){grid-column:2 / -1;grid-row:1}
+  .scard .chip-time{grid-column:2;grid-row:2;align-self:center}
+  .scard .badge,.scard .btn{grid-column:3;grid-row:2;justify-self:end;align-self:center}
+}
+@media (max-width:440px){
+  .scard{grid-template-columns:64px minmax(0,1fr);grid-template-rows:auto auto auto}
+  .scard .chip-time{grid-column:2;grid-row:2;justify-self:start}
+  .scard .badge,.scard .btn{grid-column:2;grid-row:3;justify-self:start}
+}
+</style>
+</head>
+<body>
+
+<!-- PROVIDER BAND -->
+<header class="band">
+  <div class="logo">Aviva</div>
+  <div class="right">
+    <a href="#" class="support">◎ Support</a>
+    <div class="user"><span>Margaret</span><span class="avatar">M</span></div>
+  </div>
+</header>
+
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="side-eyebrow">Your programme</div>
+    <nav class="navlist">
+      <div class="nav is-active"><span class="n">1</span><span><span class="t">Imagine</span><span class="s">Picture your future</span></span></div>
+      <div class="nav is-idle"><span class="n n--idle">2</span><span><span class="t">Explore</span><span class="s">Go deeper, area by area</span></span></div>
+      <div class="nav is-idle"><span class="n n--idle">3</span><span><span class="t">Understand</span><span class="s">What matters most</span></span></div>
+      <div class="nav is-idle"><span class="n n--idle">4</span><span><span class="t">Plan</span><span class="s">Shape the years ahead</span></span></div>
+      <div class="nav is-idle"><span class="n n--idle">5</span><span><span class="t">Act</span><span class="s">Turn it into next steps</span></span></div>
+    </nav>
+
+    <div class="clarity">
+      <div class="radial-wrap"><div class="radial"><span>33%</span></div></div>
+      <div class="lab">Your Imagine score</div>
+      <div class="sub">Grows as you complete the steps in this stage.</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="col">
+
+      <!-- GREETING -->
+      <h1 class="greeting">Good morning, Margaret</h1>
+      <p class="greet-sub">You're on Stage 1 of 5 — Imagine.</p>
+
+      <!-- STAGE ARC -->
+      <div class="steps">
+        <div class="step active"><div class="dot">1</div><div class="cap">Imagine</div></div>
+        <div class="step todo"><div class="dot">2</div><div class="cap">Explore</div></div>
+        <div class="step todo"><div class="dot">3</div><div class="cap">Understand</div></div>
+        <div class="step todo"><div class="dot">4</div><div class="cap">Plan</div></div>
+        <div class="step todo"><div class="dot">5</div><div class="cap">Act</div></div>
+      </div>
+
+      <!-- COACH NEXT-STEP HERO -->
+      <section class="hero">
+        <div class="body">
+          <div class="vita"><span class="sun">☀</span><span class="name">Vita</span></div>
+          <span class="coachpill">Your retirement coach</span>
+          <p class="intro">Last time, you talked about staying the one who hosts Sunday lunch — the person the family gathers around. Today, let's look at the shape of a whole week, not just a single day.</p>
+          <div class="ns-eyebrow">Your next step</div>
+          <div class="ns-title">Your ideal week</div>
+          <div class="ctarow">
+            <button class="btn btn-navy">Continue with Vita →</button>
+            <span class="chip-time">🕐 15 min</span>
+          </div>
+        </div>
+        <div class="scene"><div class="sun-ill"></div><div class="cloud"></div><div class="cloud two"></div></div>
+      </section>
+
+      <!-- STAGE 1 SESSIONS -->
+      <div class="sec-row">
+        <div class="sec-head">Your steps in Imagine</div>
+        <div class="sec-prog">2 of 6 steps complete</div>
+      </div>
+      <div class="bar"><i></i></div>
+
+      <div class="cards">
+
+        <!-- complete -->
+        <div class="scard">
+          <div class="thumb sunrise"></div>
+          <div><div class="title">A day in your retirement</div><div class="desc">Picture one specific day — who's around, what you do, how it feels.</div></div>
+          <span class="chip-time">🕐 15 min</span>
+          <span class="badge badge-complete">Complete ✓</span>
+        </div>
+
+        <!-- complete -->
+        <div class="scard">
+          <div class="thumb roles"></div>
+          <div><div class="title">The roles you want to play</div><div class="desc">The parts of life you want to hold onto — and the new ones you'd take up.</div></div>
+          <span class="chip-time">🕐 15 min</span>
+          <span class="badge badge-complete">Complete ✓</span>
+        </div>
+
+        <!-- active / current step -->
+        <div class="scard is-active">
+          <div class="thumb cal"></div>
+          <div><div class="title">Your ideal week</div><div class="desc">Map a week that feels right — what stays constant, what changes?</div></div>
+          <span class="chip-time">🕐 15 min</span>
+          <button class="btn btn-accent">Continue →</button>
+        </div>
+
+        <!-- not started -->
+        <div class="scard">
+          <div class="thumb keep"></div>
+          <div><div class="title">What you want to keep — and leave behind</div><div class="desc">What's worth carrying forward, and what you're ready to set down.</div></div>
+          <span class="chip-time">🕐 15 min</span>
+          <span class="badge badge-notstarted">Not started</span>
+        </div>
+
+        <!-- not started -->
+        <div class="scard">
+          <div class="thumb mtn"></div>
+          <div><div class="title">Hopes and fears</div><div class="desc">What you're looking forward to, and what quietly worries you.</div></div>
+          <span class="chip-time">🕐 15 min</span>
+          <span class="badge badge-notstarted">Not started</span>
+        </div>
+
+        <!-- not started -->
+        <div class="scard">
+          <div class="thumb future"></div>
+          <div><div class="title">Your future self</div><div class="desc">The person you're becoming — and what they'd thank you for.</div></div>
+          <span class="chip-time">🕐 15 min</span>
+          <span class="badge badge-notstarted">Not started</span>
+        </div>
+
+      </div>
+
+      <!-- ENCOURAGEMENT -->
+      <div class="info">
+        <div class="av">🌱</div>
+        <div>
+          <h4>There's no wrong way to do this</h4>
+          <p>Take the sessions in any order, at any pace. Nothing is graded, and you can revisit anything you've said.</p>
+        </div>
+        <a href="#" class="lk">How it works ›</a>
+      </div>
+
+      <!-- RESET -->
+      <div class="reset">
+        <button onclick="alert('Confirmation dialog → clears all rlp_ keys → redirect to /onboarding')">Start over</button>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<button class="fb">💬 Feedback</button>
+
+</body>
+</html>
