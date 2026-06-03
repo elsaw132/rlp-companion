@@ -31,6 +31,10 @@ export default function HomeDashboard() {
   const [completed, setCompleted] = useState<string[]>([]);
   const [greeting, setGreeting] = useState("Good morning");
   const [loaded, setLoaded] = useState(false);
+  // Whether the Stage 1 picture has been generated and confirmed (saved under
+  // rlp_stage1_summary_[userId]). Controls whether the Imagine view shows the
+  // loud "is ready" prompt or the calmer "View your picture" entry.
+  const [hasStage1Summary, setHasStage1Summary] = useState(false);
   // The stage the person is currently looking at. null means "follow the current
   // stage"; clicking a finished stage (in the nav or the arc) pins it to a number.
   const [viewedStage, setViewedStage] = useState<number | null>(null);
@@ -42,6 +46,9 @@ export default function HomeDashboard() {
     setLoaded(true);
     setCompleted(getCompletedIds(user.id));
     setGreeting(greetingWord());
+    setHasStage1Summary(
+      localStorage.getItem(`rlp_stage1_summary_${user.id}`) !== null
+    );
   }
 
   const firstName = user?.firstName || user?.fullName?.split(" ")[0] || "there";
@@ -207,26 +214,6 @@ export default function HomeDashboard() {
               {activeStage.name}.
             </p>
 
-            {/* STAGE 1 PICTURE — appears once all six Imagine modules are done.
-                A first sketch of their retirement they own and can keep shaping. */}
-            {isStageDone(STAGES[0]) && (
-              <Link className="picture-card" href="/stage/1">
-                <span className="pc-icon" aria-hidden="true">
-                  ✦
-                </span>
-                <span className="pc-body">
-                  <span className="pc-title">Your Stage 1 picture is ready</span>
-                  <span className="pc-sub">
-                    A first sketch of the retirement you&apos;ve started to
-                    imagine — yours to shape as you go.
-                  </span>
-                </span>
-                <span className="pc-chev" aria-hidden="true">
-                  ›
-                </span>
-              </Link>
-            )}
-
             {/* STAGE ARC */}
             <div className="steps">
               {STAGES.map((s) => {
@@ -316,6 +303,41 @@ export default function HomeDashboard() {
                 <div className="cloud two"></div>
               </div>
             </section>
+            )}
+
+            {/* STAGE 1 PICTURE — only within the Imagine view, once all six
+                Imagine modules are done. A loud "is ready" prompt until the
+                picture is confirmed, then a calmer persistent entry. */}
+            {viewedStageNumber === 1 && isStageDone(STAGES[0]) && (
+              hasStage1Summary ? (
+                <Link className="picture-card is-calm" href="/stage/1">
+                  <span className="pc-icon" aria-hidden="true">
+                    ✦
+                  </span>
+                  <span className="pc-body">
+                    <span className="pc-title">View your Stage 1 picture</span>
+                  </span>
+                  <span className="pc-chev" aria-hidden="true">
+                    ›
+                  </span>
+                </Link>
+              ) : (
+                <Link className="picture-card" href="/stage/1">
+                  <span className="pc-icon" aria-hidden="true">
+                    ✦
+                  </span>
+                  <span className="pc-body">
+                    <span className="pc-title">Your Stage 1 picture is ready</span>
+                    <span className="pc-sub">
+                      A first sketch of the retirement you&apos;ve started to
+                      imagine — yours to shape as you go.
+                    </span>
+                  </span>
+                  <span className="pc-chev" aria-hidden="true">
+                    ›
+                  </span>
+                </Link>
+              )
             )}
 
             {/* STAGE SESSIONS */}
@@ -472,6 +494,10 @@ const homeCss = `
 .rlp-home .picture-card .pc-title{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--ink);line-height:1.2}
 .rlp-home .picture-card .pc-sub{font-size:14px;color:var(--text-muted);line-height:1.5}
 .rlp-home .picture-card .pc-chev{margin-left:auto;font-size:24px;line-height:1;color:var(--text-muted);flex-shrink:0}
+.rlp-home .picture-card.is-calm{background:#fff;border-color:var(--border);box-shadow:var(--shadow-sm);padding:16px 20px}
+.rlp-home .picture-card.is-calm:hover{border-color:var(--border-strong);box-shadow:var(--shadow-md)}
+.rlp-home .picture-card.is-calm .pc-icon{width:34px;height:34px;font-size:16px;background:var(--bg-alt)}
+.rlp-home .picture-card.is-calm .pc-title{font-family:var(--font-sans);font-size:15px;font-weight:600;color:var(--brand-primary)}
 
 .rlp-home .steps{display:flex;align-items:flex-start;gap:0;margin-bottom:32px}
 .rlp-home .step{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;flex:1;position:relative;background:none;border:none;font-family:inherit;padding:0}

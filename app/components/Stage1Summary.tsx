@@ -167,6 +167,23 @@ export default function Stage1Summary() {
                   ))}
                 </article>
 
+                {/* A calm, separate forward-look beneath the personal picture,
+                    so it reads as a foundation rather than a full stop. Largely
+                    the same for everyone — the programme shape doesn't change. */}
+                <section className="whatnext">
+                  <h2 className="wn-head">What happens next</h2>
+                  <p className="wn-body">
+                    This picture is the ground everything else builds on. From
+                    here, each stage takes it further: in <strong>Explore</strong>,
+                    you&apos;ll go deeper one area at a time; in{" "}
+                    <strong>Understand</strong>, you&apos;ll work out what matters
+                    most to you; and in <strong>Plan</strong>, you&apos;ll turn it
+                    into something concrete. It all builds towards your Retirement
+                    Life Plan at the end. None of it is fixed — you&apos;ll keep
+                    adjusting and adding to this picture as you go.
+                  </p>
+                </section>
+
                 {phase === "editing" ? (
                   <div className="editbox">
                     <label className="edit-label" htmlFor="whatoff">
@@ -263,6 +280,10 @@ const css = `
 .rlp-stage1 .picture p:last-child{margin-bottom:0}
 .rlp-stage1 .picture.is-loading{display:grid;place-items:center;min-height:160px}
 .rlp-stage1 .loading-line{font-family:var(--font-serif)!important;font-style:italic;color:var(--text-muted)!important}
+.rlp-stage1 .whatnext{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:22px 24px;margin-bottom:28px}
+.rlp-stage1 .whatnext .wn-head{font-family:var(--font-sans);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin:0 0 10px}
+.rlp-stage1 .whatnext .wn-body{font-family:var(--font-sans);font-size:15px;line-height:1.65;color:var(--text);margin:0}
+.rlp-stage1 .whatnext .wn-body strong{color:var(--ink);font-weight:600}
 .rlp-stage1 .errorbox{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);padding:28px;margin-bottom:28px;text-align:center}
 .rlp-stage1 .errorbox p{font-family:var(--font-sans);font-size:15px;color:var(--text);margin-bottom:18px}
 .rlp-stage1 .actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
