@@ -2,16 +2,9 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ProviderBand from "../components/ProviderBand";
-import { markOnboardingComplete } from "@/lib/onboarding";
-import { getPreferredName, setPreferredName } from "@/lib/displayName";
-
-type Answers = {
-  partner: string;
-  horizon: string;
-  motivation: string | null;
-};
+import { useUserData } from "@/lib/userData";
 
 const HORIZON_OPTIONS = [
   "Less than 2 years",
@@ -32,6 +25,7 @@ const MOTIVATION_OPTIONS = [
 
 export default function OnboardingPage() {
   const { user, isLoaded } = useUser();
+  const data = useUserData();
   const router = useRouter();
 
   const [step, setStep] = useState(1);
@@ -42,40 +36,36 @@ export default function OnboardingPage() {
   const [horizon, setHorizon] = useState("");
   const [motivation, setMotivation] = useState("");
 
-  // Pre-fill the name field once Clerk resolves: any preferred name they've
-  // already set, else Clerk's firstName. Leaves it blank when there's nothing —
-  // the field is optional and the greeting falls back gracefully.
-  if (user && !nameInit) {
+  // Once the data layer has loaded (running the one-time migration if needed),
+  // anyone who has already finished onboarding is sent straight to /home — they
+  // never see the form. Someone only part-way through (answers but no complete
+  // flag) stays here; their partial data has already been migrated, so nothing
+  // is lost.
+  const alreadyOnboarded = !data.loading && data.isOnboardingComplete();
+  useEffect(() => {
+    if (alreadyOnboarded) router.replace("/home");
+  }, [alreadyOnboarded, router]);
+
+  // Pre-fill the name field once the snapshot is loaded: any preferred name
+  // they've already set, else Clerk's firstName. Leaves it blank when there's
+  // nothing — the field is optional and the greeting falls back gracefully.
+  if (user && !data.loading && !nameInit) {
     setNameInit(true);
-    setName(getPreferredName(user.id) || user.firstName || "");
+    setName(data.getPreferredName() || user.firstName || "");
   }
 
-  function save(answers: Partial<Answers>) {
-    if (!user) return;
-    const key = `rlp_onboarding_${user.id}`;
-    let existing: Partial<Answers> = {};
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) existing = JSON.parse(raw);
-    } catch {
-      existing = {};
-    }
-    const merged: Answers = {
-      partner: "",
-      horizon: "",
-      motivation: null,
-      ...existing,
-      ...answers,
-    };
-    localStorage.setItem(key, JSON.stringify(merged));
-  }
-
-  if (!isLoaded) {
+  // Hold the form back until we know whether they belong here. The brief
+  // "setting things up" covers Clerk resolving and the first data load (which
+  // may include the one-time migration from localStorage).
+  if (!isLoaded || data.loading || alreadyOnboarded) {
     return (
       <>
         <ProviderBand />
         <main className="rlp-onb">
           <style>{css}</style>
+          <div className="column">
+            <p className="paragraph">Setting things up…</p>
+          </div>
         </main>
       </>
     );
@@ -100,7 +90,7 @@ export default function OnboardingPage() {
               name={name}
               setName={setName}
               onContinue={() => {
-                if (user && name.trim()) setPreferredName(user.id, name.trim());
+                if (name.trim()) data.setPreferredName(name.trim());
                 setStep(3);
               }}
             />
@@ -114,7 +104,7 @@ export default function OnboardingPage() {
               onSelect={setPartner}
               large
               onContinue={() => {
-                save({ partner });
+                data.saveOnboarding({ partner });
                 setStep(4);
               }}
               buttonLabel="Continue"
@@ -128,7 +118,7 @@ export default function OnboardingPage() {
               selected={horizon}
               onSelect={setHorizon}
               onContinue={() => {
-                save({ horizon });
+                data.saveOnboarding({ horizon });
                 setStep(5);
               }}
               buttonLabel="Continue"
@@ -141,15 +131,15 @@ export default function OnboardingPage() {
               options={MOTIVATION_OPTIONS}
               selected={motivation}
               onSelect={setMotivation}
-              onContinue={() => {
-                save({ motivation });
-                if (user) markOnboardingComplete(user.id);
+              onContinue={async () => {
+                await data.saveOnboarding({ motivation });
+                await data.markOnboardingComplete();
                 router.push("/home");
               }}
               buttonLabel="Finish"
-              onSkip={() => {
-                save({ motivation: null });
-                if (user) markOnboardingComplete(user.id);
+              onSkip={async () => {
+                await data.saveOnboarding({ motivation: null });
+                await data.markOnboardingComplete();
                 router.push("/home");
               }}
             />

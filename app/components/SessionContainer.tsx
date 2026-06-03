@@ -22,15 +22,7 @@ import QualitiesPicker, {
 } from "./QualitiesPicker";
 import type { InteractionMode } from "./InteractionShell";
 import type { ContentBlock, Interaction, BuildResult } from "@/lib/modules";
-import {
-  getCompletedIds,
-  markModuleComplete,
-} from "@/lib/progress";
-import {
-  buildPriorReflections,
-  hasPriorTakeaways,
-  saveTakeaway,
-} from "@/lib/takeaways";
+import { useUserData } from "@/lib/userData";
 
 // Vita appends this to her closing message so we know the module is finished.
 // It's stripped before display and before storage, so it never shows and never
@@ -139,47 +131,6 @@ type SessionContainerProps = {
 const COACH_ERROR_REPLY =
   "Sorry — something went wrong reaching Vita. Please try again in a moment.";
 
-type OnboardingAnswers = {
-  partner?: string;
-  horizon?: string;
-  motivation?: string | null;
-};
-
-// Turn the saved onboarding answers into a short sentence Vita can read.
-function buildOnboardingContext(userId?: string): string {
-  if (!userId) return "Nothing recorded yet.";
-
-  let answers: OnboardingAnswers = {};
-  try {
-    const raw = localStorage.getItem(`rlp_onboarding_${userId}`);
-    if (raw) answers = JSON.parse(raw) as OnboardingAnswers;
-  } catch {
-    return "Nothing recorded yet.";
-  }
-
-  const parts: string[] = [];
-
-  if (answers.partner === "Me and my partner") {
-    parts.push("They're planning their retirement with a partner");
-  } else if (answers.partner === "Just me") {
-    parts.push("They're planning their retirement on their own");
-  }
-
-  if (answers.horizon === "Not sure") {
-    parts.push("they're not yet sure how far off retirement is");
-  } else if (answers.horizon) {
-    parts.push(`retirement is roughly ${answers.horizon} away`);
-  }
-
-  let sentence = parts.length ? parts.join(", ") + "." : "";
-
-  if (answers.motivation) {
-    sentence += `${sentence ? " " : ""}What prompted them to start: ${answers.motivation.toLowerCase()}.`;
-  }
-
-  return sentence.trim() || "Nothing recorded yet.";
-}
-
 function youtubeEmbedUrl(url: string): string {
   try {
     const u = new URL(url);
@@ -215,6 +166,7 @@ export default function SessionContainer({
   interaction,
 }: SessionContainerProps) {
   const { user } = useUser();
+  const userData = useUserData();
 
   // The readable text Vita draws on — the primer's text blocks, joined. Video
   // blocks have no readable text, so they're skipped.
@@ -231,7 +183,10 @@ export default function SessionContainer({
   >("reading");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  // Flips true once we've read this module's saved state out of the snapshot, so
+  // the persist effect can't overwrite a saved conversation with an empty one
+  // before hydration.
+  const [hydrated, setHydrated] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Guards the one-time dynamic-opening call so it can't fire twice (e.g. under
@@ -251,65 +206,46 @@ export default function SessionContainer({
   // state (this flips back to false).
   const [reopened, setReopened] = useState(false);
 
-  const storageKey = user ? `rlp_session_${user.id}_${sessionId}` : null;
-  const buildKey = user ? `rlp_build_${user.id}_${sessionId}` : null;
-
-  // Load any saved conversation and built day as soon as the user (and so the
-  // key) is known. We read during render rather than in an effect so the first
-  // paint already has the saved state — no empty-then-refill second render. The
-  // setLoadedKey guard makes this run exactly once per key. localStorage is
-  // browser-only, so skip it during server rendering.
-  if (
-    storageKey &&
-    buildKey &&
-    storageKey !== loadedKey &&
-    typeof window !== "undefined"
-  ) {
-    setLoadedKey(storageKey);
+  // Load any saved conversation and built day from the snapshot as soon as the
+  // user is signed in and the data layer has finished loading. We read during
+  // render rather than in an effect so the first paint already has the saved
+  // state — no empty-then-refill second render. The hydrated guard makes this
+  // run exactly once.
+  if (user && !userData.loading && !hydrated) {
+    setHydrated(true);
 
     // How many modules in this stage are already complete (and is this one).
-    const completedIds = user ? getCompletedIds(user.id) : [];
+    const completedIds = userData.getCompletedIds();
     setCompletedCount(
       stageModuleIds.filter((id) => completedIds.includes(id)).length
     );
     if (completedIds.includes(sessionId)) setCompleted(true);
 
-    let savedBuild: BuildResult | null = null;
-    try {
-      const raw = localStorage.getItem(buildKey);
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed && typeof parsed === "object" && "type" in parsed) {
-        savedBuild = parsed as BuildResult;
-      }
-    } catch {
-      savedBuild = null;
-    }
+    const savedBuild = userData.getBuild(sessionId);
     if (savedBuild) setBuildResult(savedBuild);
 
-    try {
-      const raw = localStorage.getItem(storageKey);
-      const saved = raw ? (JSON.parse(raw) as Message[]) : null;
-      if (Array.isArray(saved) && saved.length > 0) {
-        // A conversation is already underway — resume it.
-        setMessages(saved);
-        setPhase("conversation");
-      } else if (savedBuild) {
-        // They finished the build last time but hadn't started talking. Drop
-        // them into the conversation with no messages yet — the opening effect
-        // generates Vita's first line from what they built.
-        setPhase("conversation");
-      }
-    } catch {
-      // ignore corrupt data — start fresh
+    const saved = userData.getConversation(sessionId);
+    if (saved && saved.length > 0) {
+      // A conversation is already underway — resume it.
+      setMessages(saved);
+      setPhase("conversation");
+    } else if (savedBuild) {
+      // They finished the build last time but hadn't started talking. Drop
+      // them into the conversation with no messages yet — the opening effect
+      // generates Vita's first line from what they built.
+      setPhase("conversation");
     }
   }
 
-  // Persist the conversation after every change, but only once we've loaded any
-  // existing conversation for this key (otherwise we'd overwrite it with []).
+  // Persist the conversation after every change, but only once we've hydrated
+  // any existing conversation (otherwise we'd overwrite it with []).
   useEffect(() => {
-    if (!storageKey || storageKey !== loadedKey) return;
-    localStorage.setItem(storageKey, JSON.stringify(messages));
-  }, [messages, storageKey, loadedKey]);
+    if (!hydrated) return;
+    void userData.saveConversation(sessionId, messages);
+    // userData is a fresh object each render; the hydrated guard and sessionId
+    // are what actually gate this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, hydrated, sessionId]);
 
   // Show the conversation. The opening effect seeds Vita's first message — a
   // dynamic, drawn-from-context one when there's something to draw on, or the
@@ -333,8 +269,8 @@ export default function SessionContainer({
           isOpening: true,
           coachOpening,
           sessionInstructions: sessionInstructions ?? "",
-          onboardingContext: buildOnboardingContext(user?.id),
-          priorReflections: buildPriorReflections(user?.id, sessionId),
+          onboardingContext: userData.buildOnboardingContext(),
+          priorReflections: userData.buildPriorReflections(sessionId),
           sessionContent: sessionContent ?? primerText,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
         }),
@@ -362,7 +298,7 @@ export default function SessionContainer({
 
     const store = (text: string) => {
       if (!text.trim() || !user) return;
-      saveTakeaway(user.id, {
+      void userData.saveTakeaway({
         moduleId: sessionId,
         moduleTitle: sessionTitle,
         text: text.trim(),
@@ -393,7 +329,7 @@ export default function SessionContainer({
   // Seed Vita's opening. Open dynamically whenever there's something to draw on
   // — an interaction output OR earlier takeaways — otherwise use the fixed line.
   async function seedOpening() {
-    if (buildResult || (user && hasPriorTakeaways(user.id, sessionId))) {
+    if (buildResult || (user && userData.hasPriorTakeaways(sessionId))) {
       await generateOpening();
     } else {
       setMessages([{ role: "coach", text: coachOpening }]);
@@ -428,7 +364,7 @@ export default function SessionContainer({
   // then open the conversation.
   function handleBuildFinish(result: BuildResult) {
     setBuildResult(result);
-    if (buildKey) localStorage.setItem(buildKey, JSON.stringify(result));
+    void userData.saveBuild(sessionId, result);
     startConversation();
   }
 
@@ -452,7 +388,7 @@ export default function SessionContainer({
     const changed =
       !buildResult || JSON.stringify(buildResult) !== JSON.stringify(result);
     setBuildResult(result);
-    if (buildKey) localStorage.setItem(buildKey, JSON.stringify(result));
+    void userData.saveBuild(sessionId, result);
     if (changed && messages.length > 0) setEditAckPending(true);
     setPhase("conversation");
   }
@@ -487,8 +423,8 @@ export default function SessionContainer({
           messages: conversation,
           coachOpening: actualOpening,
           sessionInstructions: sessionInstructions ?? "",
-          onboardingContext: buildOnboardingContext(user?.id),
-          priorReflections: buildPriorReflections(user?.id, sessionId),
+          onboardingContext: userData.buildOnboardingContext(),
+          priorReflections: userData.buildPriorReflections(sessionId),
           sessionContent: sessionContent ?? primerText,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
           editAcknowledgement,
@@ -517,7 +453,7 @@ export default function SessionContainer({
       if (editAckPending) setEditAckPending(false);
 
       if (isClosing && user) {
-        markModuleComplete(user.id, sessionId);
+        void userData.markModuleComplete(sessionId);
         if (!completed) {
           setCompleted(true);
           setCompletedCount((n) => n + 1);
@@ -553,6 +489,17 @@ export default function SessionContainer({
     : allText
       ? "I've read this →"
       : "Continue →";
+
+  // Hold the screen until the data layer has loaded, so a saved conversation
+  // can hydrate before we paint — never flash the reading screen over one
+  // that's already underway.
+  if (userData.loading) {
+    return (
+      <div style={styles.container}>
+        <p style={styles.loadingLine}>Loading…</p>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -852,6 +799,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: "32px",
+  },
+  loadingLine: {
+    fontFamily: "var(--font-serif)",
+    fontStyle: "italic",
+    fontSize: "var(--fs-body)",
+    color: "var(--text-muted)",
   },
 
   // ZONE 1 — programme header

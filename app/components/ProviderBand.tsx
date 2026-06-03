@@ -6,7 +6,7 @@
 // All text/icons on the band are navy (--brand-on-band).
 
 import { useUser } from "@clerk/nextjs";
-import { getDisplayName } from "@/lib/displayName";
+import { useUserData } from "@/lib/userData";
 
 // The provider whose brand the band carries. This is the one piece that swaps
 // per provider; the brand colours (yellow band, navy) stay as they are.
@@ -29,7 +29,8 @@ function initialsOf(user: ClerkUser): string {
 
 export default function ProviderBand() {
   const { user } = useUser();
-  const name = getDisplayName(user?.id, user);
+  const userData = useUserData();
+  const name = userData.loading ? null : userData.getDisplayName(user);
   const initials = initialsOf(user);
 
   return (

@@ -4,8 +4,8 @@
 // are complete. It reads the six stored takeaways, asks Claude to weave them
 // into one warm, second-person picture (via /api/stage-summary), and lets the
 // person confirm it ("that's a good picture of me") or say what isn't quite
-// right and have it written again. The confirmed picture is saved under
-// rlp_stage1_summary_[userId]. Whether a partner prompt follows is read from
+// right and have it written again. The confirmed picture is saved through the
+// user data layer. Whether a partner prompt follows is read from
 // onboarding. Everything is framed as a first sketch they own and can change —
 // not a verdict, not a finished plan.
 
@@ -13,41 +13,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { STAGES } from "@/lib/modules";
-import { getTakeaway } from "@/lib/takeaways";
-import { getDisplayName } from "@/lib/displayName";
-
-const summaryKey = (userId: string) => `rlp_stage1_summary_${userId}`;
-
-type SavedSummary = { text: string; savedAt: string };
-
-function getSavedSummary(userId: string): SavedSummary | null {
-  try {
-    const raw = localStorage.getItem(summaryKey(userId));
-    const parsed = raw ? JSON.parse(raw) : null;
-    if (parsed && typeof parsed.text === "string") return parsed as SavedSummary;
-  } catch {
-    // ignore corrupt data
-  }
-  return null;
-}
-
-// Whether the person is planning with a partner, read from onboarding. Only
-// "Me and my partner" turns on the partner prompt; anything else skips it.
-function hasPartner(userId: string): boolean {
-  try {
-    const raw = localStorage.getItem(`rlp_onboarding_${userId}`);
-    if (!raw) return false;
-    const answers = JSON.parse(raw) as { partner?: string };
-    return answers.partner === "Me and my partner";
-  } catch {
-    return false;
-  }
-}
+import { useUserData } from "@/lib/userData";
 
 type Phase = "loading" | "review" | "editing" | "partner";
 
 export default function Stage1Summary() {
   const { user } = useUser();
+  const userData = useUserData();
   const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>("loading");
@@ -59,13 +31,13 @@ export default function Stage1Summary() {
   // The name to address them by in the intro line, or null to drop it.
   const [displayName, setDisplayName] = useState<string | null>(null);
 
-  // Once Clerk resolves the user, either show the already-saved picture or
-  // generate a fresh one. Done in render (guarded) so the first paint matches
-  // the server, then fills in — the same pattern the dashboard uses.
-  if (user && !loaded && typeof window !== "undefined") {
+  // Once the data layer has loaded, either show the already-saved picture or
+  // generate a fresh one. Done in render (guarded) so it runs once the snapshot
+  // is ready — the same pattern the dashboard uses.
+  if (user && !userData.loading && !loaded) {
     setLoaded(true);
-    setDisplayName(getDisplayName(user.id, user));
-    const saved = getSavedSummary(user.id);
+    setDisplayName(userData.getDisplayName(user));
+    const saved = userData.getStage1Summary();
     if (saved) {
       setSummary(saved.text);
       setPhase("review");
@@ -76,9 +48,8 @@ export default function Stage1Summary() {
 
   // The six Imagine takeaways, in programme order, with non-empty text only.
   function gatherTakeaways(): { moduleTitle: string; text: string }[] {
-    if (!user) return [];
     return STAGES[0].modules.flatMap((m) => {
-      const t = getTakeaway(user.id, m.id);
+      const t = userData.getTakeaway(m.id);
       return t && t.text.trim()
         ? [{ moduleTitle: m.title, text: t.text.trim() }]
         : [];
@@ -113,12 +84,8 @@ export default function Stage1Summary() {
 
   function confirmPicture() {
     if (!user) return;
-    const payload: SavedSummary = {
-      text: summary,
-      savedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(summaryKey(user.id), JSON.stringify(payload));
-    if (hasPartner(user.id)) {
+    void userData.saveStage1Summary(summary);
+    if (userData.hasPartner()) {
       setPhase("partner");
     } else {
       router.push("/home");
@@ -129,6 +96,21 @@ export default function Stage1Summary() {
     .split(/\n{2,}/)
     .map((p) => p.trim())
     .filter(Boolean);
+
+  // Hold the screen until the snapshot is ready, so we never flash an empty
+  // picture before the saved one (or a fresh generation) is known.
+  if (userData.loading) {
+    return (
+      <main className="rlp-stage1">
+        <style>{css}</style>
+        <div className="wrap">
+          <div className="picture is-loading">
+            <p className="loading-line">Loading your picture…</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="rlp-stage1">

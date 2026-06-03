@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import "./globals.css";
+import { UserDataProvider } from "@/lib/userData";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -21,7 +22,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
-          {children}
+          <UserDataProvider>{children}</UserDataProvider>
           {/* Global feedback button — fixed bottom-right on every screen. */}
           <a
             href="https://tally.so"

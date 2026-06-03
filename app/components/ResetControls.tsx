@@ -4,9 +4,7 @@
 // data so the flow can be re-run easily during testing. Hide or remove them
 // before real users see the app.
 
-import { useUser } from "@clerk/nextjs";
-import { clearModuleComplete } from "@/lib/progress";
-import { clearTakeaway } from "@/lib/takeaways";
+import { useUserData } from "@/lib/userData";
 
 const linkStyle: React.CSSProperties = {
   background: "none",
@@ -33,14 +31,10 @@ const hoverCss = `
 // fresh from the reading and redoing it regenerates the takeaway. Onboarding is
 // left intact.
 export function ResetModuleLink({ sessionId }: { sessionId: string }) {
-  const { user } = useUser();
+  const data = useUserData();
 
-  function handleRestart() {
-    if (!user) return;
-    localStorage.removeItem(`rlp_session_${user.id}_${sessionId}`);
-    localStorage.removeItem(`rlp_build_${user.id}_${sessionId}`);
-    clearTakeaway(user.id, sessionId);
-    clearModuleComplete(user.id, sessionId);
+  async function handleRestart() {
+    await data.resetModule(sessionId);
     window.location.reload();
   }
 

@@ -8,14 +8,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { STAGES, TOTAL_STAGES } from "@/lib/modules";
-import { getCompletedIds, getActiveStageNumber } from "@/lib/progress";
-import { isOnboardingComplete } from "@/lib/onboarding";
-import { getDisplayName } from "@/lib/displayName";
-import { getStageIntrosSeen, markStageIntroSeen } from "@/lib/stageIntro";
-import { getTakeaway } from "@/lib/takeaways";
+import { getActiveStageNumber } from "@/lib/progress";
+import { useUserData } from "@/lib/userData";
 import StageIntro from "./StageIntro";
 
 // The soft illustrated thumbnail per module, by position within the stage —
@@ -31,6 +28,7 @@ function greetingWord(): string {
 
 export default function HomeDashboard() {
   const { user } = useUser();
+  const userData = useUserData();
   const router = useRouter();
   const [completed, setCompleted] = useState<string[]>([]);
   const [greeting, setGreeting] = useState("Good morning");
@@ -49,53 +47,34 @@ export default function HomeDashboard() {
   // the dashboard, or null. Set once on load, when the current stage has an
   // intro the person hasn't seen yet (first forward entry only).
   const [introStage, setIntroStage] = useState<number | null>(null);
-  // Onboarding gate. Genuinely new users land here straight from sign-up, so
-  // the dashboard must not render until we've confirmed they finished the
-  // welcome flow. The completion flag lives in localStorage (per user), which
-  // server middleware can't read — hence this client-side check. It fires only
-  // when the flag is absent, and onboarding sets the flag before routing back
-  // to /home, so there's no redirect loop. null = still checking.
-  const [onboardingOk, setOnboardingOk] = useState<boolean | null>(null);
 
-  // Resolve the gate during render (browser-only), matching how completion is
-  // read below. Navigation is a side effect, so it waits for the effect.
-  if (user && onboardingOk === null && typeof window !== "undefined") {
-    setOnboardingOk(isOnboardingComplete(user.id));
-  }
-
-  // Send users who haven't finished onboarding there before the dashboard shows.
-  useEffect(() => {
-    if (onboardingOk === false) router.replace("/onboarding");
-  }, [onboardingOk, router]);
-
-  // Hold the dashboard back until the onboarding gate has confirmed the user
-  // belongs here. Until then (or while redirecting to /onboarding) render
-  // nothing — the ProviderBand from the parent still shows.
-  if (onboardingOk !== true) {
-    return null;
-  }
-
-  // Read completion once Clerk resolves the user. Done during render (not an
-  // effect) so the first client paint matches the server (empty), then fills in.
-  // localStorage and the time-based greeting are browser-only, so guard for it.
-  if (user && !loaded && typeof window !== "undefined") {
+  // Read completion once the data layer has loaded. Done during render (not an
+  // effect) so the first paint after load already has the saved state. The
+  // onboarding gate now lives server-side in /home, so the dashboard only waits
+  // on its own data. The time-based greeting is browser-only.
+  if (user && !userData.loading && !loaded) {
     setLoaded(true);
-    const ids = getCompletedIds(user.id);
+    const ids = userData.getCompletedIds();
     setCompleted(ids);
     setGreeting(greetingWord());
-    setDisplayName(getDisplayName(user.id, user));
-    setHasStage1Summary(
-      localStorage.getItem(`rlp_stage1_summary_${user.id}`) !== null
-    );
+    setDisplayName(userData.getDisplayName(user));
+    setHasStage1Summary(userData.hasStage1Summary());
     // Show the current stage's intro once, the first time it's the active stage.
     // Tying it to the current stage (not the viewed one) means navigating back to
     // a finished stage never re-triggers it, and anyone already past a stage
     // won't suddenly see that stage's intro.
     const currentStage = getActiveStageNumber(ids);
     const stage = STAGES.find((s) => s.number === currentStage);
-    if (stage?.intro && !getStageIntrosSeen(user.id).includes(currentStage)) {
+    if (stage?.intro && !userData.getStageIntrosSeen().includes(currentStage)) {
       setIntroStage(currentStage);
     }
+  }
+
+  // Hold the dashboard back until the data layer has loaded, so we never paint
+  // an empty dashboard before completion is known. The ProviderBand from the
+  // parent still shows.
+  if (userData.loading) {
+    return null;
   }
 
   // The framing moment takes over the screen before anything else. Continuing
@@ -107,7 +86,7 @@ export default function HomeDashboard() {
         <StageIntro
           stage={stage}
           onContinue={() => {
-            if (user) markStageIntroSeen(user.id, introStage);
+            if (user) void userData.markStageIntroSeen(introStage);
             setIntroStage(null);
           }}
         />
@@ -156,7 +135,7 @@ export default function HomeDashboard() {
   const lastCompleted = completedModules[completedModules.length - 1] ?? null;
   const priorTakeaway =
     user && loaded && lastCompleted
-      ? getTakeaway(user.id, lastCompleted.id)
+      ? userData.getTakeaway(lastCompleted.id)
       : null;
 
   // Vita's personalised hero intro. A placeholder until the real wiring lands:
@@ -173,20 +152,13 @@ export default function HomeDashboard() {
     heroIntro = `Last time, you worked through "${lastCompleted.title}". Today, let's look at "${nextModule.title}".`;
   }
 
-  function handleReset() {
+  async function handleReset() {
     if (!user) return;
     const confirmed = window.confirm(
       "This clears all your answers and conversations. Start over?"
     );
     if (!confirmed) return;
-    const toRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("rlp_") && key.includes(user.id)) {
-        toRemove.push(key);
-      }
-    }
-    toRemove.forEach((k) => localStorage.removeItem(k));
+    await userData.resetAll();
     router.push("/onboarding");
   }
 
