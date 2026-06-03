@@ -8,10 +8,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { STAGES, TOTAL_STAGES } from "@/lib/modules";
 import { getCompletedIds, getActiveStageNumber } from "@/lib/progress";
+import { isOnboardingComplete } from "@/lib/onboarding";
 import { getStageIntrosSeen, markStageIntroSeen } from "@/lib/stageIntro";
 import { getTakeaway } from "@/lib/takeaways";
 import StageIntro from "./StageIntro";
@@ -44,6 +45,31 @@ export default function HomeDashboard() {
   // the dashboard, or null. Set once on load, when the current stage has an
   // intro the person hasn't seen yet (first forward entry only).
   const [introStage, setIntroStage] = useState<number | null>(null);
+  // Onboarding gate. Genuinely new users land here straight from sign-up, so
+  // the dashboard must not render until we've confirmed they finished the
+  // welcome flow. The completion flag lives in localStorage (per user), which
+  // server middleware can't read — hence this client-side check. It fires only
+  // when the flag is absent, and onboarding sets the flag before routing back
+  // to /home, so there's no redirect loop. null = still checking.
+  const [onboardingOk, setOnboardingOk] = useState<boolean | null>(null);
+
+  // Resolve the gate during render (browser-only), matching how completion is
+  // read below. Navigation is a side effect, so it waits for the effect.
+  if (user && onboardingOk === null && typeof window !== "undefined") {
+    setOnboardingOk(isOnboardingComplete(user.id));
+  }
+
+  // Send users who haven't finished onboarding there before the dashboard shows.
+  useEffect(() => {
+    if (onboardingOk === false) router.replace("/onboarding");
+  }, [onboardingOk, router]);
+
+  // Hold the dashboard back until the onboarding gate has confirmed the user
+  // belongs here. Until then (or while redirecting to /onboarding) render
+  // nothing — the ProviderBand from the parent still shows.
+  if (onboardingOk !== true) {
+    return null;
+  }
 
   // Read completion once Clerk resolves the user. Done during render (not an
   // effect) so the first client paint matches the server (empty), then fills in.

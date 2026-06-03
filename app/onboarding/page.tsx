@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ProviderBand from "../components/ProviderBand";
+import { markOnboardingComplete } from "@/lib/onboarding";
 
 type Answers = {
   partner: string;
@@ -120,11 +121,13 @@ export default function OnboardingPage() {
               onSelect={setMotivation}
               onContinue={() => {
                 save({ motivation });
+                if (user) markOnboardingComplete(user.id);
                 router.push("/home");
               }}
               buttonLabel="Finish"
               onSkip={() => {
                 save({ motivation: null });
+                if (user) markOnboardingComplete(user.id);
                 router.push("/home");
               }}
             />
