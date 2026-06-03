@@ -5,7 +5,6 @@
 // before real users see the app.
 
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { clearModuleComplete } from "@/lib/progress";
 import { clearTakeaway } from "@/lib/takeaways";
 
@@ -55,47 +54,6 @@ export function ResetModuleLink({ sessionId }: { sessionId: string }) {
         onClick={handleRestart}
       >
         Restart this module
-      </button>
-    </>
-  );
-}
-
-// Clears every rlp_ key belonging to this user (onboarding + all conversations),
-// then sends them to onboarding to start over. Confirms first since it wipes
-// onboarding too.
-export function ResetAllDataLink() {
-  const { user } = useUser();
-  const router = useRouter();
-
-  function handleResetAll() {
-    if (!user) return;
-    const confirmed = window.confirm(
-      "This clears all your answers and conversations. Start over?"
-    );
-    if (!confirmed) return;
-
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("rlp_") && key.includes(user.id)) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
-
-    router.push("/onboarding");
-  }
-
-  return (
-    <>
-      <style>{hoverCss}</style>
-      <button
-        type="button"
-        className="reset-link"
-        style={linkStyle}
-        onClick={handleResetAll}
-      >
-        Reset all my data
       </button>
     </>
   );
