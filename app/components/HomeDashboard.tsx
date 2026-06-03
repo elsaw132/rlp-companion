@@ -31,6 +31,9 @@ export default function HomeDashboard() {
   const [completed, setCompleted] = useState<string[]>([]);
   const [greeting, setGreeting] = useState("Good morning");
   const [loaded, setLoaded] = useState(false);
+  // The stage the person is currently looking at. null means "follow the current
+  // stage"; clicking a finished stage (in the nav or the arc) pins it to a number.
+  const [viewedStage, setViewedStage] = useState<number | null>(null);
 
   // Read completion once Clerk resolves the user. Done during render (not an
   // effect) so the first client paint matches the server (empty), then fills in.
@@ -61,7 +64,23 @@ export default function HomeDashboard() {
   const activeStage =
     STAGES.find((s) => s.number === activeStageNumber) ?? STAGES[0];
 
-  const stageModules = activeStage.modules;
+  // Whether a stage is fully finished (every module in it complete). Empty
+  // future stages don't count as done.
+  const isStageDone = (s: (typeof STAGES)[number]) =>
+    s.modules.length > 0 && s.modules.every((m) => completed.includes(m.id));
+
+  // The stage being looked at. Defaults to the current stage and stays there
+  // until the person pins an earlier one. Stages past the current one are locked
+  // and can't be viewed, so clamp to the current stage if anything tries.
+  const viewedStageNumber =
+    viewedStage !== null && viewedStage <= activeStageNumber
+      ? viewedStage
+      : activeStageNumber;
+  const viewedStageData =
+    STAGES.find((s) => s.number === viewedStageNumber) ?? activeStage;
+  const isViewingCurrent = viewedStageNumber === activeStageNumber;
+
+  const stageModules = viewedStageData.modules;
   const doneInStage = stageModules.filter((m) => completed.includes(m.id)).length;
   const totalInStage = stageModules.length;
   const stagePct =
@@ -116,24 +135,48 @@ export default function HomeDashboard() {
           <div className="side-eyebrow">Your programme</div>
           <nav className="navlist">
             {STAGES.map((s) => {
-              const isActive = s.number === activeStageNumber;
-              const isDone =
-                s.modules.length > 0 &&
-                s.modules.every((m) => completed.includes(m.id));
-              const navClass = isActive ? "nav is-active" : "nav is-idle";
-              const numClass = isActive
-                ? "n"
+              const isCurrent = s.number === activeStageNumber;
+              const isDone = isStageDone(s);
+              const isLocked = s.number > activeStageNumber;
+              const isViewing = s.number === viewedStageNumber;
+              const numClass = isCurrent
+                ? "n n--current"
                 : isDone
                   ? "n n--done"
                   : "n n--idle";
-              return (
-                <div key={s.number} className={navClass}>
+              const navClass = [
+                "nav",
+                isViewing ? "is-viewing" : "",
+                isLocked ? "is-locked" : "",
+                !isCurrent && !isDone ? "is-idle" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              const inner = (
+                <>
                   <span className={numClass}>{isDone ? "✓" : s.number}</span>
                   <span>
                     <span className="t">{s.name}</span>
                     <span className="s">{s.subtitle}</span>
                   </span>
+                </>
+              );
+              // Finished stages and the current stage are navigable; later stages
+              // are locked and inert.
+              return isLocked ? (
+                <div key={s.number} className={navClass} aria-disabled="true">
+                  {inner}
                 </div>
+              ) : (
+                <button
+                  key={s.number}
+                  type="button"
+                  className={navClass}
+                  aria-current={isViewing ? "true" : undefined}
+                  onClick={() => setViewedStage(s.number)}
+                >
+                  {inner}
+                </button>
               );
             })}
           </nav>
@@ -147,7 +190,7 @@ export default function HomeDashboard() {
                 <span>{stagePct}%</span>
               </div>
             </div>
-            <div className="lab">Your {activeStage.name} score</div>
+            <div className="lab">Your {viewedStageData.name} score</div>
             <div className="sub">Grows as you complete the steps in this stage.</div>
           </div>
         </aside>
@@ -167,21 +210,63 @@ export default function HomeDashboard() {
             {/* STAGE ARC */}
             <div className="steps">
               {STAGES.map((s) => {
-                const isActive = s.number === activeStageNumber;
-                const isDone =
-                  s.modules.length > 0 &&
-                  s.modules.every((m) => completed.includes(m.id));
-                const stepClass = isDone ? "done" : isActive ? "active" : "todo";
-                return (
-                  <div key={s.number} className={`step ${stepClass}`}>
+                const isCurrent = s.number === activeStageNumber;
+                const isDone = isStageDone(s);
+                const isLocked = s.number > activeStageNumber;
+                const isViewing = s.number === viewedStageNumber;
+                const stepState = isDone ? "done" : isCurrent ? "active" : "todo";
+                const stepClass = [
+                  "step",
+                  stepState,
+                  isViewing ? "is-viewing" : "",
+                  isLocked ? "is-locked" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+                const inner = (
+                  <>
                     <div className="dot">{isDone ? "✓" : s.number}</div>
                     <div className="cap">{s.name}</div>
+                  </>
+                );
+                return isLocked ? (
+                  <div key={s.number} className={stepClass} aria-disabled="true">
+                    {inner}
                   </div>
+                ) : (
+                  <button
+                    key={s.number}
+                    type="button"
+                    className={stepClass}
+                    aria-current={isViewing ? "true" : undefined}
+                    onClick={() => setViewedStage(s.number)}
+                  >
+                    {inner}
+                  </button>
                 );
               })}
             </div>
 
-            {/* COACH NEXT-STEP HERO */}
+            {/* COACH NEXT-STEP HERO — only when looking at the current stage.
+                Viewing an earlier, finished stage shows a calmer header instead. */}
+            {!isViewingCurrent ? (
+              <section className="done-head">
+                <h2>
+                  <span className="tick" aria-hidden="true">
+                    ✓
+                  </span>
+                  {viewedStageData.name} — complete
+                </h2>
+                <p>Revisit any step below; your answers are saved.</p>
+                <button
+                  type="button"
+                  className="link-back"
+                  onClick={() => setViewedStage(null)}
+                >
+                  Back to your current step ›
+                </button>
+              </section>
+            ) : (
             <section className="hero">
               <div className="body">
                 <div className="vita">
@@ -211,10 +296,11 @@ export default function HomeDashboard() {
                 <div className="cloud two"></div>
               </div>
             </section>
+            )}
 
             {/* STAGE SESSIONS */}
             <div className="sec-row">
-              <div className="sec-head">Your steps in {activeStage.name}</div>
+              <div className="sec-head">Your steps in {viewedStageData.name}</div>
               <div className="sec-prog">
                 {doneInStage} of {totalInStage} steps complete
               </div>
@@ -231,9 +317,9 @@ export default function HomeDashboard() {
                 <div>
                   <h4>This stage is on its way</h4>
                   <p>
-                    The steps for {activeStage.name} are still being prepared.
-                    You can revisit anything you&apos;ve already done in the
-                    meantime.
+                    The steps for {viewedStageData.name} are still being
+                    prepared. You can revisit anything you&apos;ve already done in
+                    the meantime.
                   </p>
                 </div>
               </div>
@@ -241,20 +327,44 @@ export default function HomeDashboard() {
               <div className="cards">
                 {stageModules.map((m, i) => {
                   const isComplete = completed.includes(m.id);
-                  const isActiveStep = nextModule?.id === m.id;
+                  const isActiveStep = isViewingCurrent && nextModule?.id === m.id;
                   const thumb = THUMBS[i] ?? "future";
-                  const cardClass = isActiveStep ? "scard is-active" : "scard";
-                  return (
-                    <div key={m.id} className={cardClass}>
+                  const body = (
+                    <>
                       <div className={`thumb ${thumb}`} aria-hidden="true"></div>
                       <div>
                         <div className="title">{m.title}</div>
                         <div className="desc">{m.description}</div>
                       </div>
                       <span className="chip-time">🕐 {m.durationMin} min</span>
-                      {isComplete ? (
-                        <span className="badge badge-complete">Complete ✓</span>
-                      ) : isActiveStep ? (
+                    </>
+                  );
+                  // Completed steps are clickable — they reopen the module to
+                  // re-read or carry on. The whole card is the link.
+                  if (isComplete) {
+                    return (
+                      <Link
+                        key={m.id}
+                        className="scard scard-done"
+                        href={`/session/${m.id}`}
+                      >
+                        {body}
+                        <span className="done-cap">
+                          <span className="badge badge-complete">Complete ✓</span>
+                          <span className="chev" aria-hidden="true">
+                            ›
+                          </span>
+                        </span>
+                      </Link>
+                    );
+                  }
+                  return (
+                    <div
+                      key={m.id}
+                      className={isActiveStep ? "scard is-active" : "scard"}
+                    >
+                      {body}
+                      {isActiveStep ? (
                         <Link className="btn btn-accent" href={`/session/${m.id}`}>
                           Continue →
                         </Link>
@@ -309,12 +419,14 @@ const homeCss = `
 
 .rlp-home .side-eyebrow{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:600;padding:0 12px;margin-bottom:10px}
 .rlp-home .navlist{display:flex;flex-direction:column;gap:4px;margin-bottom:28px}
-.rlp-home .nav{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:var(--r-sm)}
-.rlp-home .nav:hover{background:var(--bg-alt)}
-.rlp-home .nav.is-active{background:var(--brand-primary-tint)}
-.rlp-home .nav.is-active:hover{background:var(--brand-primary-tint)}
+.rlp-home .nav{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:var(--r-sm);width:100%;text-align:left;background:none;border:none;font-family:inherit;cursor:pointer}
+.rlp-home button.nav:hover{background:var(--bg-alt)}
+.rlp-home .nav.is-viewing{background:var(--brand-primary-tint)}
+.rlp-home .nav.is-viewing:hover{background:var(--brand-primary-tint)}
+.rlp-home .nav.is-locked{opacity:.5;cursor:default}
+.rlp-home .nav.is-locked:hover{background:none}
 .rlp-home .nav .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0}
-.rlp-home .nav.is-active .n{background:var(--brand-primary);color:#fff}
+.rlp-home .nav .n--current{background:var(--brand-primary);color:#fff}
 .rlp-home .nav .n--idle{background:#EBF1F8;color:var(--brand-primary)}
 .rlp-home .nav .n--done{background:var(--brand-primary);color:#fff}
 .rlp-home .nav > span:last-child{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -334,8 +446,11 @@ const homeCss = `
 .rlp-home .greet-sub{font-size:14px;color:var(--text-muted);margin-bottom:28px}
 
 .rlp-home .steps{display:flex;align-items:flex-start;gap:0;margin-bottom:32px}
-.rlp-home .step{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;flex:1;position:relative}
+.rlp-home .step{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;flex:1;position:relative;background:none;border:none;font-family:inherit;padding:0}
+.rlp-home button.step{cursor:pointer}
+.rlp-home .step.is-locked{opacity:.5;cursor:default}
 .rlp-home .step .dot{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;z-index:1}
+.rlp-home .step.is-viewing .dot{box-shadow:0 0 0 4px var(--brand-primary-tint)}
 .rlp-home .step.done .dot{background:var(--brand-primary);color:#fff}
 .rlp-home .step.active .dot{background:var(--accent);color:#fff}
 .rlp-home .step.todo .dot{background:var(--border);color:var(--text-faint)}
@@ -359,6 +474,13 @@ const homeCss = `
 .rlp-home .hero .scene .cloud{position:absolute;width:64px;height:18px;background:rgba(255,255,255,.7);border-radius:20px;top:74px;right:54px}
 .rlp-home .hero .scene .cloud.two{width:44px;top:104px;right:120px;opacity:.6}
 
+.rlp-home .done-head{background:var(--success-surface);border:1px solid var(--success-line);border-radius:var(--r-lg);padding:24px 26px;margin-bottom:34px}
+.rlp-home .done-head h2{font-family:var(--font-serif);font-size:24px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.rlp-home .done-head .tick{width:30px;height:30px;border-radius:50%;background:var(--brand-primary);color:#fff;display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.rlp-home .done-head p{font-size:15px;color:var(--text);margin-bottom:14px}
+.rlp-home .link-back{background:none;border:none;cursor:pointer;font-family:inherit;font-size:15px;font-weight:600;color:var(--brand-primary);padding:8px 0;min-height:44px}
+.rlp-home .link-back:hover{text-decoration:underline}
+
 .rlp-home .btn{font-size:15px;font-weight:600;border:none;border-radius:var(--r-sm);padding:13px 20px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;line-height:1;min-height:48px}
 .rlp-home .btn-navy{background:var(--brand-primary);color:#fff}
 .rlp-home .btn-navy:hover{background:var(--brand-primary-hover)}
@@ -375,6 +497,10 @@ const homeCss = `
 .rlp-home .cards{display:flex;flex-direction:column;gap:12px;margin-bottom:34px}
 .rlp-home .scard{display:grid;grid-template-columns:88px minmax(0,1fr) auto auto;gap:18px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:18px;box-shadow:var(--shadow-sm)}
 .rlp-home .scard.is-active{background:var(--accent-surface);border-color:var(--accent-line);box-shadow:var(--shadow-md)}
+.rlp-home .scard-done{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease}
+.rlp-home .scard-done:hover{border-color:var(--border-strong);box-shadow:var(--shadow-md)}
+.rlp-home .done-cap{display:inline-flex;align-items:center;gap:12px}
+.rlp-home .done-cap .chev{font-size:22px;line-height:1;color:var(--text-muted)}
 .rlp-home .scard > div:not(.thumb){min-width:0}
 .rlp-home .thumb{width:88px;height:72px;border-radius:var(--r-md);overflow:hidden;position:relative;flex-shrink:0}
 .rlp-home .thumb.sunrise{background:linear-gradient(var(--ill-sky-pale),var(--ill-hill) 70%)}
@@ -422,11 +548,11 @@ const homeCss = `
   .rlp-home .scard .thumb{grid-column:1;grid-row:1 / span 2;width:64px;height:64px}
   .rlp-home .scard > div:not(.thumb){grid-column:2 / -1;grid-row:1}
   .rlp-home .scard .chip-time{grid-column:2;grid-row:2;align-self:center}
-  .rlp-home .scard .badge,.rlp-home .scard .btn{grid-column:3;grid-row:2;justify-self:end;align-self:center}
+  .rlp-home .scard .badge,.rlp-home .scard .btn,.rlp-home .scard .done-cap{grid-column:3;grid-row:2;justify-self:end;align-self:center}
 }
 @media (max-width:440px){
   .rlp-home .scard{grid-template-columns:64px minmax(0,1fr);grid-template-rows:auto auto auto}
   .rlp-home .scard .chip-time{grid-column:2;grid-row:2;justify-self:start}
-  .rlp-home .scard .badge,.rlp-home .scard .btn{grid-column:2;grid-row:3;justify-self:start}
+  .rlp-home .scard .badge,.rlp-home .scard .btn,.rlp-home .scard .done-cap{grid-column:2;grid-row:3;justify-self:start}
 }
 `;
