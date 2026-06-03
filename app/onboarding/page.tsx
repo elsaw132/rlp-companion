@@ -89,18 +89,24 @@ export default function OnboardingPage() {
         <div className="column">
           {step === 1 && (
             <Welcome
-              name={name}
-              setName={setName}
               understood={understood}
               setUnderstood={setUnderstood}
-              onContinue={() => {
-                if (user && name.trim()) setPreferredName(user.id, name.trim());
-                setStep(2);
-              }}
+              onContinue={() => setStep(2)}
             />
           )}
 
           {step === 2 && (
+            <NameStep
+              name={name}
+              setName={setName}
+              onContinue={() => {
+                if (user && name.trim()) setPreferredName(user.id, name.trim());
+                setStep(3);
+              }}
+            />
+          )}
+
+          {step === 3 && (
             <CardStep
               heading="When you picture your retirement, is it just you — or you and a partner?"
               options={PARTNER_OPTIONS}
@@ -109,20 +115,6 @@ export default function OnboardingPage() {
               large
               onContinue={() => {
                 save({ partner });
-                setStep(3);
-              }}
-              buttonLabel="Continue"
-            />
-          )}
-
-          {step === 3 && (
-            <CardStep
-              heading="Roughly how far from retirement are you?"
-              options={HORIZON_OPTIONS}
-              selected={horizon}
-              onSelect={setHorizon}
-              onContinue={() => {
-                save({ horizon });
                 setStep(4);
               }}
               buttonLabel="Continue"
@@ -130,6 +122,20 @@ export default function OnboardingPage() {
           )}
 
           {step === 4 && (
+            <CardStep
+              heading="Roughly how far from retirement are you?"
+              options={HORIZON_OPTIONS}
+              selected={horizon}
+              onSelect={setHorizon}
+              onContinue={() => {
+                save({ horizon });
+                setStep(5);
+              }}
+              buttonLabel="Continue"
+            />
+          )}
+
+          {step === 5 && (
             <CardStep
               heading="What's prompted you to start thinking about retirement?"
               options={MOTIVATION_OPTIONS}
@@ -155,14 +161,10 @@ export default function OnboardingPage() {
 }
 
 function Welcome({
-  name,
-  setName,
   understood,
   setUnderstood,
   onContinue,
 }: {
-  name: string;
-  setName: (v: string) => void;
   understood: boolean;
   setUnderstood: (v: boolean) => void;
   onContinue: () => void;
@@ -195,21 +197,6 @@ function Welcome({
           helping you make sense of your own answers.
         </p>
 
-        <div className="name-field">
-          <label className="name-label" htmlFor="preferred-name">
-            First — what should I call you?
-          </label>
-          <input
-            id="preferred-name"
-            type="text"
-            className="name-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="The name you'd like me to use"
-            autoComplete="given-name"
-          />
-        </div>
-
         <label className="checkbox-row">
           <input
             type="checkbox"
@@ -232,6 +219,36 @@ function Welcome({
         </button>
       </div>
     </section>
+  );
+}
+
+function NameStep({
+  name,
+  setName,
+  onContinue,
+}: {
+  name: string;
+  setName: (v: string) => void;
+  onContinue: () => void;
+}) {
+  return (
+    <>
+      <h1 className="step-heading">What should I call you?</h1>
+      <div className="name-field">
+        <input
+          id="preferred-name"
+          type="text"
+          className="name-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="The name you'd like me to use"
+          autoComplete="given-name"
+        />
+      </div>
+      <button type="button" className="btn btn-navy" onClick={onContinue}>
+        Continue
+      </button>
+    </>
   );
 }
 
