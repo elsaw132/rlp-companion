@@ -134,7 +134,7 @@ export default function HomeDashboard() {
   // it draws on the latest takeaway when there is one, else the last title.
   let heroIntro: string;
   if (!nextModule) {
-    heroIntro = `You've finished everything that's ready so far — nicely done. New steps for ${activeStage.name} are on their way.`;
+    heroIntro = `You've finished everything that's ready so far — nicely done. New modules for ${activeStage.name} are on their way.`;
   } else if (!lastCompleted) {
     heroIntro =
       "We'll start by picturing a single ordinary day in your retirement — not the big questions yet, just what the day actually feels like.";
@@ -227,7 +227,7 @@ export default function HomeDashboard() {
               </div>
             </div>
             <div className="lab">Your {viewedStageData.name} score</div>
-            <div className="sub">Grows as you complete the steps in this stage.</div>
+            <div className="sub">Grows as you complete the modules in this stage.</div>
           </div>
         </aside>
 
@@ -293,7 +293,7 @@ export default function HomeDashboard() {
                   </span>
                   {viewedStageData.name} — complete
                 </h2>
-                <p>Revisit any step below; your answers are saved.</p>
+                <p>Revisit any module below; your answers are saved.</p>
                 <button
                   type="button"
                   className="link-back"
@@ -371,9 +371,9 @@ export default function HomeDashboard() {
 
             {/* STAGE SESSIONS */}
             <div className="sec-row">
-              <div className="sec-head">Your steps in {viewedStageData.name}</div>
+              <div className="sec-head">Your modules in {viewedStageData.name}</div>
               <div className="sec-prog">
-                {doneInStage} of {totalInStage} steps complete
+                {doneInStage} of {totalInStage} modules complete
               </div>
             </div>
             <div className="bar">
@@ -388,7 +388,7 @@ export default function HomeDashboard() {
                 <div>
                   <h4>This stage is on its way</h4>
                   <p>
-                    The steps for {viewedStageData.name} are still being
+                    The modules for {viewedStageData.name} are still being
                     prepared. You can revisit anything you&apos;ve already done in
                     the meantime.
                   </p>
@@ -436,8 +436,8 @@ export default function HomeDashboard() {
                     >
                       {body}
                       {isActiveStep ? (
-                        <Link className="btn btn-accent" href={`/session/${m.id}`}>
-                          Continue →
+                        <Link className="btn btn-navy" href={`/session/${m.id}`}>
+                          Continue with Vita →
                         </Link>
                       ) : (
                         <span className="badge badge-notstarted">Not started</span>
@@ -456,7 +456,7 @@ export default function HomeDashboard() {
               <div>
                 <h4>There&apos;s no wrong way to do this</h4>
                 <p>
-                  Take the steps in any order, at any pace. Nothing is graded,
+                  Take the modules in any order, at any pace. Nothing is graded,
                   and you can come back to anything you&apos;ve said.
                 </p>
               </div>
@@ -567,8 +567,6 @@ const homeCss = `
 .rlp-home .btn{font-size:15px;font-weight:600;border:none;border-radius:var(--r-sm);padding:13px 20px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;line-height:1;min-height:48px}
 .rlp-home .btn-navy{background:var(--brand-primary);color:#fff}
 .rlp-home .btn-navy:hover{background:var(--brand-primary-hover)}
-.rlp-home .btn-accent{background:var(--accent-strong);color:#fff}
-.rlp-home .btn-accent:hover{background:var(--accent-hover)}
 .rlp-home .chip-time{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-muted);background:#fff;border:1px solid var(--border);border-radius:var(--r-pill);padding:5px 12px;font-weight:500;white-space:nowrap}
 
 .rlp-home .sec-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:4px}
