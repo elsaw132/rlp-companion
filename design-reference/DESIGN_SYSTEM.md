@@ -1,7 +1,9 @@
 # RLP Companion — Design System
 
-**Theme:** Aviva (white-label reference). **Fonts:** Source Serif 4 + Inter.
-**Companion files:** `tokens.css` (the source of truth — import it once, globally) and `aviva-rlp-design-system.html` (a rendered reference of every component).
+**Theme:** Aviva-derived palette (white-label reference; the reference deployment shows the provider name "Lionsgate Pensions"). **Fonts:** Source Serif 4 + Inter.
+**Companion files:** `tokens.css` (the source of truth — import it once, globally), `aviva-rlp-design-system.html` (a rendered reference of every component), and `aviva-rlp-home-screen.html` (the composed home-screen target).
+
+**Terminology:** a unit of the programme is a **module** (e.g. 1.1) — that's the user-facing word and the code term. "Stage" is the group of modules (Imagine, Explore…). Don't use "session" or "step" in user-facing copy; "conversation" refers to the coach exchange inside a module.
 
 This document tells you how to build the RLP Companion's interface so it matches the agreed look. Build against the **semantic CSS variables** in `tokens.css`, never against raw hex values. The design has two layers: a **brand layer** (navy, yellow band — swappable per pension provider) and a **product layer** (warm cream, orange accent, neutrals — fixed everywhere). To re-skin for a different provider, only the brand block in `tokens.css` changes.
 
@@ -48,9 +50,9 @@ Two families, never blurred:
 |---|---|---|---|---|
 | Greeting / display | serif | `--fs-display` 34 | 600 | "Good morning, Margaret" |
 | Hero next-step title | serif | `--fs-h2` 22 | 600 | "Your ideal week" inside the hero |
-| Session card title | serif | `--fs-title` 20 | 600 | every session/stage title |
-| Section heading | **sans** | `--fs-section` 18 | 700 | "Your steps in this stage" |
-| Body / reading | sans | `--fs-body` 16 | 400 | session content, paragraphs |
+| Module card title | serif | `--fs-title` 20 | 600 | every module/stage title |
+| Section heading | **sans** | `--fs-section` 18 | 700 | "Your modules in this stage" |
+| Body / reading | sans | `--fs-body` 16 | 400 | module content, paragraphs |
 | Secondary / description | sans | `--fs-sm` 14 | 500 | card descriptions, dates |
 | Nav subtitle / small label | sans | `--fs-label` 12.5 | 500 | "Picture your future" |
 | Overline / eyebrow | sans | `--fs-eyebrow` 11.5 | 600 | UPPERCASE, letter-spacing .1em, muted |
@@ -64,15 +66,15 @@ Two families, never blurred:
 Each component below maps to a section in the HTML reference. Match structure, spacing, and states.
 
 ### Buttons
-- **Primary (navy):** `--brand-primary` fill, white text, `--r-sm`, min-height 48px, 13×20 padding, weight 600. Hover → `--brand-primary-hover`. Default primary action everywhere.
-- **Accent (current step):** fill is `--accent-strong` (**not** `--accent` — see accessibility), white text. Used *only* on the active session's Continue.
+- **Primary (navy):** `--brand-primary` fill, white text, `--r-sm`, min-height 48px, 13×20 padding, weight 600. Hover → `--brand-primary-hover`. Default primary action everywhere. The next-step Continue is **"Continue with Vita →"**, navy — in both the hero and the active module card (identical: same colour, same label).
 - **Ghost:** transparent, `--brand-primary` text, 1.5px `--border-strong`. Secondary actions ("Back to home").
 - **Link:** navy text, weight 600, trailing `›` or `→`, no background.
 - All buttons carry a trailing `→` for forward motion, `›` for navigation.
+- **No orange button fills.** Orange (`--accent` / `--accent-strong`) is *not* used as a button. The current step is signalled by the active module card's highlight (accent surface + border) and the orange stage-arc dot — not by an orange button. `--accent-strong` is retained only as a safeguard for any future orange-on-white control a provider brand might require.
 
-### Status (a session shows exactly one)
-- **Complete:** pill, white bg, 1.5px `--success-line` border, `--success-text` text, trailing `✓`.
-- **Active:** an orange Continue button (no separate badge).
+### Status (a module shows exactly one)
+- **Complete:** pill, white bg, 1.5px `--success-line` border, `--success-text` text, trailing `✓`. Completed module cards are **revisitable** — clickable, with a hover lift and a trailing `›`.
+- **Active:** the card carries the orange current-step highlight (`--accent-surface` + `--accent-line` border); its action is the navy **"Continue with Vita →"** button — not an orange button.
 - **Not started:** pill, `--muted-surface` bg, `--text-muted` text, inert.
 
 ### Duration chip
@@ -81,27 +83,33 @@ Each component below maps to a section in the HTML reference. Match structure, s
 ### Five-stage arc (`Imagine · Explore · Understand · Plan · Act`)
 40px circles joined by a 2px line. Done = navy fill + `✓`, navy connector. Active = `--accent` fill + number. Future = `--border` fill + faint number. Caption beneath each; the active caption is `--ink`, others `--text-muted`.
 
-### Clarity / progress
-- **Radial:** conic-gradient, `--brand-primary` fill on `--border` track, white inner disc, navy percentage. Label: "Your clarity score".
-- **Bar:** 6px, pill radius, `--brand-primary` fill on `--border` track, with an "X of Y steps complete" label above.
+### Stage score / progress
+- **Radial (stage score):** conic-gradient, `--brand-primary` fill on `--border` track, white inner disc, navy percentage. Label is **dynamic and names the active stage** — "Your {Stage} score" (e.g. "Your Imagine score"). Value = completion *within the active stage* (modules complete in that stage ÷ total modules in that stage). Never a global completed-÷-all figure — that breaks "no progress shame". Confidence-weighting (how firm the answers are) is a Phase 2 enhancement.
+- **Bar:** 6px, pill radius, `--brand-primary` fill on `--border` track, with an "X of Y modules complete" label above.
 
 ### Sidebar nav item
-Row: numbered circle + title + subtitle. **Active** → `--brand-primary-tint` background, solid navy numeral. **Idle** → pale numeral (`#EBF1F8`/navy), no background, `--text` title. Subtitle always present, muted.
+Row: numbered circle + a **vertical stack** (title on its own line, subtitle beneath — never run together inline). **Active** → `--brand-primary-tint` background, solid navy numeral. **Done** → navigable (clickable, hover), navy numeral/✓. **Future (locked)** → dimmed, not clickable. Subtitle always present, muted. Completed and active stages are navigable (back-navigation); future stages are locked.
 
 ### Coach "next-step" hero (the dashboard's centrepiece)
-Two columns inside one `--r-lg` card. Left = `--warm-surface` body containing: Vita lockup (sun disc + serif "Vita"), the `--coach-pill` "Your retirement coach" tag, a 1–2 line personalised intro referencing prior sessions, the `Your next step` eyebrow, the serif step title, a duration chip, and a **navy** Continue. Right = a soft illustrated scene (sky→hills gradient using the `--ill-*` palette). Lift: `--shadow-md`.
+Two columns inside one `--r-lg` card. Left = `--warm-surface` body containing: Vita lockup (sun disc + serif "Vita"), the `--coach-pill` "Your retirement coach" tag, a 1–2 line personalised intro referencing the prior module, the `Your next step` eyebrow, the serif step title, a navy **"Continue with Vita →"** button, and a duration chip. Right = a soft illustrated scene (sky→hills gradient using the `--ill-*` palette). Lift: `--shadow-md`.
 
 ### Stage progress card
-Horizontal: sun disc + ("Stage X of 5 · {Stage}" heading, muted description) + right-aligned "X of Y steps complete" with a progress bar. Hairline border, `--shadow-sm`.
+Horizontal: sun disc + ("Stage X of 5 · {Stage}" heading, muted description) + right-aligned "X of Y modules complete" with a progress bar. Hairline border, `--shadow-sm`.
 
-### Session card
-Grid: thumbnail (88×72, `--r-md`) · (serif title + muted description) · duration chip · status control. Default = white, hairline, `--shadow-sm`. **Active variant** = `--accent-surface` background, `--accent-line` border, `--shadow-md`, orange Continue. Only one card is ever active.
+### Module card
+Grid: thumbnail (88×72, `--r-md`) · (serif title + muted description) · duration chip · status control. Default = white, hairline, `--shadow-sm`. **Active variant** = `--accent-surface` background, `--accent-line` border, `--shadow-md`, and the navy **"Continue with Vita →"** button (identical to the hero — not an orange button). Only one card is ever active. **Completed** cards are clickable to revisit (hover lift, trailing `›`). Responsive: a grid that reflows, never overflows — `minmax(0,1fr)` on the body so long serif titles wrap; below ~880px the thumbnail spans two rows with the chip + status on a meta row beneath.
 
 ### Encouragement card
 `--info-surface` (lavender) with `--info-line` border. Soft avatar + serif title + muted body + a link. For orientation/reassurance only — never a required action.
 
-### Conversation bubbles (session screen — extends the system)
+### Conversation bubbles (the module's conversation — extends the system)
 Coach bubble: `--warm-surface`, `--ink` text, 16px, radius `18px 18px 18px 4px`, left-aligned, hairline `--warm-line`. User bubble: white, 1.5px `--border-strong`, radius `18px 18px 4px 18px`, right-aligned. One question per coach turn.
+
+### Stage intro
+A brief framing moment on the warm/coach surface, shown once on first forward entry into a stage (not on back-navigation): Vita lockup + serif heading + short body + a single navy button. Intro copy lives per-stage in the config.
+
+### Edit-your-selections
+On the read-only interaction summary above a module's conversation, a quiet navy "Edit your selections ›" link returns the user to the interaction pre-filled to adjust (not restart); the conversation is preserved, and the coach acknowledges the change in one line on its next turn. Distinct from "Restart this module" (a full start-over).
 
 ---
 
@@ -117,7 +125,7 @@ Coach bubble: `--warm-surface`, `--ink` text, 16px, radius `18px 18px 18px 4px`,
 ## 6. Accessibility (acceptance criterion — non-negotiable)
 
 - **Target WCAG 2.1 AA.** Reading content is ≥16px.
-- **Orange + white text:** the bright `--accent` (`#E06F1F`) only meets AA for *large* text. Button fills behind white text use `--accent-strong` (`#B85C16`) which reaches 4.5:1. Reserve bright `--accent` for borders, the active stage dot, and surfaces — never behind small white text.
+- **Orange usage:** the bright `--accent` (`#E06F1F`) only meets AA for *large* text, so it's used for borders, the active stage-arc dot, and surfaces — never behind small white text, and never as a button fill (the current step's action is the navy Continue). `--accent-strong` (`#B85C16`, 4.5:1 on white) is kept only as a safeguard should a provider brand ever need an orange-on-white control.
 - **Focus:** every interactive element shows a visible focus ring — `box-shadow: var(--focus-ring)` (3px navy glow), offset where needed. Don't remove outlines without replacing them.
 - **Tap targets:** ≥44px.
 - **Status by more than colour:** Complete carries a `✓`, Not started carries its label — never colour alone.
@@ -127,7 +135,7 @@ Coach bubble: `--warm-surface`, `--ink` text, 16px, radius `18px 18px 18px 4px`,
 
 ## 7. Six rules to hold it together
 
-1. **Orange is the cursor** — exactly one orange element on screen, the current step.
+1. **Orange is the cursor** — it marks the current step (the active module's highlight and the stage-arc dot), never as a button and never as a general accent.
 2. **Serif feels, sans functions.**
 3. **Cream is the coach** — warm surfaces only where Vita speaks; the rest is white.
 4. **Lift is meaningful** — flat hairline cards by default; shadow marks "you are here".
@@ -142,4 +150,6 @@ To deploy for a different pension provider, edit only the brand block in `tokens
 
 ---
 
-*Design System v1.0 — built from the Aviva dashboard reference. Pair with `tokens.css` and `aviva-rlp-design-system.html`.*
+*Design System v1.1 — built from the Aviva dashboard reference. Pair with `tokens.css`, `aviva-rlp-design-system.html`, and `aviva-rlp-home-screen.html`.*
+
+*v1.1 changes: both next-step Continue buttons are navy "Continue with Vita →" (no orange button fills — orange is the active-card highlight + arc dot only); "clarity score" is now the dynamic "Your {Stage} score" (current-stage completion); unit term standardised to "module"; added stage intro, edit-your-selections, completed-card revisit, and locked/navigable stages.*
