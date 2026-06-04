@@ -1,11 +1,11 @@
 import ProviderBand from "../../components/ProviderBand";
-import Stage1Summary from "../../components/Stage1Summary";
+import ImagineReveal from "../../components/ImagineReveal";
 
-export default function Stage1SummaryPage() {
+export default function Stage1RevealPage() {
   return (
     <>
       <ProviderBand />
-      <Stage1Summary />
+      <ImagineReveal />
     </>
   );
 }

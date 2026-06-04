@@ -14,6 +14,7 @@ import { STAGES, TOTAL_STAGES } from "@/lib/modules";
 import { getActiveStageNumber } from "@/lib/progress";
 import { useUserData } from "@/lib/userData";
 import StageIntro from "./StageIntro";
+import VitaMark from "./VitaMark";
 
 // The soft illustrated thumbnail per module, by position within the stage —
 // matches the order in the reference (sunrise, roles, cal, keep, mtn, future).
@@ -36,10 +37,9 @@ export default function HomeDashboard() {
   // case the greeting shows the time of day alone, never "there".
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
-  // Whether the Stage 1 picture has been generated and confirmed (saved under
-  // rlp_stage1_summary_[userId]). Controls whether the Imagine view shows the
-  // loud "is ready" prompt or the calmer "View your picture" entry.
-  const [hasStage1Summary, setHasStage1Summary] = useState(false);
+  // Whether the Stage 1 reveal has been generated yet. Controls whether the
+  // Imagine view shows the loud "is ready" prompt or the calmer "View" entry.
+  const [hasStage1Reveal, setHasStage1Reveal] = useState(false);
   // The stage the person is currently looking at. null means "follow the current
   // stage"; clicking a finished stage (in the nav or the arc) pins it to a number.
   const [viewedStage, setViewedStage] = useState<number | null>(null);
@@ -58,7 +58,7 @@ export default function HomeDashboard() {
     setCompleted(ids);
     setGreeting(greetingWord());
     setDisplayName(userData.getDisplayName(user));
-    setHasStage1Summary(userData.hasStage1Summary());
+    setHasStage1Reveal(userData.hasStage1Reveal());
     // Show the current stage's intro once, the first time it's the active stage.
     // Tying it to the current stage (not the viewed one) means navigating back to
     // a finished stage never re-triggers it, and anyone already past a stage
@@ -101,6 +101,13 @@ export default function HomeDashboard() {
 
   // The single next step: the first incomplete module in programme order.
   const nextModule = allModules.find((m) => !completed.includes(m.id)) ?? null;
+
+  // First-time wording for the next-step button: a brand-new user who hasn't
+  // started or completed any module is invited to "Get started"; everyone else
+  // picks up where they left off. Derived from the DB-backed user data.
+  const ctaLabel = userData.hasStartedAnyModule()
+    ? "Continue with Vita →"
+    : "Get started →";
 
   // The stage the person is "on": the one holding the next step, or — if every
   // built module is complete — the first stage that isn't fully finished.
@@ -147,7 +154,10 @@ export default function HomeDashboard() {
     heroIntro =
       "We'll start by picturing a single ordinary day in your retirement — not the big questions yet, just what the day actually feels like.";
   } else if (priorTakeaway?.text) {
-    heroIntro = `${priorTakeaway.text} Today, let's look at "${nextModule.title}".`;
+    // Vita reads the recap directly to the user here, so use the second-person
+    // version; older takeaways without it fall back to the third-person text.
+    const recap = priorTakeaway.textDirect ?? priorTakeaway.text;
+    heroIntro = `${recap} Today, let's look at "${nextModule.title}".`;
   } else {
     heroIntro = `Last time, you worked through "${lastCompleted.title}". Today, let's look at "${nextModule.title}".`;
   }
@@ -308,9 +318,7 @@ export default function HomeDashboard() {
             <section className="hero">
               <div className="body">
                 <div className="vita">
-                  <span className="sun" aria-hidden="true">
-                    ☀
-                  </span>
+                  <VitaMark size={36} />
                   <span className="name">Vita</span>
                 </div>
                 <span className="coachpill">Your retirement coach</span>
@@ -322,7 +330,7 @@ export default function HomeDashboard() {
                 {nextModule && (
                   <div className="ctarow">
                     <Link className="btn btn-navy" href={`/session/${nextModule.id}`}>
-                      Continue with Vita →
+                      {ctaLabel}
                     </Link>
                     <span className="chip-time">🕐 {nextModule.durationMin} min</span>
                   </div>
@@ -340,13 +348,13 @@ export default function HomeDashboard() {
                 Imagine modules are done. A loud "is ready" prompt until the
                 picture is confirmed, then a calmer persistent entry. */}
             {viewedStageNumber === 1 && isStageDone(STAGES[0]) && (
-              hasStage1Summary ? (
+              hasStage1Reveal ? (
                 <Link className="picture-card is-calm" href="/stage/1">
                   <span className="pc-icon" aria-hidden="true">
                     ✦
                   </span>
                   <span className="pc-body">
-                    <span className="pc-title">View your Stage 1 picture</span>
+                    <span className="pc-title">View your Imagine reveal</span>
                   </span>
                   <span className="pc-chev" aria-hidden="true">
                     ›
@@ -358,10 +366,10 @@ export default function HomeDashboard() {
                     ✦
                   </span>
                   <span className="pc-body">
-                    <span className="pc-title">Your Stage 1 picture is ready</span>
+                    <span className="pc-title">Your Imagine reveal is ready</span>
                     <span className="pc-sub">
-                      A first sketch of the retirement you&apos;ve started to
-                      imagine — yours to shape as you go.
+                      The threads of what you imagined — and the retirement type
+                      that&apos;s emerged. Yours to shape as you go.
                     </span>
                   </span>
                   <span className="pc-chev" aria-hidden="true">
@@ -439,7 +447,7 @@ export default function HomeDashboard() {
                       {body}
                       {isActiveStep ? (
                         <Link className="btn btn-navy" href={`/session/${m.id}`}>
-                          Continue with Vita →
+                          {ctaLabel}
                         </Link>
                       ) : (
                         <span className="badge badge-notstarted">Not started</span>
@@ -547,7 +555,6 @@ const homeCss = `
 .rlp-home .hero{display:grid;grid-template-columns:1.05fr .95fr;background:var(--warm-surface);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--warm-line);box-shadow:var(--shadow-md);margin-bottom:34px}
 .rlp-home .hero .body{padding:28px 28px 30px}
 .rlp-home .hero .vita{display:flex;align-items:center;gap:9px;margin-bottom:12px}
-.rlp-home .hero .vita .sun{width:36px;height:36px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:18px}
 .rlp-home .hero .vita .name{font-family:var(--font-serif);font-size:20px;font-weight:600;color:var(--ink)}
 .rlp-home .coachpill{display:inline-block;background:var(--coach-pill);color:var(--coach-pill-text);font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-sm);margin-bottom:16px}
 .rlp-home .hero p.intro{font-size:15px;color:var(--text);line-height:1.6;margin-bottom:22px}

@@ -22,6 +22,7 @@ import { useUser } from "@clerk/nextjs";
 import { getModulesBefore, type BuildResult } from "@/lib/modules";
 import { getActiveStageNumber } from "@/lib/progress";
 import type { Takeaway } from "@/lib/takeaways";
+import type { RevealSynthesis, SavedStageReveal } from "@/lib/stageReveal";
 
 // ---- Shapes shared across the app ----
 
@@ -36,8 +37,6 @@ export type ConversationMessage = {
   text: string;
 };
 
-export type Stage1Summary = { text: string; savedAt: string };
-
 // ---- Logical keys (the former rlp_ keys, minus the user-id suffix) ----
 
 const KEYS = {
@@ -47,6 +46,7 @@ const KEYS = {
   completed: "completed",
   stageIntroSeen: "stage-intro-seen",
   stage1Summary: "stage1-summary",
+  stage1Reveal: "stage1-reveal",
   takeaway: (moduleId: string) => `takeaway:${moduleId}`,
   conversation: (id: string) => `conversation:${id}`,
   interaction: (id: string) => `interaction:${id}`,
@@ -296,6 +296,25 @@ export function useUserData() {
 
   const getActiveStage = (): number => getActiveStageNumber(getCompletedIds());
 
+  // Whether the user has begun the programme at all: any module completed, any
+  // conversation with at least one message, or any saved interaction. Reads the
+  // DB-backed snapshot (not localStorage). Note merely opening a module writes an
+  // empty conversation array, so an empty one doesn't count as started.
+  const hasStartedAnyModule = (): boolean => {
+    if (getCompletedIds().length > 0) return true;
+    for (const [key, value] of Object.entries(snapshot)) {
+      if (
+        key.startsWith("conversation:") &&
+        Array.isArray(value) &&
+        value.length > 0
+      ) {
+        return true;
+      }
+      if (key.startsWith("interaction:") && value) return true;
+    }
+    return false;
+  };
+
   // ---- Takeaways ----
   const getTakeaway = (moduleId: string): Takeaway | null => {
     const t = snapshot[KEYS.takeaway(moduleId)];
@@ -397,22 +416,26 @@ export function useUserData() {
     return sentence.trim() || "Nothing recorded yet.";
   };
 
-  // ---- Stage 1 summary ----
-  const getStage1Summary = (): Stage1Summary | null => {
-    const v = snapshot[KEYS.stage1Summary];
-    if (v && typeof v === "object" && typeof (v as Stage1Summary).text === "string") {
-      return v as Stage1Summary;
+  // ---- Stage 1 reveal (threads + archetype) ----
+  const getStage1Reveal = (): SavedStageReveal | null => {
+    const v = snapshot[KEYS.stage1Reveal];
+    if (
+      v &&
+      typeof v === "object" &&
+      Array.isArray((v as SavedStageReveal).synthesis?.threads)
+    ) {
+      return v as SavedStageReveal;
     }
     return null;
   };
 
-  const hasStage1Summary = (): boolean => getStage1Summary() !== null;
+  const hasStage1Reveal = (): boolean => getStage1Reveal() !== null;
 
-  const saveStage1Summary = (text: string) =>
-    setKey(KEYS.stage1Summary, {
-      text,
+  const saveStage1Reveal = (synthesis: RevealSynthesis) =>
+    setKey(KEYS.stage1Reveal, {
+      synthesis,
       savedAt: new Date().toISOString(),
-    } satisfies Stage1Summary);
+    } satisfies SavedStageReveal);
 
   // ---- Per-module conversation + interaction ----
   const getConversation = (id: string): ConversationMessage[] | null => {
@@ -450,6 +473,7 @@ export function useUserData() {
     markModuleComplete,
     clearModuleComplete,
     getActiveStage,
+    hasStartedAnyModule,
     getTakeaway,
     saveTakeaway,
     clearTakeaway,
@@ -466,9 +490,9 @@ export function useUserData() {
     saveOnboarding,
     hasPartner,
     buildOnboardingContext,
-    getStage1Summary,
-    hasStage1Summary,
-    saveStage1Summary,
+    getStage1Reveal,
+    hasStage1Reveal,
+    saveStage1Reveal,
     getConversation,
     saveConversation,
     getBuild,
