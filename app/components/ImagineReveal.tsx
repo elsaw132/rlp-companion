@@ -13,7 +13,11 @@ import { useUser } from "@clerk/nextjs";
 import { STAGES } from "@/lib/modules";
 import { useUserData } from "@/lib/userData";
 import { getArchetype } from "@/lib/archetypes";
-import { FALLBACK_SYNTHESIS, type RevealSynthesis } from "@/lib/stageReveal";
+import {
+  FALLBACK_SYNTHESIS,
+  isFallbackSynthesis,
+  type RevealSynthesis,
+} from "@/lib/stageReveal";
 import StageReveal from "./StageReveal";
 import DawnMotif from "./DawnMotif";
 import ArchetypeBlock from "./ArchetypeBlock";
@@ -33,7 +37,10 @@ export default function ImagineReveal() {
     setLoaded(true);
     setDisplayName(userData.getDisplayName(user));
     const saved = userData.getStage1Reveal();
-    if (saved) {
+    // Show a saved reveal only if it's a real, personalised one. A saved
+    // fallback (from an earlier generation that had no takeaways or hit an API
+    // hiccup) is ignored and regenerated, so it can't freeze on the generic one.
+    if (saved && !isFallbackSynthesis(saved.synthesis)) {
       setSynthesis(saved.synthesis);
     } else {
       void generate();
@@ -60,8 +67,10 @@ export default function ImagineReveal() {
       if (!res.ok) throw new Error("bad response");
       const data = (await res.json()) as RevealSynthesis;
       setSynthesis(data);
-      // Persist only a real result, so a transient failure retries next time.
-      void userData.saveStage1Reveal(data);
+      // Persist only a real, personalised result — never a fallback, so a run
+      // with no takeaways or a transient API failure retries next time rather
+      // than freezing the reveal on the generic version.
+      if (!isFallbackSynthesis(data)) void userData.saveStage1Reveal(data);
     } catch {
       // Never leave the screen empty — render the safe generic reveal.
       setSynthesis(FALLBACK_SYNTHESIS);

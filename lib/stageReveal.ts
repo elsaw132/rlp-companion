@@ -23,6 +23,22 @@ export type RevealSynthesis = {
 // What we persist so the reveal is revisitable without regenerating.
 export type SavedStageReveal = { synthesis: RevealSynthesis; savedAt: string };
 
+// True when a synthesis is the generic fallback rather than a real, personalised
+// one. Used so a fallback is never persisted (it would freeze the reveal on the
+// generic version) and so an already-saved fallback is regenerated on next view.
+// The fallback is a fixed constant, so matching its theme labels and "why you"
+// line is a reliable signal a real, per-person synthesis won't trip.
+export function isFallbackSynthesis(
+  s: RevealSynthesis | null | undefined
+): boolean {
+  if (!s) return false;
+  const labels = (s.threads ?? []).map((t) => t.themeLabel).join("|");
+  const fallbackLabels = FALLBACK_SYNTHESIS.threads
+    .map((t) => t.themeLabel)
+    .join("|");
+  return labels === fallbackLabels && s.whyYou === FALLBACK_SYNTHESIS.whyYou;
+}
+
 // A safe, generic synthesis used when generation fails or no inputs exist, so
 // the screen always renders something coherent.
 export const FALLBACK_SYNTHESIS: RevealSynthesis = {
