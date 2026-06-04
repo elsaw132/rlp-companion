@@ -37,6 +37,14 @@ export type ConversationMessage = {
   text: string;
 };
 
+// The user's planned date for their next module, set on the return-home path
+// and read when they next open a module. `date` is a local ISO calendar date
+// (YYYY-MM-DD); `setAt` is the moment they chose it.
+export type PlannedNextModule = {
+  date: string;
+  setAt: string;
+};
+
 // ---- Logical keys (the former rlp_ keys, minus the user-id suffix) ----
 
 const KEYS = {
@@ -44,6 +52,7 @@ const KEYS = {
   onboardingComplete: "onboarding-complete",
   preferredName: "preferred-name",
   completed: "completed",
+  plannedNextModule: "planned-next-module",
   stageIntroSeen: "stage-intro-seen",
   stage1Summary: "stage1-summary",
   stage1Reveal: "stage1-reveal",
@@ -296,6 +305,27 @@ export function useUserData() {
 
   const getActiveStage = (): number => getActiveStageNumber(getCompletedIds());
 
+  // ---- Planned next module (the commitment loop) ----
+  const getPlannedNextModule = (): PlannedNextModule | null => {
+    const v = snapshot[KEYS.plannedNextModule];
+    if (
+      v &&
+      typeof v === "object" &&
+      typeof (v as PlannedNextModule).date === "string"
+    ) {
+      return v as PlannedNextModule;
+    }
+    return null;
+  };
+
+  const setPlannedNextModule = (date: string) =>
+    setKey(KEYS.plannedNextModule, {
+      date,
+      setAt: new Date().toISOString(),
+    } satisfies PlannedNextModule);
+
+  const clearPlannedNextModule = () => removeKey(KEYS.plannedNextModule);
+
   // Whether the user has begun the programme at all: any module completed, any
   // conversation with at least one message, or any saved interaction. Reads the
   // DB-backed snapshot (not localStorage). Note merely opening a module writes an
@@ -473,6 +503,9 @@ export function useUserData() {
     markModuleComplete,
     clearModuleComplete,
     getActiveStage,
+    getPlannedNextModule,
+    setPlannedNextModule,
+    clearPlannedNextModule,
     hasStartedAnyModule,
     getTakeaway,
     saveTakeaway,

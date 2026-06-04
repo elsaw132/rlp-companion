@@ -3,6 +3,9 @@
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import PlanNextModule from "./PlanNextModule";
+import { isTodayLocal, todayISODate } from "@/lib/planDate";
 import DayBuilder, {
   DayBuilderSummary,
   dayBuilderSummaryText,
@@ -33,6 +36,20 @@ const MODULE_COMPLETE_MARKER = "[[MODULE_COMPLETE]]";
 // her dynamic opening. It is never rendered as a bubble or saved — it lives in
 // the API request alone.
 const OPENING_PRIMER = "(I've just finished the activity — please open.)";
+
+// Part B of the commitment loop: the single line Vita opens with when the
+// person kept the plan they set — shown ONLY on an exact same-day match. It's
+// fixed (not model-generated) so it stays brief, obeys the banned-praise rules,
+// and never references an early, late, or missed return. It leads her normal
+// opening; it is never a badge or banner.
+const PLAN_KEPT_LINE =
+  "You planned to come back to this today — and here you are.";
+
+// Lead Vita's opening with the recognition line on a same-day match; otherwise
+// her opening stands alone.
+function withRecognition(recognition: string | null, opening: string): string {
+  return recognition ? `${recognition} ${opening}` : opening;
+}
 
 // The readable sentence Vita reads, derived from whatever they built. Switches
 // on interaction type so each future type can describe its own result.
@@ -169,6 +186,7 @@ export default function SessionContainer({
 }: SessionContainerProps) {
   const { user } = useUser();
   const userData = useUserData();
+  const router = useRouter();
 
   // The readable text Vita draws on — the primer's text blocks, joined. Video
   // blocks have no readable text, so they're skipped.
@@ -207,6 +225,9 @@ export default function SessionContainer({
   // re-reveals the composer. Vita signing off again returns to the finished
   // state (this flips back to false).
   const [reopened, setReopened] = useState(false);
+  // The return-home path shows one optional plan-capture step before the hub.
+  // "Next module" never sets this — they're carrying straight on.
+  const [showPlan, setShowPlan] = useState(false);
 
   // Load any saved conversation and built day from the snapshot as soon as the
   // user is signed in and the data layer has finished loading. We read during
@@ -259,7 +280,7 @@ export default function SessionContainer({
   // Generate Vita's first message with one model call and a hidden priming turn:
   // she reacts to what they built and/or draws on earlier modules. The module's
   // fixed coachOpening is the fallback if the call fails.
-  async function generateOpening() {
+  async function generateOpening(recognition: string | null) {
     setSending(true);
     setError(null);
     try {
@@ -282,9 +303,13 @@ export default function SessionContainer({
 
       const data = (await res.json()) as { reply: string };
       const text = data.reply.replaceAll(MODULE_COMPLETE_MARKER, "").trim();
-      setMessages([{ role: "coach", text: text || coachOpening }]);
+      setMessages([
+        { role: "coach", text: withRecognition(recognition, text || coachOpening) },
+      ]);
     } catch {
-      setMessages([{ role: "coach", text: coachOpening }]);
+      setMessages([
+        { role: "coach", text: withRecognition(recognition, coachOpening) },
+      ]);
     } finally {
       setSending(false);
     }
@@ -332,13 +357,30 @@ export default function SessionContainer({
     }
   }
 
+  // Read the kept-plan recognition exactly as the module starts, then clear the
+  // stored plan no matter what — so each cycle starts fresh and a plan is never
+  // acknowledged twice. Returns the line only on an exact same-day match; on an
+  // early, late, or absent plan it returns null and Vita says nothing of timing.
+  function consumePlanRecognition(): string | null {
+    if (!user) return null;
+    const planned = userData.getPlannedNextModule();
+    if (!planned) return null;
+    const matchedToday = isTodayLocal(planned.date);
+    void userData.clearPlannedNextModule();
+    return matchedToday ? PLAN_KEPT_LINE : null;
+  }
+
   // Seed Vita's opening. Open dynamically whenever there's something to draw on
   // — an interaction output OR earlier takeaways — otherwise use the fixed line.
+  // Either way, lead with the kept-plan recognition on a same-day match.
   async function seedOpening() {
+    const recognition = consumePlanRecognition();
     if (buildResult || (user && userData.hasPriorTakeaways(sessionId))) {
-      await generateOpening();
+      await generateOpening(recognition);
     } else {
-      setMessages([{ role: "coach", text: coachOpening }]);
+      setMessages([
+        { role: "coach", text: withRecognition(recognition, coachOpening) },
+      ]);
     }
   }
 
@@ -397,6 +439,24 @@ export default function SessionContainer({
     void userData.saveBuild(sessionId, result);
     if (changed && messages.length > 0) setEditAckPending(true);
     setPhase("conversation");
+  }
+
+  // The return-home choice opens the optional plan-capture step instead of
+  // navigating straight away.
+  function handleReturnHome() {
+    setShowPlan(true);
+  }
+
+  // They chose a day for their next module — store it (keyed to the user, with
+  // the timestamp) and head to the hub.
+  async function handlePlanConfirm(date: string) {
+    await userData.setPlannedNextModule(date);
+    router.push("/home");
+  }
+
+  // The easy out — store nothing and go straight to the hub.
+  function handlePlanSkip() {
+    router.push("/home");
   }
 
   async function handleSend() {
@@ -506,6 +566,14 @@ export default function SessionContainer({
       </div>
     );
   }
+
+  // Pre-fill the capture step with a future plan that's already on file, so the
+  // person confirms or changes it rather than starting from scratch.
+  const existingPlan = userData.getPlannedNextModule();
+  const prefillDate =
+    existingPlan && existingPlan.date >= todayISODate()
+      ? existingPlan.date
+      : undefined;
 
   return (
     <div style={styles.container}>
@@ -631,38 +699,47 @@ export default function SessionContainer({
           </div>
 
           {completed && !reopened ? (
-            <div style={styles.completeBlock}>
-              <p style={styles.completeCue}>
-                <span aria-hidden="true">✓</span> You&apos;ve finished this
-                module
-              </p>
-              <div style={styles.completeActions}>
-                <Link
-                  href="/home"
-                  className="home-complete-btn"
-                  style={styles.homeCompleteButton}
-                >
-                  Back to home
-                </Link>
-                {nextHref && (
-                  <Link
-                    href={nextHref}
-                    className="next-complete-btn"
-                    style={styles.nextCompleteButton}
+            showPlan ? (
+              <PlanNextModule
+                initialDate={prefillDate}
+                onConfirm={handlePlanConfirm}
+                onSkip={handlePlanSkip}
+              />
+            ) : (
+              <div style={styles.completeBlock}>
+                <p style={styles.completeCue}>
+                  <span aria-hidden="true">✓</span> You&apos;ve finished this
+                  module
+                </p>
+                <div style={styles.completeActions}>
+                  <button
+                    type="button"
+                    className="home-complete-btn"
+                    style={styles.homeCompleteButton}
+                    onClick={handleReturnHome}
                   >
-                    Next module →
-                  </Link>
-                )}
+                    Back to home
+                  </button>
+                  {nextHref && (
+                    <Link
+                      href={nextHref}
+                      className="next-complete-btn"
+                      style={styles.nextCompleteButton}
+                    >
+                      Next module →
+                    </Link>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="keep-talking-link"
+                  style={styles.keepTalkingLink}
+                  onClick={() => setReopened(true)}
+                >
+                  Want to add something? Keep talking
+                </button>
               </div>
-              <button
-                type="button"
-                className="keep-talking-link"
-                style={styles.keepTalkingLink}
-                onClick={() => setReopened(true)}
-              >
-                Want to add something? Keep talking
-              </button>
-            </div>
+            )
           ) : (
             <>
               {error && (
@@ -1106,10 +1183,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-body)",
     fontWeight: 600,
+    border: "none",
     borderRadius: "var(--r-sm)",
     padding: "13px 24px",
     textDecoration: "none",
     boxShadow: "var(--shadow-sm)",
+    cursor: "pointer",
   },
   nextCompleteButton: {
     width: "100%",
