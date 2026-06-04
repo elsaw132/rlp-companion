@@ -7,7 +7,12 @@
 export type Takeaway = {
   moduleId: string;
   moduleTitle: string;
+  // Third-person summary ("they") — carried into later modules as Vita's memory.
   text: string;
+  // The same summary in the second person ("you"), shown when Vita recaps it
+  // directly to the user on the home screen. Optional: takeaways saved before
+  // this field existed fall back to `text`.
+  textDirect?: string;
   // ISO timestamp of when it was generated, so the latest re-run wins.
   savedAt: string;
 };

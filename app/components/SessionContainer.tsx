@@ -111,8 +111,10 @@ type SessionContainerProps = {
   modulesInStage: number;
   // Module ids in this stage, used to count how many are complete.
   stageModuleIds: string[];
-  // Where the in-conversation "Next module →" button goes once finished.
-  nextHref: string;
+  // The next module in this stage once finished, or null on the last module.
+  // Completion always offers "Back to home"; this adds a secondary "Next
+  // module" action when there's a next one.
+  nextHref: string | null;
   sessionTitle: string;
   sessionDescription: string;
   durationMin: number;
@@ -296,12 +298,13 @@ export default function SessionContainer({
     if (!user) return;
     const interactionSummary = buildResult ? summarizeBuild(buildResult) : "";
 
-    const store = (text: string) => {
+    const store = (text: string, textDirect?: string) => {
       if (!text.trim() || !user) return;
       void userData.saveTakeaway({
         moduleId: sessionId,
         moduleTitle: sessionTitle,
         text: text.trim(),
+        textDirect: textDirect?.trim() || undefined,
         savedAt: new Date().toISOString(),
       });
     };
@@ -319,8 +322,11 @@ export default function SessionContainer({
 
       if (!res.ok) throw new Error(`Takeaway request failed: ${res.status}`);
 
-      const data = (await res.json()) as { takeaway: string };
-      store(data.takeaway || interactionSummary);
+      const data = (await res.json()) as {
+        takeaway: string;
+        takeawayDirect?: string;
+      };
+      store(data.takeaway || interactionSummary, data.takeawayDirect);
     } catch {
       store(interactionSummary);
     }
@@ -630,13 +636,24 @@ export default function SessionContainer({
                 <span aria-hidden="true">✓</span> You&apos;ve finished this
                 module
               </p>
-              <Link
-                href={nextHref}
-                className="next-complete-btn"
-                style={styles.nextCompleteButton}
-              >
-                Next module →
-              </Link>
+              <div style={styles.completeActions}>
+                <Link
+                  href="/home"
+                  className="home-complete-btn"
+                  style={styles.homeCompleteButton}
+                >
+                  Back to home
+                </Link>
+                {nextHref && (
+                  <Link
+                    href={nextHref}
+                    className="next-complete-btn"
+                    style={styles.nextCompleteButton}
+                  >
+                    Next module →
+                  </Link>
+                )}
+              </div>
               <button
                 type="button"
                 className="keep-talking-link"
@@ -1070,9 +1087,15 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--success-text)",
     margin: 0,
   },
-  nextCompleteButton: {
+  completeActions: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
     width: "100%",
     maxWidth: "360px",
+  },
+  homeCompleteButton: {
+    width: "100%",
     minHeight: "48px",
     boxSizing: "border-box",
     display: "inline-flex",
@@ -1087,6 +1110,23 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "13px 24px",
     textDecoration: "none",
     boxShadow: "var(--shadow-sm)",
+  },
+  nextCompleteButton: {
+    width: "100%",
+    minHeight: "48px",
+    boxSizing: "border-box",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "var(--bg)",
+    color: "var(--brand-primary)",
+    border: "1.5px solid var(--border-strong)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-body)",
+    fontWeight: 600,
+    borderRadius: "var(--r-sm)",
+    padding: "13px 24px",
+    textDecoration: "none",
   },
   keepTalkingLink: {
     background: "none",
@@ -1134,9 +1174,14 @@ const styles: Record<string, React.CSSProperties> = {
 
 const focusCss = `
   .primary-btn:hover, .send-btn:hover,
-  .next-complete-btn:hover { background: var(--brand-primary-hover); }
+  .home-complete-btn:hover { background: var(--brand-primary-hover); }
+  .next-complete-btn:hover {
+    border-color: var(--brand-primary);
+    background: var(--bg-alt);
+  }
   .primary-btn:focus-visible,
   .send-btn:focus-visible,
+  .home-complete-btn:focus-visible,
   .next-complete-btn:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);

@@ -28,9 +28,11 @@ export default async function SessionPage({
     stageModuleIds,
   } = found;
 
-  // Next module in this stage, or back to the dashboard if this is the last one.
+  // The next module in this stage, if there is one — offered as a secondary
+  // action on completion, alongside returning to the hub. Null on the last
+  // module in the stage, where only "Back to home" shows.
   const nextId = getNextModule(mod.id);
-  const nextHref = nextId ? `/session/${nextId}` : "/home";
+  const nextHref = nextId ? `/session/${nextId}` : null;
 
   return (
     <main style={{ minHeight: "100vh", background: "var(--bg-alt)" }}>
