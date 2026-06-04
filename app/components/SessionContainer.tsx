@@ -132,6 +132,10 @@ type SessionContainerProps = {
   // Completion always offers "Back to home"; this adds a secondary "Next
   // module" action when there's a next one.
   nextHref: string | null;
+  // The stage reveal, offered as the primary completion action on the last
+  // module of a stage that has one (otherwise null). When set, finishing the
+  // module leads straight to the reveal rather than only back to the hub.
+  revealHref: string | null;
   sessionTitle: string;
   sessionDescription: string;
   durationMin: number;
@@ -175,6 +179,7 @@ export default function SessionContainer({
   modulesInStage,
   stageModuleIds,
   nextHref,
+  revealHref,
   sessionTitle,
   sessionDescription,
   durationMin,
@@ -712,22 +717,47 @@ export default function SessionContainer({
                   module
                 </p>
                 <div style={styles.completeActions}>
-                  <button
-                    type="button"
-                    className="home-complete-btn"
-                    style={styles.homeCompleteButton}
-                    onClick={handleReturnHome}
-                  >
-                    Back to home
-                  </button>
-                  {nextHref && (
-                    <Link
-                      href={nextHref}
-                      className="next-complete-btn"
-                      style={styles.nextCompleteButton}
-                    >
-                      Next module →
-                    </Link>
+                  {revealHref ? (
+                    <>
+                      {/* End of the stage — the reveal is the natural next
+                          step, so it leads; "Back to home" still offers the
+                          plan-capture out as the secondary action. */}
+                      <Link
+                        href={revealHref}
+                        className="home-complete-btn"
+                        style={styles.homeCompleteButton}
+                      >
+                        See your Imagine reveal →
+                      </Link>
+                      <button
+                        type="button"
+                        className="next-complete-btn"
+                        style={styles.nextCompleteButton}
+                        onClick={handleReturnHome}
+                      >
+                        Back to home
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="home-complete-btn"
+                        style={styles.homeCompleteButton}
+                        onClick={handleReturnHome}
+                      >
+                        Back to home
+                      </button>
+                      {nextHref && (
+                        <Link
+                          href={nextHref}
+                          className="next-complete-btn"
+                          style={styles.nextCompleteButton}
+                        >
+                          Next module →
+                        </Link>
+                      )}
+                    </>
                   )}
                 </div>
                 <button
@@ -1206,6 +1236,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "var(--r-sm)",
     padding: "13px 24px",
     textDecoration: "none",
+    cursor: "pointer",
   },
   keepTalkingLink: {
     background: "none",

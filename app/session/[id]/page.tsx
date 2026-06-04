@@ -34,6 +34,11 @@ export default async function SessionPage({
   const nextId = getNextModule(mod.id);
   const nextHref = nextId ? `/session/${nextId}` : null;
 
+  // The last module of the Imagine stage (stage 1) closes into its reveal —
+  // offered as the primary completion action so the reveal is reached on
+  // purpose rather than stumbled on later from the hub.
+  const revealHref = !nextId && stageNumber === 1 ? "/stage/1" : null;
+
   return (
     <main style={{ minHeight: "100vh", background: "var(--bg-alt)" }}>
       <div style={styles.navBar}>
@@ -49,6 +54,7 @@ export default async function SessionPage({
         modulesInStage={modulesInStage}
         stageModuleIds={stageModuleIds}
         nextHref={nextHref}
+        revealHref={revealHref}
         sessionTitle={mod.title}
         sessionDescription={mod.description}
         durationMin={mod.durationMin}
