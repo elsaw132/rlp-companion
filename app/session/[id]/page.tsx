@@ -1,6 +1,6 @@
-import Link from "next/link";
 import SessionContainer from "../../components/SessionContainer";
 import { ResetModuleLink } from "../../components/ResetControls";
+import { ModulesBackLink } from "../../components/ModulesBackLink";
 import { getModule, getNextModule } from "@/lib/modules";
 
 export default async function SessionPage({
@@ -36,12 +36,8 @@ export default async function SessionPage({
 
   return (
     <main style={{ minHeight: "100vh", background: "var(--bg-alt)" }}>
-      <style>{navCss}</style>
-
       <div style={styles.navBar}>
-        <Link href="/home" className="ghost-link" style={styles.ghostLink}>
-          ← Your modules
-        </Link>
+        <ModulesBackLink sessionId={mod.id} />
         <ResetModuleLink sessionId={mod.id} />
       </div>
 
@@ -75,14 +71,6 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
   },
-  ghostLink: {
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-sm)",
-    fontWeight: 600,
-    color: "var(--brand-primary)",
-    textDecoration: "none",
-    padding: "8px 4px",
-  },
   notFoundPage: {
     minHeight: "100vh",
     background: "var(--bg-alt)",
@@ -98,12 +86,3 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--ink)",
   },
 };
-
-const navCss = `
-  .ghost-link:hover { text-decoration: underline; }
-  .ghost-link:focus-visible {
-    outline: none;
-    border-radius: var(--r-sm);
-    box-shadow: var(--focus-ring);
-  }
-`;
