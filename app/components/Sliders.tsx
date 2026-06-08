@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SlidersInteraction, SlidersResult } from "@/lib/modules";
 import { FinishControls, type EditableProps } from "./InteractionShell";
 
@@ -29,8 +29,9 @@ export function slidersSummaryText(result: SlidersResult): string {
   const phrases = result.spectrums.map((s) =>
     positionPhrase(s.left, s.right, s.position)
   );
-  const week = phrases.length ? `Ideal week: ${phrases.join("; ")}.` : "";
-  const seasons = result.seasonal.answer
+  const label = result.summaryLabel ?? "Ideal week";
+  const week = phrases.length ? `${label}: ${phrases.join("; ")}.` : "";
+  const seasons = result.seasonal?.answer
     ? `Seasons change it: ${lowerFirst(result.seasonal.answer)}.`
     : "";
   return [week, seasons].filter(Boolean).join(" ");
@@ -39,6 +40,10 @@ export function slidersSummaryText(result: SlidersResult): string {
 type SlidersProps = {
   interaction: SlidersInteraction;
   onFinish: (result: SlidersResult) => void;
+  // Embedded inside a composite step: render without the finish button and
+  // report the current settings upward on every change.
+  embedded?: boolean;
+  onChange?: (result: SlidersResult) => void;
 } & EditableProps<SlidersResult>;
 
 export default function Sliders({
@@ -47,8 +52,11 @@ export default function Sliders({
   mode = "create",
   initial,
   onCancel,
+  embedded = false,
+  onChange,
 }: SlidersProps) {
-  const { instruction, spectrums, seasonal } = interaction;
+  const { instruction, spectrums, seasonal, anchors, summaryLabel } =
+    interaction;
 
   // In edit mode, start each slider where they left it (matched by position)
   // and restore the seasonal answer; otherwise the midpoint and no answer.
@@ -56,15 +64,42 @@ export default function Sliders({
     spectrums.map((_, i) => initial?.spectrums[i]?.position ?? MIDPOINT)
   );
   const [season, setSeason] = useState<string | null>(
-    initial?.seasonal.answer ?? null
+    initial?.seasonal?.answer ?? null
   );
+
+  // Build the result from the current settings — seasonal and summaryLabel are
+  // only present when the interaction configured them.
+  const buildResultObject = (): SlidersResult => ({
+    type: "sliders",
+    spectrums: spectrums.map((s, i) => ({
+      left: s.left,
+      right: s.right,
+      position: positions[i],
+    })),
+    ...(seasonal ? { seasonal: { prompt: seasonal.prompt, answer: season } } : {}),
+    ...(summaryLabel ? { summaryLabel } : {}),
+  });
+
+  // Keep the parent composite in step with the live settings.
+  useEffect(() => {
+    if (!embedded || !onChange) return;
+    onChange(buildResultObject());
+    // onChange is a fresh closure each render; positions/season drive this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positions, season, embedded]);
 
   function setPosition(index: number, value: number) {
     setPositions((prev) => prev.map((p, i) => (i === index ? value : p)));
   }
 
   return (
-    <section style={styles.wrap}>
+    <section
+      style={
+        embedded
+          ? { ...styles.wrap, paddingTop: 0, marginTop: 0, borderTop: "none" }
+          : styles.wrap
+      }
+    >
       <style>{slidersCss}</style>
 
       <p style={styles.instruction}>{instruction}</p>
@@ -72,12 +107,14 @@ export default function Sliders({
       <div style={styles.spectrums}>
         {spectrums.map((spectrum, i) => (
           <div key={`${spectrum.left}-${spectrum.right}`} style={styles.spectrum}>
-            <div style={styles.labelRow}>
-              <span style={styles.endLabel}>{spectrum.left}</span>
-              <span style={{ ...styles.endLabel, ...styles.endLabelRight }}>
-                {spectrum.right}
-              </span>
-            </div>
+            {!(anchors && anchors.length > 0) && (
+              <div style={styles.labelRow}>
+                <span style={styles.endLabel}>{spectrum.left}</span>
+                <span style={{ ...styles.endLabel, ...styles.endLabelRight }}>
+                  {spectrum.right}
+                </span>
+              </div>
+            )}
             <input
               type="range"
               className="week-slider"
@@ -89,51 +126,54 @@ export default function Sliders({
               aria-label={`${spectrum.left} to ${spectrum.right}`}
               onChange={(e) => setPosition(i, Number(e.target.value))}
             />
+            {anchors && anchors.length > 0 && (
+              <div style={styles.anchorRow}>
+                {anchors.map((a) => (
+                  <span key={a} style={styles.anchorLabel}>
+                    {a}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      <div style={styles.seasonal}>
-        <p style={styles.seasonalPrompt}>{seasonal.prompt}</p>
-        <div style={styles.seasonalOptions}>
-          {seasonal.options.map((option) => {
-            const isSelected = season === option;
-            return (
-              <button
-                key={option}
-                type="button"
-                className="season-chip"
-                style={{
-                  ...styles.seasonChip,
-                  ...(isSelected ? styles.seasonChipSelected : null),
-                }}
-                aria-pressed={isSelected}
-                onClick={() => setSeason(isSelected ? null : option)}
-              >
-                {option}
-              </button>
-            );
-          })}
+      {seasonal && (
+        <div style={styles.seasonal}>
+          <p style={styles.seasonalPrompt}>{seasonal.prompt}</p>
+          <div style={styles.seasonalOptions}>
+            {seasonal.options.map((option) => {
+              const isSelected = season === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  className="season-chip"
+                  style={{
+                    ...styles.seasonChip,
+                    ...(isSelected ? styles.seasonChipSelected : null),
+                  }}
+                  aria-pressed={isSelected}
+                  onClick={() => setSeason(isSelected ? null : option)}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      <FinishControls
-        mode={mode}
-        disabled={false}
-        onFinish={() =>
-          onFinish({
-            type: "sliders",
-            spectrums: spectrums.map((s, i) => ({
-              left: s.left,
-              right: s.right,
-              position: positions[i],
-            })),
-            seasonal: { prompt: seasonal.prompt, answer: season },
-          })
-        }
-        onCancel={onCancel}
-        hint="Slide each one to where your week feels right."
-      />
+      {!embedded && (
+        <FinishControls
+          mode={mode}
+          disabled={false}
+          onFinish={() => onFinish(buildResultObject())}
+          onCancel={onCancel}
+          hint="Slide each one to where it feels right."
+        />
+      )}
     </section>
   );
 }
@@ -182,6 +222,19 @@ const styles: Record<string, React.CSSProperties> = {
   slider: {
     width: "100%",
     margin: 0,
+  },
+  anchorRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "8px",
+    marginTop: "2px",
+  },
+  anchorLabel: {
+    flex: 1,
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    color: "var(--text-muted)",
+    textAlign: "center",
   },
   seasonal: {
     display: "flex",
@@ -247,7 +300,7 @@ export function SlidersSummary({ result }: { result: SlidersResult }) {
           </div>
         ))}
       </div>
-      {result.seasonal.answer && (
+      {result.seasonal?.answer && (
         <p style={summaryStyles.seasonal}>
           {result.seasonal.prompt}{" "}
           <strong style={summaryStyles.seasonalAnswer}>

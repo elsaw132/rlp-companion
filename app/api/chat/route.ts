@@ -17,6 +17,15 @@ type ChatRequest = {
   // interaction step (e.g. the day builder). Empty/omitted when the module
   // has no interaction.
   interactionSummary?: string;
+  // The title of the next module in this stage, so Vita's closing sign-off can
+  // name it correctly. Null/omitted on the last module of a stage, where she
+  // should not name a specific next module.
+  nextModuleTitle?: string | null;
+  // When true, Vita closes in a single sign-off instead of the usual two-step
+  // "mirror back, then confirm" wrap-up. Set for short, practical modules (e.g.
+  // the senses screening) where the conversation was a couple of concrete
+  // answers and there's nothing inferred to validate — restating it is noise.
+  closeInOneStep?: boolean;
   // True only for the one call that generates Vita's first message, where she
   // opens by reacting to what they built rather than using a fixed line.
   isOpening?: boolean;
@@ -65,10 +74,16 @@ function buildSystemPrompt(body: ChatRequest): string {
     return sections.join("\n");
   }
 
-  sections.push(
-    "",
-    "CLOSING THIS MODULE — TWO STEPS. When you're ready to close, first offer your wrap-up: name what matters in their words and check it feels right to them. This message asks a question (does this land? anything to add?), so it must NOT contain the marker. Then, only after they respond, send a brief final sign-off that points to the next module, asks nothing at all, and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. Never put [[MODULE_COMPLETE]] on any message that asks a question. Only ever include the marker in that one final sign-off."
-  );
+  const nextModuleGuidance =
+    body.nextModuleTitle && body.nextModuleTitle.trim()
+      ? `The next module is "${body.nextModuleTitle.trim()}" — if you point ahead, name only this one and nothing else.`
+      : "This is the last module of the stage, so do not name a specific next module — close gently without pointing to a particular one.";
+
+  const closingInstruction = body.closeInOneStep
+    ? `CLOSING THIS MODULE — ONE STEP. This was a short, practical conversation, so there is nothing to mirror back or confirm — do NOT add a wrap-up that restates their answers and asks whether it's a fair summary. That would just be noise here. Once they've given their answer (or made clear they're done), close in a single message: a brief, warm sign-off that asks nothing at all and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question.`
+    : `CLOSING THIS MODULE — TWO STEPS. When you're ready to close, first offer your wrap-up: name what matters in their words and check it feels right to them. This message asks a question (does this land? anything to add?), so it must NOT contain the marker. Then, only after they respond, send a brief final sign-off that points to the next module, asks nothing at all, and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question. Only ever include the marker in that one final sign-off.`;
+
+  sections.push("", closingInstruction);
 
   sections.push(
     "",

@@ -19,7 +19,11 @@ import {
   useState,
 } from "react";
 import { useUser } from "@clerk/nextjs";
-import { getModulesBefore, type BuildResult } from "@/lib/modules";
+import {
+  getModulesBefore,
+  type BuildResult,
+  type ScreeningCommitment,
+} from "@/lib/modules";
 import { getActiveStageNumber } from "@/lib/progress";
 import type { Takeaway } from "@/lib/takeaways";
 import type { RevealSynthesis, SavedStageReveal } from "@/lib/stageReveal";
@@ -54,12 +58,25 @@ const KEYS = {
   completed: "completed",
   plannedNextModule: "planned-next-module",
   stageIntroSeen: "stage-intro-seen",
+  stage1StartingSeen: "stage1-starting-seen",
   stage1Summary: "stage1-summary",
   stage1Reveal: "stage1-reveal",
   takeaway: (moduleId: string) => `takeaway:${moduleId}`,
   conversation: (id: string) => `conversation:${id}`,
   interaction: (id: string) => `interaction:${id}`,
+  // A concrete plan commitment captured at a module's close (e.g. the senses
+  // module's screening rhythm). Distinct from interaction/takeaway — a plan
+  // entry, not reflection data.
+  commitment: (id: string) => `commitment:${id}`,
 };
+
+// The Stage 1 opening capture ("Where you're starting from") is stored as a
+// takeaway under its own id, kept deliberately distinct from any real module id
+// (1.day, 1.money, …) so it never counts as a module or shows up in module-driven
+// logic — only the places that explicitly ask for it (the letter suggestions and
+// the Imagine reveal synthesis) pull it in.
+export const STAGE1_STARTING_ID = "stage1-start";
+export const STAGE1_STARTING_TITLE = "Where you're starting from";
 
 // ---- One-time migration from localStorage ----
 
@@ -142,6 +159,85 @@ async function migrateLocalToDb(uid: string): Promise<Record<string, unknown>> {
   return migrated;
 }
 
+// ---- One-time migration of Stage 1 module ids ----
+
+// Stage 1 modules were renamed from numeric ids to semantic ones. Existing
+// testers have data (conversations, interactions, takeaways, and completed
+// entries) keyed by the old ids, so rename them in place rather than orphan it.
+const MODULE_ID_RENAMES: Record<string, string> = {
+  "1.1": "1.day",
+  "1.2": "1.roles",
+  "1.3": "1.week",
+};
+
+// Rename any keys/entries still using an old numeric Stage 1 id to its semantic
+// one. Idempotent: only fires when an old id is actually present, so it's a
+// no-op once a user's data is migrated. Updates the in-memory snapshot and
+// persists each change (POST the new key, DELETE the old). Never clobbers data
+// already stored under a new id.
+async function migrateModuleIds(
+  data: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const next = { ...data };
+  const writes: { key: string; value: unknown }[] = [];
+  const deletes: string[] = [];
+
+  for (const [oldId, newId] of Object.entries(MODULE_ID_RENAMES)) {
+    for (const prefix of ["conversation:", "interaction:", "takeaway:"]) {
+      const oldKey = `${prefix}${oldId}`;
+      if (!(oldKey in next)) continue;
+      const newKey = `${prefix}${newId}`;
+      let value = next[oldKey];
+      // The takeaway object carries its own moduleId — keep it consistent.
+      if (prefix === "takeaway:" && value && typeof value === "object") {
+        value = { ...(value as Record<string, unknown>), moduleId: newId };
+      }
+      if (!(newKey in next)) {
+        next[newKey] = value;
+        writes.push({ key: newKey, value });
+      }
+      delete next[oldKey];
+      deletes.push(oldKey);
+    }
+  }
+
+  // The completed array stores raw module ids.
+  const completed = next[KEYS.completed];
+  if (
+    Array.isArray(completed) &&
+    completed.some((id) => typeof id === "string" && id in MODULE_ID_RENAMES)
+  ) {
+    const renamed = completed.map((id) =>
+      typeof id === "string" && MODULE_ID_RENAMES[id] ? MODULE_ID_RENAMES[id] : id
+    );
+    next[KEYS.completed] = renamed;
+    writes.push({ key: KEYS.completed, value: renamed });
+  }
+
+  if (writes.length === 0 && deletes.length === 0) return data;
+
+  try {
+    for (const w of writes) {
+      await fetch("/api/user-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(w),
+      });
+    }
+    for (const key of deletes) {
+      await fetch("/api/user-data", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+      });
+    }
+  } catch {
+    // best-effort — the in-memory snapshot is already corrected
+  }
+
+  return next;
+}
+
 // ---- Context ----
 
 type ContextValue = {
@@ -209,6 +305,10 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       if (Object.keys(data).length === 0) {
         data = await migrateLocalToDb(userId);
       }
+
+      // Rename any old numeric Stage 1 ids to the semantic ones. Idempotent and
+      // a no-op once a user's data is already on the new ids.
+      data = await migrateModuleIds(data);
 
       if (cancelled || loadedFor.current !== userId) return;
       commit(data);
@@ -359,17 +459,41 @@ export function useUserData() {
 
   const clearTakeaway = (moduleId: string) => removeKey(KEYS.takeaway(moduleId));
 
+  // ---- Stage 1 opening capture ("Where you're starting from") ----
+  // Stored as its own takeaway, separate from the module takeaways.
+  const getStartingThoughts = (): Takeaway | null =>
+    getTakeaway(STAGE1_STARTING_ID);
+
+  const saveStartingThoughts = (text: string) =>
+    saveTakeaway({
+      moduleId: STAGE1_STARTING_ID,
+      moduleTitle: STAGE1_STARTING_TITLE,
+      text: text.trim(),
+      savedAt: new Date().toISOString(),
+    });
+
   const hasPriorTakeaways = (moduleId: string): boolean =>
     getModulesBefore(moduleId).some((m) => getTakeaway(m.id));
 
-  const buildPriorReflections = (moduleId: string): string => {
+  const buildPriorReflections = (
+    moduleId: string,
+    includeStartingThoughts = false
+  ): string => {
     const fallback = "No earlier modules completed yet.";
     const lines = getModulesBefore(moduleId).flatMap((m) => {
       const t = getTakeaway(m.id);
       return t && t.text.trim() ? [`- ${m.title}: ${t.text.trim()}`] : [];
     });
+    // The opening capture sits before every module, so when asked for it leads
+    // the list — what they already had in mind before any module framed it.
+    if (includeStartingThoughts) {
+      const start = getStartingThoughts();
+      if (start && start.text.trim()) {
+        lines.unshift(`- ${start.moduleTitle}: ${start.text.trim()}`);
+      }
+    }
     if (lines.length === 0) return fallback;
-    return ["Here's what they've explored in earlier modules:", ...lines].join("\n");
+    return ["Here's what they've worked through in earlier modules — draw on it only where it's directly relevant to this module's topic:", ...lines].join("\n");
   };
 
   // ---- Preferred name / display name ----
@@ -397,6 +521,14 @@ export function useUserData() {
     if (seen.includes(stageNumber)) return Promise.resolve();
     return setKey(KEYS.stageIntroSeen, [...seen, stageNumber]);
   };
+
+  // ---- Stage 1 opening-capture "seen" flag ----
+  // Whether the person has been shown the opening capture (saved or skipped), so
+  // it appears once, between the Stage 1 intro and module 1.day, and never again.
+  const hasSeenStage1Starting = (): boolean =>
+    snapshot[KEYS.stage1StartingSeen] === true;
+
+  const markStage1StartingSeen = () => setKey(KEYS.stage1StartingSeen, true);
 
   // ---- Onboarding ----
   const isOnboardingComplete = (): boolean =>
@@ -487,12 +619,31 @@ export function useUserData() {
   const saveBuild = (id: string, result: BuildResult) =>
     setKey(KEYS.interaction(id), result);
 
+  // ---- Closing commitment (a concrete plan entry) ----
+  const getCommitment = (id: string): ScreeningCommitment | null => {
+    const v = snapshot[KEYS.commitment(id)];
+    if (
+      v &&
+      typeof v === "object" &&
+      typeof (v as ScreeningCommitment).frequency === "string"
+    ) {
+      return v as ScreeningCommitment;
+    }
+    return null;
+  };
+
+  const saveCommitment = (id: string, commitment: ScreeningCommitment) =>
+    setKey(KEYS.commitment(id), commitment);
+
+  const clearCommitment = (id: string) => removeKey(KEYS.commitment(id));
+
   // ---- Resets ----
   const resetAll = () => removeAll();
 
   const resetModule = async (id: string) => {
     await removeKey(KEYS.conversation(id));
     await removeKey(KEYS.interaction(id));
+    await clearCommitment(id);
     await clearTakeaway(id);
     await clearModuleComplete(id);
   };
@@ -510,6 +661,8 @@ export function useUserData() {
     getTakeaway,
     saveTakeaway,
     clearTakeaway,
+    getStartingThoughts,
+    saveStartingThoughts,
     hasPriorTakeaways,
     buildPriorReflections,
     getPreferredName,
@@ -517,6 +670,8 @@ export function useUserData() {
     getDisplayName,
     getStageIntrosSeen,
     markStageIntroSeen,
+    hasSeenStage1Starting,
+    markStage1StartingSeen,
     isOnboardingComplete,
     markOnboardingComplete,
     getOnboarding,
@@ -530,6 +685,9 @@ export function useUserData() {
     saveConversation,
     getBuild,
     saveBuild,
+    getCommitment,
+    saveCommitment,
+    clearCommitment,
     resetAll,
     resetModule,
   };

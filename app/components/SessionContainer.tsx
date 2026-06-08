@@ -15,17 +15,29 @@ import RolePicker, {
   rolePickerSummaryText,
 } from "./RolePicker";
 import Sliders, { SlidersSummary, slidersSummaryText } from "./Sliders";
-import KeepLeaveGain, {
-  KeepLeaveGainSummary,
-  keepLeaveGainSummaryText,
-} from "./KeepLeaveGain";
-import QualitiesPicker, {
-  QualitiesPickerSummary,
-  qualitiesPickerSummaryText,
-} from "./QualitiesPicker";
-import type { InteractionMode } from "./InteractionShell";
-import type { ContentBlock, Interaction, BuildResult } from "@/lib/modules";
+import SparkPrompts, {
+  SparkPromptsSummary,
+  sparkPromptsSummaryText,
+} from "./SparkPrompts";
+import ScreeningCheck, {
+  ScreeningCheckSummary,
+  screeningCheckSummaryText,
+} from "./ScreeningCheck";
+import ScreeningCommitment from "./ScreeningCommitment";
+import LetterFlow from "./LetterFlow";
+import { FinishControls, type InteractionMode } from "./InteractionShell";
+import type {
+  ContentBlock,
+  Interaction,
+  CompositeInteraction,
+  BuildResult,
+  CompositeResult,
+  LetterResult,
+  ClosingCommitment,
+  ScreeningCommitment as ScreeningCommitmentResult,
+} from "@/lib/modules";
 import { useUserData } from "@/lib/userData";
+import { buildCarryForward, hasCarryForward } from "@/lib/carryForward";
 
 // Vita appends this to her closing message so we know the module is finished.
 // It's stripped before display and before storage, so it never shows and never
@@ -61,10 +73,14 @@ function summarizeBuild(result: BuildResult): string {
       return rolePickerSummaryText(result);
     case "sliders":
       return slidersSummaryText(result);
-    case "keep-leave-gain":
-      return keepLeaveGainSummaryText(result);
-    case "qualities-picker":
-      return qualitiesPickerSummaryText(result);
+    case "letter":
+      return `A letter written to ${result.recipientLabel}:\n${result.body}`;
+    case "spark-prompts":
+      return sparkPromptsSummaryText(result);
+    case "screening-check":
+      return screeningCheckSummaryText(result);
+    case "composite":
+      return result.results.map(summarizeBuild).filter(Boolean).join(" ");
     default:
       return "";
   }
@@ -91,11 +107,20 @@ function InteractionSummary({
     case "sliders":
       body = <SlidersSummary result={result} />;
       break;
-    case "keep-leave-gain":
-      body = <KeepLeaveGainSummary result={result} />;
+    case "spark-prompts":
+      body = <SparkPromptsSummary result={result} />;
       break;
-    case "qualities-picker":
-      body = <QualitiesPickerSummary result={result} />;
+    case "screening-check":
+      body = <ScreeningCheckSummary result={result} />;
+      break;
+    case "composite":
+      body = (
+        <div style={styles.compositeSummaryStack}>
+          {result.results.map((r, i) => (
+            <CompositeSummaryPart key={i} result={r} />
+          ))}
+        </div>
+      );
       break;
     default:
       body = null;
@@ -115,6 +140,23 @@ function InteractionSummary({
   );
 }
 
+// One sub-result's recap inside a composite summary — the same per-type summary
+// bodies, stacked, with no Edit link of their own (the composite owns editing).
+function CompositeSummaryPart({ result }: { result: BuildResult }) {
+  switch (result.type) {
+    case "day-builder":
+      return <DayBuilderSummary result={result} />;
+    case "role-picker":
+      return <RolePickerSummary result={result} />;
+    case "sliders":
+      return <SlidersSummary result={result} />;
+    case "spark-prompts":
+      return <SparkPromptsSummary result={result} />;
+    default:
+      return null;
+  }
+}
+
 type Message = {
   role: "coach" | "user";
   text: string;
@@ -132,6 +174,9 @@ type SessionContainerProps = {
   // Completion always offers "Back to home"; this adds a secondary "Next
   // module" action when there's a next one.
   nextHref: string | null;
+  // The next module's title, passed to Vita so her closing sign-off names the
+  // correct upcoming module. Null on the last module of the stage.
+  nextModuleTitle: string | null;
   // The stage reveal, offered as the primary completion action on the last
   // module of a stage that has one (otherwise null). When set, finishing the
   // module leads straight to the reveal rather than only back to the hub.
@@ -141,7 +186,9 @@ type SessionContainerProps = {
   durationMin: number;
   // The primer shown before the conversation, as ordered text/video blocks.
   primer: ContentBlock[];
-  coachOpening: string;
+  // Vita's first conversation line. Absent for modules with no conversation
+  // (e.g. the letter module, whose writing surface replaces the chat).
+  coachOpening?: string;
   // Wired into the page in a later step. Until then sessionContent falls back
   // to the primer's text, and there are no module-specific instructions.
   sessionContent?: string;
@@ -149,6 +196,14 @@ type SessionContainerProps = {
   // Optional build step shown between the reading and the conversation. When
   // absent, the module keeps the plain reading → conversation flow.
   interaction?: Interaction;
+  // Optional commitment captured after the conversation closes (a concrete plan
+  // entry). When set, a small Vita-voiced widget appears on completion before
+  // the home CTAs. Only the senses module uses it so far.
+  closingCommitment?: ClosingCommitment;
+  // When true, Vita closes in a single sign-off rather than the usual two-step
+  // "mirror back, then confirm" wrap-up. For short, practical modules where
+  // restating the answers adds nothing. Threaded to /api/chat at closing time.
+  closeInOneStep?: boolean;
 };
 
 const COACH_ERROR_REPLY =
@@ -179,15 +234,20 @@ export default function SessionContainer({
   modulesInStage,
   stageModuleIds,
   nextHref,
+  nextModuleTitle,
   revealHref,
   sessionTitle,
   sessionDescription,
   durationMin,
   primer,
-  coachOpening,
+  // Defaults to "" so the conversation code paths stay typed as string; the
+  // letter module never reaches them (its writing surface replaces the chat).
+  coachOpening = "",
   sessionContent,
   sessionInstructions,
   interaction,
+  closingCommitment,
+  closeInOneStep = false,
 }: SessionContainerProps) {
   const { user } = useUser();
   const userData = useUserData();
@@ -200,11 +260,28 @@ export default function SessionContainer({
     .map((b) => b.value)
     .join("\n\n");
 
+  // What fills Vita's {priorReflections} slot. Stage 2 modules with a
+  // carry-forward contract get a curated, module-specific callback drawn from
+  // Stage 1; everything else gets the generic earlier-modules recap. The carry
+  // block falls back to the recap if Stage 1 captured nothing relevant.
+  function priorReflectionsBlock(includeStartingThoughts = false): string {
+    if (stageNumber === 2 && hasCarryForward(sessionId)) {
+      const carry = buildCarryForward(sessionId, userData);
+      if (carry) return carry;
+    }
+    return userData.buildPriorReflections(sessionId, includeStartingThoughts);
+  }
+
+  // The letter module replaces the build → conversation flow with a single
+  // writing surface (LetterFlow), so it takes its own "letter" phase.
+  const isLetter = interaction?.type === "letter";
+
   // Where the person is in the module: the reading, the build step (only for
   // modules with an interaction), the conversation, then optionally back into
-  // "editing" to adjust earlier picks without losing the conversation.
+  // "editing" to adjust earlier picks without losing the conversation. The
+  // letter module uses "letter" in place of building/conversation.
   const [phase, setPhase] = useState<
-    "reading" | "building" | "conversation" | "editing"
+    "reading" | "building" | "conversation" | "editing" | "letter"
   >("reading");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -233,6 +310,13 @@ export default function SessionContainer({
   // The return-home path shows one optional plan-capture step before the hub.
   // "Next module" never sets this — they're carrying straight on.
   const [showPlan, setShowPlan] = useState(false);
+  // For modules with a closing commitment: whether the person has set or skipped
+  // it. Shown once on fresh completion; revisits to an already-finished module
+  // skip straight to the completion CTAs (set true on hydration below).
+  const [commitmentDone, setCommitmentDone] = useState(false);
+  // Vita's closing line for the letter module, shown above the completion block
+  // once the letter is finalised (the letter module has no chat transcript).
+  const [letterAck, setLetterAck] = useState<string | null>(null);
 
   // Load any saved conversation and built day from the snapshot as soon as the
   // user is signed in and the data layer has finished loading. We read during
@@ -247,21 +331,32 @@ export default function SessionContainer({
     setCompletedCount(
       stageModuleIds.filter((id) => completedIds.includes(id)).length
     );
-    if (completedIds.includes(sessionId)) setCompleted(true);
+    if (completedIds.includes(sessionId)) {
+      setCompleted(true);
+      // Already finished before — don't re-prompt the commitment step on revisit.
+      setCommitmentDone(true);
+    }
 
     const savedBuild = userData.getBuild(sessionId);
     if (savedBuild) setBuildResult(savedBuild);
 
-    const saved = userData.getConversation(sessionId);
-    if (saved && saved.length > 0) {
-      // A conversation is already underway — resume it.
-      setMessages(saved);
-      setPhase("conversation");
-    } else if (savedBuild) {
-      // They finished the build last time but hadn't started talking. Drop
-      // them into the conversation with no messages yet — the opening effect
-      // generates Vita's first line from what they built.
-      setPhase("conversation");
+    if (isLetter) {
+      // The letter module has no chat. If it's already complete the completion
+      // block shows; otherwise resume on the writing surface (LetterFlow
+      // pre-fills from any saved draft). Never enter the conversation phase.
+      if (!completedIds.includes(sessionId)) setPhase("letter");
+    } else {
+      const saved = userData.getConversation(sessionId);
+      if (saved && saved.length > 0) {
+        // A conversation is already underway — resume it.
+        setMessages(saved);
+        setPhase("conversation");
+      } else if (savedBuild) {
+        // They finished the build last time but hadn't started talking. Drop
+        // them into the conversation with no messages yet — the opening effect
+        // generates Vita's first line from what they built.
+        setPhase("conversation");
+      }
     }
   }
 
@@ -298,7 +393,7 @@ export default function SessionContainer({
           coachOpening,
           sessionInstructions: sessionInstructions ?? "",
           onboardingContext: userData.buildOnboardingContext(),
-          priorReflections: userData.buildPriorReflections(sessionId),
+          priorReflections: priorReflectionsBlock(),
           sessionContent: sessionContent ?? primerText,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
         }),
@@ -324,9 +419,15 @@ export default function SessionContainer({
   // store it for later modules to draw on. Runs in the background, so it never
   // blocks the done state. If generation fails, fall back to the interaction
   // summary if there is one; otherwise store nothing.
-  async function generateAndStoreTakeaway(fullMessages: Message[]) {
+  async function generateAndStoreTakeaway(
+    fullMessages: Message[],
+    summaryOverride?: string
+  ) {
     if (!user) return;
-    const interactionSummary = buildResult ? summarizeBuild(buildResult) : "";
+    // The override carries the interaction summary when buildResult state hasn't
+    // settled yet (e.g. the letter module finalising in the same tick).
+    const interactionSummary =
+      summaryOverride ?? (buildResult ? summarizeBuild(buildResult) : "");
 
     const store = (text: string, textDirect?: string) => {
       if (!text.trim() || !user) return;
@@ -403,13 +504,33 @@ export default function SessionContainer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, messages.length, buildResult, user]);
 
-  // After the reading: modules with an interaction go to the build step first;
-  // everything else goes straight to the conversation.
+  // After the reading: the letter module goes to its writing surface; other
+  // modules with an interaction go to the build step; everything else goes
+  // straight to the conversation.
   function handleReadingDone() {
-    if (interaction) {
+    if (isLetter) {
+      setPhase("letter");
+    } else if (interaction) {
       setPhase("building");
     } else {
       startConversation();
+    }
+  }
+
+  // The letter is finalised. Persist it, mark the module complete, keep Vita's
+  // closing line for the completion block, and capture the takeaway in the
+  // background — mirroring how the conversation modules close.
+  function handleLetterComplete(result: LetterResult, vitaMessage: string) {
+    setBuildResult(result);
+    void userData.saveBuild(sessionId, result);
+    setLetterAck(vitaMessage);
+    if (user) {
+      void userData.markModuleComplete(sessionId);
+      void generateAndStoreTakeaway([], summarizeBuild(result));
+    }
+    if (!completed) {
+      setCompleted(true);
+      setCompletedCount((n) => n + 1);
     }
   }
 
@@ -464,6 +585,18 @@ export default function SessionContainer({
     router.push("/home");
   }
 
+  // They set a closing commitment (e.g. a screening rhythm) — save it as a
+  // concrete plan entry, then fall through to the completion CTAs.
+  function handleCommitmentConfirm(commitment: ScreeningCommitmentResult) {
+    void userData.saveCommitment(sessionId, commitment);
+    setCommitmentDone(true);
+  }
+
+  // Skipped the commitment — store nothing, move on to the completion CTAs.
+  function handleCommitmentSkip() {
+    setCommitmentDone(true);
+  }
+
   async function handleSend() {
     const text = input.trim();
     if (!text || sending) return;
@@ -495,9 +628,11 @@ export default function SessionContainer({
           coachOpening: actualOpening,
           sessionInstructions: sessionInstructions ?? "",
           onboardingContext: userData.buildOnboardingContext(),
-          priorReflections: userData.buildPriorReflections(sessionId),
+          priorReflections: priorReflectionsBlock(),
           sessionContent: sessionContent ?? primerText,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
+          nextModuleTitle,
+          closeInOneStep,
           editAcknowledgement,
         }),
       });
@@ -625,23 +760,45 @@ export default function SessionContainer({
           </span>
         </div>
 
-        {primer.map((block, i) =>
-          block.type === "video" ? (
-            <div key={i} style={styles.videoFrame}>
-              <iframe
-                src={youtubeEmbedUrl(block.url)}
-                title={sessionTitle || "Session video"}
-                style={styles.videoIframe}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          ) : (
+        {primer.map((block, i) => {
+          if (block.type === "video") {
+            return (
+              <div key={i} style={styles.videoFrame}>
+                <iframe
+                  src={youtubeEmbedUrl(block.url)}
+                  title={sessionTitle || "Session video"}
+                  style={styles.videoIframe}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            );
+          }
+          if (block.type === "links") {
+            return (
+              <div key={i} style={styles.linksBlock}>
+                {block.links.map((link) => (
+                  <a
+                    key={link.url}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="primer-link"
+                    style={styles.primerLink}
+                  >
+                    <span aria-hidden="true">↗</span>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            );
+          }
+          return (
             <p key={i} style={styles.bodyText}>
               {block.value}
             </p>
-          )
-        )}
+          );
+        })}
 
         {phase === "reading" && (
           <div style={styles.gateRow}>
@@ -704,71 +861,24 @@ export default function SessionContainer({
           </div>
 
           {completed && !reopened ? (
-            showPlan ? (
-              <PlanNextModule
-                initialDate={prefillDate}
-                onConfirm={handlePlanConfirm}
-                onSkip={handlePlanSkip}
+            closingCommitment && !commitmentDone ? (
+              <ScreeningCommitment
+                config={closingCommitment}
+                initial={userData.getCommitment(sessionId) ?? undefined}
+                onConfirm={handleCommitmentConfirm}
+                onSkip={handleCommitmentSkip}
               />
             ) : (
-              <div style={styles.completeBlock}>
-                <p style={styles.completeCue}>
-                  <span aria-hidden="true">✓</span> You&apos;ve finished this
-                  module
-                </p>
-                <div style={styles.completeActions}>
-                  {revealHref ? (
-                    <>
-                      {/* End of the stage — the reveal is the natural next
-                          step, so it leads; "Back to home" still offers the
-                          plan-capture out as the secondary action. */}
-                      <Link
-                        href={revealHref}
-                        className="home-complete-btn"
-                        style={styles.homeCompleteButton}
-                      >
-                        See your Imagine reveal →
-                      </Link>
-                      <button
-                        type="button"
-                        className="next-complete-btn"
-                        style={styles.nextCompleteButton}
-                        onClick={handleReturnHome}
-                      >
-                        Back to home
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="home-complete-btn"
-                        style={styles.homeCompleteButton}
-                        onClick={handleReturnHome}
-                      >
-                        Back to home
-                      </button>
-                      {nextHref && (
-                        <Link
-                          href={nextHref}
-                          className="next-complete-btn"
-                          style={styles.nextCompleteButton}
-                        >
-                          Next module →
-                        </Link>
-                      )}
-                    </>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="keep-talking-link"
-                  style={styles.keepTalkingLink}
-                  onClick={() => setReopened(true)}
-                >
-                  Want to add something? Keep talking
-                </button>
-              </div>
+              <CompletionBlock
+                showPlan={showPlan}
+                prefillDate={prefillDate}
+                onPlanConfirm={handlePlanConfirm}
+                onPlanSkip={handlePlanSkip}
+                revealHref={revealHref}
+                onReturnHome={handleReturnHome}
+                nextHref={nextHref}
+                onKeepTalking={() => setReopened(true)}
+              />
             )
           ) : (
             <>
@@ -805,6 +915,144 @@ export default function SessionContainer({
             </>
           )}
         </section>
+      )}
+
+      {/* ZONE 4 — LETTER (its own writing surface; replaces the conversation) */}
+      {interaction &&
+        interaction.type === "letter" &&
+        phase === "letter" &&
+        !completed && (
+          <LetterFlow
+            interaction={interaction}
+            priorReflections={priorReflectionsBlock(true)}
+            initial={buildResult?.type === "letter" ? buildResult : undefined}
+            onComplete={handleLetterComplete}
+          />
+        )}
+
+      {/* ZONE 4.5 — LETTER COMPLETE (Vita's closing line + the reveal/home CTAs) */}
+      {isLetter && completed && (
+        <section style={styles.conversationZone}>
+          <div style={styles.vitaLockup}>
+            <span style={styles.sun} aria-hidden="true">
+              ☀️
+            </span>
+            <span style={styles.vitaName}>Vita</span>
+            <span style={styles.coachPill}>Your retirement coach</span>
+          </div>
+
+          {letterAck && (
+            <div style={styles.messageList}>
+              <CoachBubble text={letterAck} />
+            </div>
+          )}
+
+          <CompletionBlock
+            showPlan={showPlan}
+            prefillDate={prefillDate}
+            onPlanConfirm={handlePlanConfirm}
+            onPlanSkip={handlePlanSkip}
+            revealHref={revealHref}
+            onReturnHome={handleReturnHome}
+            nextHref={nextHref}
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
+// The finished-module panel: Vita's "you've finished" cue and the forward CTAs
+// (the stage reveal where there is one, otherwise back-to-home and an optional
+// next module), or the optional plan-capture step when the person chose to set
+// a return date. "Keep talking" only applies to conversation modules, so it's
+// shown only when onKeepTalking is provided.
+function CompletionBlock({
+  showPlan,
+  prefillDate,
+  onPlanConfirm,
+  onPlanSkip,
+  revealHref,
+  onReturnHome,
+  nextHref,
+  onKeepTalking,
+}: {
+  showPlan: boolean;
+  prefillDate?: string;
+  onPlanConfirm: (date: string) => void;
+  onPlanSkip: () => void;
+  revealHref: string | null;
+  onReturnHome: () => void;
+  nextHref: string | null;
+  onKeepTalking?: () => void;
+}) {
+  if (showPlan) {
+    return (
+      <PlanNextModule
+        initialDate={prefillDate}
+        onConfirm={onPlanConfirm}
+        onSkip={onPlanSkip}
+      />
+    );
+  }
+  return (
+    <div style={styles.completeBlock}>
+      <p style={styles.completeCue}>
+        <span aria-hidden="true">✓</span> You&apos;ve finished this module
+      </p>
+      <div style={styles.completeActions}>
+        {revealHref ? (
+          <>
+            {/* End of the stage — the reveal is the natural next step, so it
+                leads; "Back to home" still offers the plan-capture out as the
+                secondary action. */}
+            <Link
+              href={revealHref}
+              className="home-complete-btn"
+              style={styles.homeCompleteButton}
+            >
+              See your Imagine reveal →
+            </Link>
+            <button
+              type="button"
+              className="next-complete-btn"
+              style={styles.nextCompleteButton}
+              onClick={onReturnHome}
+            >
+              Back to home
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="home-complete-btn"
+              style={styles.homeCompleteButton}
+              onClick={onReturnHome}
+            >
+              Back to home
+            </button>
+            {nextHref && (
+              <Link
+                href={nextHref}
+                className="next-complete-btn"
+                style={styles.nextCompleteButton}
+              >
+                Next module →
+              </Link>
+            )}
+          </>
+        )}
+      </div>
+      {onKeepTalking && (
+        <button
+          type="button"
+          className="keep-talking-link"
+          style={styles.keepTalkingLink}
+          onClick={onKeepTalking}
+        >
+          Want to add something? Keep talking
+        </button>
       )}
     </div>
   );
@@ -859,24 +1107,98 @@ function InteractionStep({
           onCancel={onCancel}
         />
       );
-    case "keep-leave-gain":
+    case "spark-prompts":
       return (
-        <KeepLeaveGain
+        <SparkPrompts
           interaction={interaction}
           onFinish={onFinish}
           mode={mode}
-          initial={initial?.type === "keep-leave-gain" ? initial : undefined}
+          initial={initial?.type === "spark-prompts" ? initial : undefined}
           onCancel={onCancel}
         />
       );
-    case "qualities-picker":
+    case "screening-check":
       return (
-        <QualitiesPicker
+        <ScreeningCheck
           interaction={interaction}
           onFinish={onFinish}
           mode={mode}
-          initial={initial?.type === "qualities-picker" ? initial : undefined}
+          initial={initial?.type === "screening-check" ? initial : undefined}
           onCancel={onCancel}
+        />
+      );
+    case "composite":
+      return (
+        <CompositeStep
+          interaction={interaction}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "composite" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    default:
+      // The letter interaction doesn't run through InteractionStep — it has its
+      // own phase and surface (LetterFlow). Other unknown types fall back here.
+      return (
+        <section style={styles.placeholderStep}>[interaction coming soon]</section>
+      );
+  }
+}
+
+// Whether a composite sub-step has been answered enough to finish. Sliders
+// always have a position; the picker honours its select range (or "at least one").
+function isStepValid(
+  interaction: Interaction,
+  result: BuildResult | null
+): boolean {
+  if (!result) return false;
+  switch (interaction.type) {
+    case "role-picker": {
+      if (result.type !== "role-picker") return false;
+      const min = interaction.selectRange?.min ?? 1;
+      const max = interaction.selectRange?.max;
+      const n = result.picked.length;
+      return n >= min && (max === undefined || n <= max);
+    }
+    case "sliders":
+      return result.type === "sliders";
+    default:
+      return true;
+  }
+}
+
+// Renders one composite sub-interaction in embedded mode — no finish button of
+// its own; it reports its current value up via onChange. Only the composable
+// primitives are embeddable.
+function EmbeddedInteraction({
+  interaction,
+  initial,
+  onChange,
+}: {
+  interaction: Interaction;
+  initial?: BuildResult;
+  onChange: (result: BuildResult) => void;
+}) {
+  switch (interaction.type) {
+    case "role-picker":
+      return (
+        <RolePicker
+          interaction={interaction}
+          embedded
+          onChange={onChange}
+          onFinish={() => {}}
+          initial={initial?.type === "role-picker" ? initial : undefined}
+        />
+      );
+    case "sliders":
+      return (
+        <Sliders
+          interaction={interaction}
+          embedded
+          onChange={onChange}
+          onFinish={() => {}}
+          initial={initial?.type === "sliders" ? initial : undefined}
         />
       );
     default:
@@ -884,6 +1206,60 @@ function InteractionStep({
         <section style={styles.placeholderStep}>[interaction coming soon]</section>
       );
   }
+}
+
+// Runs two or more sub-interactions on one screen as a single build step. Each
+// sub-step reports its value up; one shared finish button completes them all,
+// gated until every sub-step is valid. Edit mode pre-fills from the stored
+// composite result.
+function CompositeStep({
+  interaction,
+  onFinish,
+  mode = "create",
+  initial,
+  onCancel,
+}: {
+  interaction: CompositeInteraction;
+  onFinish: (result: BuildResult) => void;
+  mode?: InteractionMode;
+  initial?: CompositeResult;
+  onCancel?: () => void;
+}) {
+  const steps = interaction.steps;
+  const [results, setResults] = useState<(BuildResult | null)[]>(() =>
+    steps.map((_, i) => initial?.results[i] ?? null)
+  );
+
+  const setStepResult = (i: number, r: BuildResult) =>
+    setResults((prev) => prev.map((p, idx) => (idx === i ? r : p)));
+
+  const allValid = steps.every((s, i) => isStepValid(s, results[i]));
+
+  return (
+    <section style={styles.compositeStep}>
+      {steps.map((step, i) => (
+        <div key={i} style={styles.compositeStepPart}>
+          {interaction.stepHeadings?.[i] ? (
+            <p style={styles.compositeStepHeading}>{interaction.stepHeadings[i]}</p>
+          ) : null}
+          <EmbeddedInteraction
+            interaction={step}
+            initial={initial?.results[i]}
+            onChange={(r) => setStepResult(i, r)}
+          />
+        </div>
+      ))}
+      <FinishControls
+        mode={mode}
+        disabled={!allValid}
+        onFinish={() =>
+          onFinish({ type: "composite", results: results as BuildResult[] })
+        }
+        onCancel={onCancel}
+        hint={allValid ? undefined : "Make a choice on each before continuing."}
+      />
+    </section>
+  );
 }
 
 function CoachBubble({ text }: { text: string }) {
@@ -1042,6 +1418,27 @@ const styles: Record<string, React.CSSProperties> = {
     height: "100%",
     border: "none",
   },
+  linksBlock: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+  },
+  primerLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    alignSelf: "flex-start",
+    background: "var(--bg)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-sm)",
+    boxShadow: "var(--shadow-sm)",
+    padding: "10px 16px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    color: "var(--brand-primary)",
+    textDecoration: "none",
+  },
   gateRow: {
     display: "flex",
     justifyContent: "flex-start",
@@ -1074,6 +1471,31 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "var(--r-lg)",
     padding: "20px 24px",
     boxShadow: "var(--shadow-sm)",
+  },
+  compositeStep: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "32px",
+    paddingTop: "36px",
+    marginTop: "8px",
+    borderTop: "1px solid var(--border)",
+  },
+  compositeStepPart: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  compositeStepHeading: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-title)",
+    fontWeight: 600,
+    color: "var(--ink)",
+    lineHeight: 1.3,
+    margin: "0 0 4px",
+  },
+  compositeSummaryStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "22px",
   },
   editLink: {
     display: "inline-flex",
@@ -1298,6 +1720,14 @@ const focusCss = `
   }
   .composer-input:focus-visible {
     border-color: var(--brand-primary);
+    box-shadow: var(--focus-ring);
+  }
+  .primer-link:hover {
+    border-color: var(--brand-primary);
+    background: var(--bg-alt);
+  }
+  .primer-link:focus-visible {
+    outline: none;
     box-shadow: var(--focus-ring);
   }
   .keep-talking-link:hover { color: var(--text); }

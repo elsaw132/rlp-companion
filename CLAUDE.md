@@ -17,7 +17,11 @@ conversation works, not a production app. Built by a non-technical founder.
 - Next.js (App Router) + TypeScript + Tailwind
 - Clerk for authentication
 - Anthropic SDK for the AI coach
-- Browser **localStorage** for all data — no database or backend in this phase
+- **Postgres** (Neon, via `@neondatabase/serverless`) for all user data — a
+  single `user_data` table keyed by `(user_id, key)` with a `jsonb` value.
+  Accessed through `/api/user-data`; the client reads/writes via the
+  `useUserData()` hook in `lib/userData.tsx`. (Earlier this phase used browser
+  localStorage; that data is migrated up on first load.)
 
 ## Routes
 - `/sign-in`, `/sign-up` — Clerk, public; every other route is Clerk-protected

@@ -33,6 +33,9 @@ export default async function SessionPage({
   // module in the stage, where only "Back to home" shows.
   const nextId = getNextModule(mod.id);
   const nextHref = nextId ? `/session/${nextId}` : null;
+  // The next module's title, so Vita's closing can name it correctly instead of
+  // guessing. Null on the last module of the stage.
+  const nextModuleTitle = nextId ? (getModule(nextId)?.module.title ?? null) : null;
 
   // The last module of the Imagine stage (stage 1) closes into its reveal —
   // offered as the primary completion action so the reveal is reached on
@@ -54,6 +57,7 @@ export default async function SessionPage({
         modulesInStage={modulesInStage}
         stageModuleIds={stageModuleIds}
         nextHref={nextHref}
+        nextModuleTitle={nextModuleTitle}
         revealHref={revealHref}
         sessionTitle={mod.title}
         sessionDescription={mod.description}
@@ -62,6 +66,8 @@ export default async function SessionPage({
         coachOpening={mod.coachOpening}
         sessionInstructions={mod.sessionInstructions}
         interaction={mod.interaction}
+        closingCommitment={mod.closingCommitment}
+        closeInOneStep={mod.closeInOneStep ?? false}
       />
     </main>
   );

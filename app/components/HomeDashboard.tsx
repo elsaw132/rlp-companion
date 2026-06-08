@@ -14,6 +14,7 @@ import { STAGES, TOTAL_STAGES } from "@/lib/modules";
 import { getActiveStageNumber } from "@/lib/progress";
 import { useUserData } from "@/lib/userData";
 import StageIntro from "./StageIntro";
+import OpeningCapture from "./OpeningCapture";
 import VitaMark from "./VitaMark";
 
 // The soft illustrated thumbnail per module, by position within the stage —
@@ -47,6 +48,10 @@ export default function HomeDashboard() {
   // the dashboard, or null. Set once on load, when the current stage has an
   // intro the person hasn't seen yet (first forward entry only).
   const [introStage, setIntroStage] = useState<number | null>(null);
+  // Whether to show the Stage 1 opening capture ("Where you're starting from").
+  // It's a stage-opening step, not a module — shown once, after the Imagine
+  // intro and before module 1.1, while 1.1 isn't done yet. Set once on load.
+  const [showOpeningCapture, setShowOpeningCapture] = useState(false);
 
   // Read completion once the data layer has loaded. Done during render (not an
   // effect) so the first paint after load already has the saved state. The
@@ -67,6 +72,16 @@ export default function HomeDashboard() {
     const stage = STAGES.find((s) => s.number === currentStage);
     if (stage?.intro && !userData.getStageIntrosSeen().includes(currentStage)) {
       setIntroStage(currentStage);
+    }
+    // The Stage 1 opening capture comes right after that intro and before module
+    // 1.day. Shown once (its own seen flag), and only while 1.day isn't complete,
+    // so anyone already into Stage 1 isn't interrupted by it.
+    if (
+      currentStage === 1 &&
+      !ids.includes("1.day") &&
+      !userData.hasSeenStage1Starting()
+    ) {
+      setShowOpeningCapture(true);
     }
   }
 
@@ -92,6 +107,24 @@ export default function HomeDashboard() {
         />
       );
     }
+  }
+
+  // After the Stage 1 intro is dismissed, the opening capture takes the screen
+  // before the dashboard. Saving stores their starting thoughts; skipping (or a
+  // blank) just records it as seen. Either way they land back on the dashboard
+  // with module 1.1 as their next step.
+  if (showOpeningCapture) {
+    return (
+      <OpeningCapture
+        onComplete={(text) => {
+          if (user) {
+            if (text) void userData.saveStartingThoughts(text);
+            void userData.markStage1StartingSeen();
+          }
+          setShowOpeningCapture(false);
+        }}
+      />
+    );
   }
 
   // Every module in programme order, tagged with its stage number.
@@ -344,7 +377,7 @@ export default function HomeDashboard() {
             </section>
             )}
 
-            {/* STAGE 1 PICTURE — only within the Imagine view, once all six
+            {/* STAGE 1 PICTURE — only within the Imagine view, once all five
                 Imagine modules are done. A loud "is ready" prompt until the
                 picture is confirmed, then a calmer persistent entry. */}
             {viewedStageNumber === 1 && isStageDone(STAGES[0]) && (

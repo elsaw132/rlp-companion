@@ -1,6 +1,6 @@
 "use client";
 
-// The Imagine stage's instance of the reveal. It gathers the six Imagine
+// The Imagine stage's instance of the reveal. It gathers the five Imagine
 // takeaways, runs them through the synthesis interface (/api/stage-reveal) to
 // get the three threads + the archetype + the personalised "why you", merges in
 // the static archetype copy, and hands it all to the shared StageReveal shell
@@ -47,14 +47,23 @@ export default function ImagineReveal() {
     }
   }
 
-  // The six Imagine takeaways, in programme order, non-empty only.
+  // The synthesis input: the opening capture (where they started) folded in
+  // first, then the five Imagine takeaways in programme order, non-empty only.
+  // The starting thoughts inform the overall picture; they don't get their own
+  // thread — the synthesis still returns exactly three threads + the archetype.
   function gatherTakeaways(): { moduleTitle: string; text: string }[] {
-    return STAGES[0].modules.flatMap((m) => {
+    const start = userData.getStartingThoughts();
+    const startEntry =
+      start && start.text.trim()
+        ? [{ moduleTitle: start.moduleTitle, text: start.text.trim() }]
+        : [];
+    const moduleEntries = STAGES[0].modules.flatMap((m) => {
       const t = userData.getTakeaway(m.id);
       return t && t.text.trim()
         ? [{ moduleTitle: m.title, text: t.text.trim() }]
         : [];
     });
+    return [...startEntry, ...moduleEntries];
   }
 
   async function generate() {
@@ -103,9 +112,13 @@ export default function ImagineReveal() {
   // Next stage after Imagine, for the forward CTA label.
   const nextStage = STAGES.find((s) => s.number === 2);
 
-  const vitaIntro = displayName
-    ? `That's the imagining done, ${displayName}. Here's what you kept coming back to\u00a0\u2014`
-    : "That's the imagining done. Here's what you kept coming back to\u00a0\u2014";
+  // A gentle nod to where they started, when they wrote opening thoughts — so the
+  // reveal lightly bookends the beginning before showing what emerged.
+  const startedFromSomething = !!userData.getStartingThoughts()?.text.trim();
+  const name = displayName ? `, ${displayName}` : "";
+  const vitaIntro = startedFromSomething
+    ? `That's the imagining done${name}. You came in with a few thoughts already — here's what you kept coming back to\u00a0\u2014`
+    : `That's the imagining done${name}. Here's what you kept coming back to\u00a0\u2014`;
 
   return (
     <StageReveal

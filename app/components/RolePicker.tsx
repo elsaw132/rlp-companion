@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { RolePickerInteraction, RolePickerResult } from "@/lib/modules";
 import { FinishControls, type EditableProps } from "./InteractionShell";
 
@@ -21,6 +21,11 @@ export function rolePickerSummaryText(result: RolePickerResult): string {
 type RolePickerProps = {
   interaction: RolePickerInteraction;
   onFinish: (result: RolePickerResult) => void;
+  // Embedded inside a composite step: render without the finish button and
+  // report the current selection upward on every change. The composite owns
+  // finishing and validity.
+  embedded?: boolean;
+  onChange?: (result: RolePickerResult) => void;
 } & EditableProps<RolePickerResult>;
 
 export default function RolePicker({
@@ -29,8 +34,17 @@ export default function RolePicker({
   mode = "create",
   initial,
   onCancel,
+  embedded = false,
+  onChange,
 }: RolePickerProps) {
-  const { instruction, groups } = interaction;
+  const { instruction, groups, selectRange, summaryLabel } = interaction;
+  // Starring is on by default (Stage 1); flat Stage 2 pickers turn it off.
+  const starrable = interaction.starrable ?? true;
+  // The "add your own" field is on by default; fixed-choice pickers (e.g. 2.5's
+  // one-pick lever chooser) turn it off.
+  const allowCustom = interaction.allowCustom ?? true;
+  const minPicks = selectRange?.min ?? 1;
+  const maxPicks = selectRange?.max;
 
   // In edit mode, pre-fill the earlier picks. Custom roles (any pick that isn't
   // one of the listed options) are restored as extras under the first group so
@@ -45,13 +59,25 @@ export default function RolePicker({
   });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
+  // Keep the parent composite in step with the live selection.
+  useEffect(() => {
+    if (!embedded || !onChange) return;
+    onChange({ type: "role-picker", picked: selected, starred, summaryLabel });
+    // onChange is a fresh closure each render; selected/starred drive this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, starred, embedded]);
+
   function toggleSelect(role: string) {
+    const isSelected = selected.includes(role);
+    // Respect an upper bound when one is set — ignore picks beyond it.
+    if (!isSelected && maxPicks !== undefined && selected.length >= maxPicks) {
+      return;
+    }
     setSelected((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     );
     // Deselecting a role also drops its star.
-    setStarred((prev) => prev.filter((r) => r !== role || !selected.includes(role)));
-    if (selected.includes(role)) {
+    if (isSelected) {
       setStarred((prev) => prev.filter((r) => r !== role));
     }
   }
@@ -77,9 +103,29 @@ export default function RolePicker({
   }
 
   const starLimitReached = starred.length >= MAX_STARRED;
+  const countOk =
+    selected.length >= minPicks &&
+    (maxPicks === undefined || selected.length <= maxPicks);
+  const rangeHint =
+    selectRange && maxPicks !== undefined
+      ? minPicks === maxPicks
+        ? `Pick ${minPicks === 1 ? "one" : minPicks}.`
+        : `Choose ${minPicks} to ${maxPicks}.`
+      : null;
+  const finishHint = !countOk
+    ? rangeHint ?? "Pick at least one to carry forward."
+    : starrable
+      ? "Star up to three that feel most alive."
+      : undefined;
 
   return (
-    <section style={styles.wrap}>
+    <section
+      style={
+        embedded
+          ? { ...styles.wrap, paddingTop: 0, marginTop: 0, borderTop: "none" }
+          : styles.wrap
+      }
+    >
       <style>{rolePickerCss}</style>
 
       <p style={styles.instruction}>{instruction}</p>
@@ -89,7 +135,7 @@ export default function RolePicker({
           const options = [...group.options, ...(extras[group.name] ?? [])];
           return (
             <div key={group.name} style={styles.group}>
-              <p style={styles.groupName}>{group.name}</p>
+              {group.name && <p style={styles.groupName}>{group.name}</p>}
               <div style={styles.chipWrap}>
                 {options.map((role) => {
                   const isSelected = selected.includes(role);
@@ -111,7 +157,7 @@ export default function RolePicker({
                       >
                         {role}
                       </button>
-                      {isSelected && (
+                      {starrable && isSelected && (
                         <button
                           type="button"
                           className="star-btn"
@@ -132,53 +178,53 @@ export default function RolePicker({
                   );
                 })}
               </div>
-              <div style={styles.customRow}>
-                <input
-                  type="text"
-                  className="custom-input"
-                  style={styles.customInput}
-                  placeholder="Add your own…"
-                  value={drafts[group.name] ?? ""}
-                  onChange={(e) =>
-                    setDrafts((prev) => ({
-                      ...prev,
-                      [group.name]: e.target.value,
-                    }))
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      submitCustom(group.name);
+              {allowCustom && (
+                <div style={styles.customRow}>
+                  <input
+                    type="text"
+                    className="custom-input"
+                    style={styles.customInput}
+                    placeholder="Add your own…"
+                    value={drafts[group.name] ?? ""}
+                    onChange={(e) =>
+                      setDrafts((prev) => ({
+                        ...prev,
+                        [group.name]: e.target.value,
+                      }))
                     }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="custom-add"
-                  style={styles.customAdd}
-                  onClick={() => submitCustom(group.name)}
-                >
-                  Add
-                </button>
-              </div>
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        submitCustom(group.name);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="custom-add"
+                    style={styles.customAdd}
+                    onClick={() => submitCustom(group.name)}
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      <FinishControls
-        mode={mode}
-        disabled={selected.length === 0}
-        onFinish={() =>
-          onFinish({ type: "role-picker", picked: selected, starred })
-        }
-        onCancel={onCancel}
-        hint={
-          selected.length === 0
-            ? "Pick at least one role to carry forward."
-            : "Star up to three that feel most alive."
-        }
-      />
+      {!embedded && (
+        <FinishControls
+          mode={mode}
+          disabled={!countOk}
+          onFinish={() =>
+            onFinish({ type: "role-picker", picked: selected, starred, summaryLabel })
+          }
+          onCancel={onCancel}
+          hint={finishHint}
+        />
+      )}
     </section>
   );
 }
@@ -292,7 +338,7 @@ const styles: Record<string, React.CSSProperties> = {
 export function RolePickerSummary({ result }: { result: RolePickerResult }) {
   return (
     <>
-      <p style={summaryStyles.heading}>Your roles</p>
+      <p style={summaryStyles.heading}>{result.summaryLabel ?? "Your roles"}</p>
       <div style={summaryStyles.chipWrap}>
         {result.picked.map((role) => {
           const isStarred = result.starred.includes(role);
