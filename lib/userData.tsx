@@ -26,6 +26,7 @@ import {
 } from "@/lib/modules";
 import { getActiveStageNumber } from "@/lib/progress";
 import type { Takeaway } from "@/lib/takeaways";
+import type { Dreams } from "@/lib/dreams";
 import type { RevealSynthesis, SavedStageReveal } from "@/lib/stageReveal";
 import type {
   Stage2Synthesis,
@@ -76,6 +77,10 @@ const KEYS = {
   // module's screening rhythm). Distinct from interaction/takeaway — a plan
   // entry, not reflection data.
   commitment: (id: string) => `commitment:${id}`,
+  // The structured "Dreams" record for the money module — top three, reasons,
+  // and the achievable/pipedream split. Distinct from the raw spark-prompts
+  // interaction (which holds the full typed list) and the prose takeaway.
+  dreams: (id: string) => `dreams:${id}`,
 };
 
 // The Stage 1 opening capture ("Where you're starting from") is stored as a
@@ -467,6 +472,20 @@ export function useUserData() {
 
   const clearTakeaway = (moduleId: string) => removeKey(KEYS.takeaway(moduleId));
 
+  // ---- Dreams (money module structured record) ----
+  const getDreams = (moduleId: string): Dreams | null => {
+    const d = snapshot[KEYS.dreams(moduleId)];
+    if (d && typeof d === "object" && Array.isArray((d as Dreams).allDreams)) {
+      return d as Dreams;
+    }
+    return null;
+  };
+
+  const saveDreams = (dreams: Dreams) =>
+    setKey(KEYS.dreams(dreams.moduleId), dreams);
+
+  const clearDreams = (moduleId: string) => removeKey(KEYS.dreams(moduleId));
+
   // ---- Stage 1 opening capture ("Where you're starting from") ----
   // Stored as its own takeaway, separate from the module takeaways.
   const getStartingThoughts = (): Takeaway | null =>
@@ -688,6 +707,7 @@ export function useUserData() {
     await removeKey(KEYS.interaction(id));
     await clearCommitment(id);
     await clearTakeaway(id);
+    await clearDreams(id);
     await clearModuleComplete(id);
   };
 
@@ -704,6 +724,9 @@ export function useUserData() {
     getTakeaway,
     saveTakeaway,
     clearTakeaway,
+    getDreams,
+    saveDreams,
+    clearDreams,
     getStartingThoughts,
     saveStartingThoughts,
     hasPriorTakeaways,

@@ -37,6 +37,7 @@ import type {
   ScreeningCommitment as ScreeningCommitmentResult,
 } from "@/lib/modules";
 import { useUserData } from "@/lib/userData";
+import type { Dreams } from "@/lib/dreams";
 import { buildCarryForward, hasCarryForward } from "@/lib/carryForward";
 
 // Vita appends this to her closing message so we know the module is finished.
@@ -463,6 +464,52 @@ export default function SessionContainer({
     }
   }
 
+  // The money module (1.money) also produces a structured "Dreams" record: the
+  // top three the person chose, why each stands out, and the achievable vs
+  // pipedream split. These emerge only in conversation, so we extract them at
+  // completion and store them alongside the full spark-prompts list. Runs in the
+  // background and self-guards to the money module. If extraction fails, the full
+  // list is still stored so the dreams are never lost.
+  async function generateAndStoreDreams(fullMessages: Message[]) {
+    if (!user) return;
+    if (sessionId !== "1.money") return;
+    const allDreams =
+      buildResult && buildResult.type === "spark-prompts"
+        ? buildResult.entries
+        : [];
+
+    const save = (
+      top3: Dreams["top3"],
+      achievable: Dreams["achievable"],
+      pipeDreams: Dreams["pipeDreams"]
+    ) =>
+      userData.saveDreams({
+        moduleId: sessionId,
+        allDreams,
+        top3,
+        achievable,
+        pipeDreams,
+        savedAt: new Date().toISOString(),
+      });
+
+    try {
+      const res = await fetch("/api/dreams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: fullMessages, allDreams }),
+      });
+      if (!res.ok) throw new Error(`Dreams request failed: ${res.status}`);
+      const data = (await res.json()) as {
+        top3: Dreams["top3"];
+        achievable: Dreams["achievable"];
+        pipeDreams: Dreams["pipeDreams"];
+      };
+      void save(data.top3 ?? [], data.achievable ?? [], data.pipeDreams ?? []);
+    } catch {
+      void save([], [], []);
+    }
+  }
+
   // Read the kept-plan recognition exactly as the module starts, then clear the
   // stored plan no matter what — so each cycle starts fresh and a plan is never
   // acknowledged twice. Returns the line only on an exact same-day match; on an
@@ -670,6 +717,9 @@ export default function SessionContainer({
         // Capture the takeaway in the background — don't block the done state.
         // Re-closing after "keep talking" regenerates and overwrites it.
         void generateAndStoreTakeaway(finalMessages);
+        // The money module also captures its structured Dreams record (self-guards
+        // to 1.money). Re-closing regenerates and overwrites it, same as above.
+        void generateAndStoreDreams(finalMessages);
       }
     } catch {
       // Roll the user's bubble back off the conversation and hand their words
