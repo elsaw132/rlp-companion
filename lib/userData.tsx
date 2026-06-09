@@ -27,6 +27,10 @@ import {
 import { getActiveStageNumber } from "@/lib/progress";
 import type { Takeaway } from "@/lib/takeaways";
 import type { RevealSynthesis, SavedStageReveal } from "@/lib/stageReveal";
+import type {
+  Stage2Synthesis,
+  SavedStage2Reveal,
+} from "@/lib/stage2Reveal";
 
 // ---- Shapes shared across the app ----
 
@@ -61,6 +65,10 @@ const KEYS = {
   stage1StartingSeen: "stage1-starting-seen",
   stage1Summary: "stage1-summary",
   stage1Reveal: "stage1-reveal",
+  stage2Reveal: "stage2-reveal",
+  // The set of Stage 2 discovery-stat ids this user has already been shown, so
+  // the reveal rotates to fresh stats on a return visit (the annual review).
+  seenStats: "seen-stats",
   takeaway: (moduleId: string) => `takeaway:${moduleId}`,
   conversation: (id: string) => `conversation:${id}`,
   interaction: (id: string) => `interaction:${id}`,
@@ -599,6 +607,41 @@ export function useUserData() {
       savedAt: new Date().toISOString(),
     } satisfies SavedStageReveal);
 
+  // ---- Stage 2 reveal (Explore: six areas + discovery stats) ----
+  const getStage2Reveal = (): SavedStage2Reveal | null => {
+    const v = snapshot[KEYS.stage2Reveal];
+    if (
+      v &&
+      typeof v === "object" &&
+      Array.isArray((v as SavedStage2Reveal).synthesis?.areas)
+    ) {
+      return v as SavedStage2Reveal;
+    }
+    return null;
+  };
+
+  const hasStage2Reveal = (): boolean => getStage2Reveal() !== null;
+
+  const saveStage2Reveal = (synthesis: Stage2Synthesis) =>
+    setKey(KEYS.stage2Reveal, {
+      synthesis,
+      savedAt: new Date().toISOString(),
+    } satisfies SavedStage2Reveal);
+
+  // ---- Seen discovery stats (Stage 2 reveal rotation) ----
+  const getSeenStats = (): string[] => asArray<string>(snapshot[KEYS.seenStats]);
+
+  // Append newly-shown stat ids, de-duplicated and preserving first-seen order
+  // (earliest = least recently introduced), so a return visit can prefer fresh
+  // stats. No-op when nothing new was shown.
+  const addSeenStats = (ids: string[]) => {
+    const existing = getSeenStats();
+    const merged = [...existing];
+    for (const id of ids) if (!merged.includes(id)) merged.push(id);
+    if (merged.length === existing.length) return Promise.resolve();
+    return setKey(KEYS.seenStats, merged);
+  };
+
   // ---- Per-module conversation + interaction ----
   const getConversation = (id: string): ConversationMessage[] | null => {
     const v = snapshot[KEYS.conversation(id)];
@@ -681,6 +724,11 @@ export function useUserData() {
     getStage1Reveal,
     hasStage1Reveal,
     saveStage1Reveal,
+    getStage2Reveal,
+    hasStage2Reveal,
+    saveStage2Reveal,
+    getSeenStats,
+    addSeenStats,
     getConversation,
     saveConversation,
     getBuild,

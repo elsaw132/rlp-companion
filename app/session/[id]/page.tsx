@@ -1,7 +1,10 @@
+import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import SessionContainer from "../../components/SessionContainer";
 import { ResetModuleLink } from "../../components/ResetControls";
 import { ModulesBackLink } from "../../components/ModulesBackLink";
-import { getModule, getNextModule } from "@/lib/modules";
+import { getModule, getNextModule, getModulesBefore } from "@/lib/modules";
+import { getUserData } from "@/lib/db";
 
 export default async function SessionPage({
   params,
@@ -28,6 +31,28 @@ export default async function SessionPage({
     stageModuleIds,
   } = found;
 
+  // In-order gate: a module opens only if it's already complete (revisiting) or
+  // every module before it in programme order is done. This keeps the modules
+  // sequential even against a directly-typed URL — the dashboard already offers
+  // only the next module as a link. Fails open on a DB hiccup so a transient
+  // error never locks a legitimate user out of their next module.
+  const { userId } = await auth();
+  if (userId) {
+    let completedIds: string[] | null = null;
+    try {
+      const raw = await getUserData(userId, "completed");
+      completedIds = Array.isArray(raw) ? (raw as string[]) : [];
+    } catch {
+      completedIds = null;
+    }
+    if (completedIds) {
+      const unlocked =
+        completedIds.includes(mod.id) ||
+        getModulesBefore(mod.id).every((m) => completedIds!.includes(m.id));
+      if (!unlocked) redirect("/home");
+    }
+  }
+
   // The next module in this stage, if there is one — offered as a secondary
   // action on completion, alongside returning to the hub. Null on the last
   // module in the stage, where only "Back to home" shows.
@@ -37,10 +62,14 @@ export default async function SessionPage({
   // guessing. Null on the last module of the stage.
   const nextModuleTitle = nextId ? (getModule(nextId)?.module.title ?? null) : null;
 
-  // The last module of the Imagine stage (stage 1) closes into its reveal —
-  // offered as the primary completion action so the reveal is reached on
-  // purpose rather than stumbled on later from the hub.
-  const revealHref = !nextId && stageNumber === 1 ? "/stage/1" : null;
+  // The last module of a stage that has a stage-close reveal (Imagine = stage 1,
+  // Explore = stage 2) closes into that reveal — offered as the primary
+  // completion action so the reveal is reached on purpose rather than stumbled on
+  // later from the hub.
+  const revealHref =
+    !nextId && (stageNumber === 1 || stageNumber === 2)
+      ? `/stage/${stageNumber}`
+      : null;
 
   return (
     <main style={{ minHeight: "100vh", background: "var(--bg-alt)" }}>

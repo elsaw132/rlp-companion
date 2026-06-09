@@ -8,6 +8,13 @@
   --success:#2F8B4E;--success-text:#2C7A46;--success-surface:#EAF5ED;--success-line:#BFE0C4;--muted-surface:#EFEEE9;
   --info-surface:#ECF0FB;--info-line:#D6DFF4;--info-text:#16202E;
   --ill-sky:#A4CCE5;--ill-sky-pale:#C9E0EE;--ill-hill:#5B9F4A;--ill-hill-deep:#3F7F36;--ill-path:#C7A53A;--ill-lavender:#D0CCEF;
+  /* Stage 2 area accents — derived from the --ill illustration palette (light fill / selected fill / readable darkened foreground). No orange. */
+  --area-active-base:#E7F2DA;--area-active-sel:#BFDD97;--area-active-fg:#2C5A1A;
+  --area-cognitive-base:#ECEAF8;--area-cognitive-sel:#CCC8F0;--area-cognitive-fg:#463C8C;
+  --area-social-base:#E4F0FA;--area-social-sel:#B4D5F1;--area-social-fg:#0C447C;
+  --area-purpose-base:#F4E9C8;--area-purpose-sel:#E8D08A;--area-purpose-fg:#6B5310;
+  --area-vitality-base:#DCF1E9;--area-vitality-sel:#9FE1CB;--area-vitality-fg:#0A5544;
+  --area-senses-base:#E6EDF2;--area-senses-sel:#C2D2DE;--area-senses-fg:#3A5566;
   --r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-pill:999px;
   --shadow-sm:0 1px 2px rgba(16,32,46,.05),0 1px 3px rgba(16,32,46,.04);
   --shadow-md:0 2px 6px rgba(16,32,46,.05),0 10px 28px rgba(16,32,46,.06);

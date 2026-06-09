@@ -644,7 +644,7 @@ WATCH FOR
       body: [
         "[Placeholder — SMW to replace.] In Imagine, you sketched the shape of the retirement you want. Now we go a little deeper, area by area. Research on what makes retirement genuinely good for people points to a handful of evidence-based domains — movement, a curious mind, the people around you, a sense of purpose, your energy, and your senses.",
         "Most people's first picture of retirement is stronger in some of these than others, and that's completely normal. These modules aren't an audit of what's missing — they're an invitation to look at each area in turn and notice what you'd like to keep, change, or add.",
-        "They're all optional, and none of them block your way forward. Take the ones that feel most relevant, in any order, whenever you have a little time.",
+        "We'll take the areas one at a time, in order — each builds on the last, and together they make the full picture. There's no rush: come to them whenever you have a little time, and your answers are always saved.",
       ],
       buttonLabel: "Let's carry on",
     },

@@ -23,9 +23,14 @@ export type StageRevealProps = {
   title: string;
   // The intro line beneath the Vita lockup (names the person).
   vitaIntro: string;
-  // Exactly three — each a synthesised theme label + a verbatim quote.
-  threads: RevealThread[];
-  // Optional payoff slot between threads and hook (Imagine = the archetype).
+  // The threads pattern (Imagine = three theme + quote pairs). Omit when a stage
+  // supplies its own body via `children` (Explore = the six area cards).
+  threads?: RevealThread[];
+  // A custom body slot rendered in place of the threads block — a stage that
+  // doesn't fit the threads pattern passes its own markup here. It sits inside
+  // .rlp-reveal, so the shared rise/dN motion classes are available to it.
+  children?: React.ReactNode;
+  // Optional payoff slot between the body and the hook (Imagine = the archetype).
   payoff?: React.ReactNode;
   forwardHook: string;
   primaryCta: { label: string; href: string };
@@ -39,6 +44,7 @@ export default function StageReveal({
   title,
   vitaIntro,
   threads,
+  children,
   payoff,
   forwardHook,
   primaryCta,
@@ -74,17 +80,19 @@ export default function StageReveal({
 
           <p className="intro rise d3">{vitaIntro}</p>
 
-          <div className="threads">
-            {threads.map((t, i) => (
-              <div
-                key={i}
-                className={`thread rise ${["d4", "d5", "d6"][i] ?? "d6"}`}
-              >
-                <div className="lab">{t.themeLabel}</div>
-                <div className="quote">&ldquo;{t.quote}&rdquo;</div>
-              </div>
-            ))}
-          </div>
+          {children ?? (
+            <div className="threads">
+              {(threads ?? []).map((t, i) => (
+                <div
+                  key={i}
+                  className={`thread rise ${["d4", "d5", "d6"][i] ?? "d6"}`}
+                >
+                  <div className="lab">{t.themeLabel}</div>
+                  <div className="quote">&ldquo;{t.quote}&rdquo;</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {payoff && <div className="rise d7">{payoff}</div>}
 
@@ -105,7 +113,7 @@ export default function StageReveal({
 }
 
 const css = `
-.rlp-reveal{max-width:var(--content-max);margin:0 auto;padding:40px 24px 96px}
+.rlp-reveal{max-width:860px;margin:0 auto;padding:40px 24px 96px}
 .rlp-reveal a{text-decoration:none}
 
 /* slim stage arc */
@@ -121,7 +129,7 @@ const css = `
 
 /* reveal card (cream = the coach is present) */
 .rlp-reveal .reveal{background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-lg);box-shadow:var(--shadow-md);overflow:hidden}
-.rlp-reveal .body{padding:44px 44px 40px}
+.rlp-reveal .body{padding:44px 56px 40px}
 
 .rlp-reveal .eyebrow{font-size:var(--fs-eyebrow);letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:600;text-align:center;margin-bottom:10px}
 .rlp-reveal .display{font-family:var(--font-serif);font-size:var(--fs-display);font-weight:600;line-height:1.12;color:var(--ink);text-align:center;letter-spacing:-.01em}
@@ -131,16 +139,16 @@ const css = `
 .rlp-reveal .vita .name{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--ink)}
 .rlp-reveal .vita .pill{font-size:var(--fs-label);font-weight:600;color:var(--coach-pill-text);background:var(--coach-pill);border-radius:var(--r-pill);padding:4px 11px}
 
-.rlp-reveal .intro{font-family:var(--font-serif);font-size:var(--fs-h2);line-height:1.5;color:var(--text);text-align:center;max-width:42ch;margin:0 auto 34px}
+.rlp-reveal .intro{font-family:var(--font-serif);font-size:var(--fs-h2);line-height:1.5;color:var(--text);text-align:center;max-width:54ch;margin:0 auto 34px}
 
 /* the three threads */
-.rlp-reveal .threads{display:flex;flex-direction:column;gap:22px;margin:0 auto;max-width:46ch}
+.rlp-reveal .threads{display:flex;flex-direction:column;gap:22px;margin:0 auto;max-width:54ch}
 .rlp-reveal .thread{border-left:2px solid var(--warm-line);padding:2px 0 2px 20px}
 .rlp-reveal .thread .lab{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--ink);display:flex;align-items:baseline;gap:9px}
 .rlp-reveal .thread .lab::before{content:"";flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--sun);transform:translateY(-3px)}
 .rlp-reveal .thread .quote{font-family:var(--font-serif);font-style:italic;font-size:var(--fs-h2);line-height:1.45;color:var(--text);margin-top:5px}
 
-.rlp-reveal .hook{font-family:var(--font-serif);font-size:var(--fs-h2);color:var(--text);text-align:center;max-width:40ch;margin:36px auto 28px}
+.rlp-reveal .hook{font-family:var(--font-serif);font-size:var(--fs-h2);color:var(--text);text-align:center;max-width:50ch;margin:36px auto 28px}
 
 .rlp-reveal .actions{display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;gap:14px}
 .rlp-reveal .btn-navy{font-family:var(--font-sans);font-size:15px;font-weight:600;color:#fff;background:var(--brand-primary);border:none;border-radius:var(--r-sm);padding:13px 22px;min-height:48px;cursor:pointer;display:inline-flex;align-items:center;gap:9px;line-height:1}

@@ -41,6 +41,9 @@ export default function HomeDashboard() {
   // Whether the Stage 1 reveal has been generated yet. Controls whether the
   // Imagine view shows the loud "is ready" prompt or the calmer "View" entry.
   const [hasStage1Reveal, setHasStage1Reveal] = useState(false);
+  // Whether the Stage 2 (Explore) reveal has been generated yet — same loud vs.
+  // calm distinction as Stage 1.
+  const [hasStage2Reveal, setHasStage2Reveal] = useState(false);
   // The stage the person is currently looking at. null means "follow the current
   // stage"; clicking a finished stage (in the nav or the arc) pins it to a number.
   const [viewedStage, setViewedStage] = useState<number | null>(null);
@@ -64,6 +67,7 @@ export default function HomeDashboard() {
     setGreeting(greetingWord());
     setDisplayName(userData.getDisplayName(user));
     setHasStage1Reveal(userData.hasStage1Reveal());
+    setHasStage2Reveal(userData.hasStage2Reveal());
     // Show the current stage's intro once, the first time it's the active stage.
     // Tying it to the current stage (not the viewed one) means navigating back to
     // a finished stage never re-triggers it, and anyone already past a stage
@@ -412,6 +416,41 @@ export default function HomeDashboard() {
               )
             )}
 
+            {/* STAGE 2 PICTURE — only within the Explore view, once all six
+                Explore modules are done. Loud "is ready" prompt until viewed,
+                then a calmer persistent entry. */}
+            {viewedStageNumber === 2 && isStageDone(STAGES[1]) && (
+              hasStage2Reveal ? (
+                <Link className="picture-card is-calm" href="/stage/2">
+                  <span className="pc-icon" aria-hidden="true">
+                    ✦
+                  </span>
+                  <span className="pc-body">
+                    <span className="pc-title">View your Explore reveal</span>
+                  </span>
+                  <span className="pc-chev" aria-hidden="true">
+                    ›
+                  </span>
+                </Link>
+              ) : (
+                <Link className="picture-card" href="/stage/2">
+                  <span className="pc-icon" aria-hidden="true">
+                    ✦
+                  </span>
+                  <span className="pc-body">
+                    <span className="pc-title">Your Explore reveal is ready</span>
+                    <span className="pc-sub">
+                      A fuller picture across the six areas of a balanced
+                      retirement — and a few things worth knowing along the way.
+                    </span>
+                  </span>
+                  <span className="pc-chev" aria-hidden="true">
+                    ›
+                  </span>
+                </Link>
+              )
+            )}
+
             {/* STAGE SESSIONS */}
             <div className="sec-row">
               <div className="sec-head">Your modules in {viewedStageData.name}</div>
@@ -499,8 +538,8 @@ export default function HomeDashboard() {
               <div>
                 <h4>There&apos;s no wrong way to do this</h4>
                 <p>
-                  Take the modules in any order, at any pace. Nothing is graded,
-                  and you can come back to anything you&apos;ve said.
+                  Take the modules one at a time, at your own pace. Nothing is
+                  graded, and you can come back to anything you&apos;ve said.
                 </p>
               </div>
               <a href="#" className="lk">
