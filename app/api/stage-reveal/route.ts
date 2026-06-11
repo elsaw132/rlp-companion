@@ -32,6 +32,8 @@ Optionally name a lighter secondary type id if their imagining clearly blends tw
 3. WHY YOU — one sentence (no leading capitalised label) tying the chosen type to their own inputs, drawn from their words. Lower-case start is fine; it follows "Why you:".
 
 Voice: warm, specific, plain. Never use these words: reflect, explore, unpack, journey, growth, share, deep dive.
+- Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"; "It isn't this, it's that"). Speak directly, confidently, and entirely in the affirmative.
+- Never use the word "genuinely".
 
 Respond with ONLY a JSON object, no markdown, no preamble, in exactly this shape:
 {"threads":[{"themeLabel":"...","quote":"..."},{"themeLabel":"...","quote":"..."},{"themeLabel":"...","quote":"..."}],"archetypeId":"one-of-the-ids","secondaryId":"optional-id-or-omit","whyYou":"..."}`;

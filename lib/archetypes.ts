@@ -27,7 +27,7 @@ export const ARCHETYPES: Record<string, Archetype> = {
     id: "adventurer",
     name: "The Adventurer",
     definition:
-      "Adventurers see retirement as an opening, not a closing — the room they've waited for to do the long-deferred things.",
+      "Adventurers see retirement as an opening — the room they've waited for to do the long-deferred things.",
     company:
       "A familiar shape for people who've spent decades saying \u201cone day\u201d — you're in good company.",
   },
@@ -37,7 +37,7 @@ export const ARCHETYPES: Record<string, Archetype> = {
     definition:
       "For Hearth-Keepers the richness is close to home — the people they love, a place that holds them, time to be properly present.",
     company:
-      "Common among people who measure a good retirement in company kept, not ground covered — you're in good company.",
+      "Common among people who measure a good retirement by the company they keep — you're in good company.",
   },
   giver: {
     id: "giver",
@@ -51,7 +51,7 @@ export const ARCHETYPES: Record<string, Archetype> = {
     id: "restorer",
     name: "The Restorer",
     definition:
-      "After a long stretch of being needed on demand, Restorers want permission to slow right down. Not idleness; recovery.",
+      "After a long stretch of being needed on demand, Restorers want permission to slow right down into real recovery.",
     company:
       "More common than people admit, and a healthy instinct after decades of obligation — you're in good company.",
   },
@@ -59,9 +59,9 @@ export const ARCHETYPES: Record<string, Archetype> = {
     id: "reinventor",
     name: "The Reinventor",
     definition:
-      "Reinventors don't want more of the same at a gentler pace — they want to become someone a little new: a fresh chapter, a new skill, a venture there was never room for.",
+      "Reinventors want to become someone a little new: a fresh chapter, a new skill, a venture there was never room for.",
     company:
-      "A familiar pattern for people who see retirement as a doorway, not a finish line — you're in good company.",
+      "A familiar pattern for people who see retirement as a doorway onto what's next — you're in good company.",
   },
 };
 

@@ -71,6 +71,10 @@ conversation works, not a production app. Built by a non-technical founder.
   share, deep dive.
 - Never say: "that's wonderful", "great answer", "I hear you",
   "let's explore that together".
+- Never use negative-contrast, parataxis, or symmetrical sentence
+  structures ("It's not X, it's Y"; "It isn't this, it's that"). Speak
+  directly, confidently, and entirely in the affirmative.
+- Never use the word "genuinely".
 - Vita is an AI coach, and is never implied to be human.
 - Vita's voice and method live in lib/coachBasePrompt.ts (COACH_BASE_PROMPT) — the single source of truth for how Vita talks. Don't edit or paraphrase it unless asked.
 

@@ -42,6 +42,8 @@ Hard rules:
 - Don't ask how they feel about retirement; don't reference hopes or fears.
 - Tie every seed to their actual material. Address the letter to the recipient given.
 - Keep seeds short (one sentence, trailing off). Plain, warm language.
+- Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"; "It isn't this, it's that"). Speak directly, confidently, and entirely in the affirmative.
+- Never use the word "genuinely".
 
 Respond with ONLY a JSON object of exactly this shape, and nothing else:
 {"suggestions": [{"chip": "...", "seed": "..."}, {"chip": "...", "seed": "..."}]}`;

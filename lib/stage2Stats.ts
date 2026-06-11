@@ -80,7 +80,7 @@ export const STATS: Stat[] = [
     claim:
       "Grip strength is one of the best simple predictors of longevity there is — a review of 42 studies found people with low grip strength had a 67% higher risk of dying early than those with strong grips.",
     sourceDisplay:
-      "Meta-analysis of 42 studies (Bohannon, reviews to 2024). Worth knowing: it's a marker of overall strength and health, not a cause on its own.",
+      "Meta-analysis of 42 studies (Bohannon, reviews to 2024). Worth knowing: it's a marker of overall strength and health rather than a cause on its own.",
     register: "mixed",
     evidence: "robust",
     trigger: () => true,
@@ -93,7 +93,7 @@ export const STATS: Stat[] = [
     claim:
       "A quick one: people who couldn't stand on one leg for ten seconds had an 84% higher risk of dying in the next decade than those who could — and balance is very trainable.",
     sourceDisplay:
-      "Araújo et al., British Journal of Sports Medicine, 2022. Worth knowing: observational, so it reflects overall fitness, not just balance.",
+      "Araújo et al., British Journal of Sports Medicine, 2022. Worth knowing: observational, so it reflects overall fitness as much as balance.",
     register: "mixed",
     evidence: "solid-but-contested", // VERIFY
     trigger: () => true,
@@ -130,7 +130,7 @@ export const STATS: Stat[] = [
     id: "active-strength-reversible",
     area: "active",
     claim:
-      "Left alone, strength fades by around 15% a decade after fifty. But it's one of the few things you can genuinely rebuild at any age — studies have had people in their seventies, eighties and nineties get measurably stronger.",
+      "Left alone, strength fades by around 15% a decade after fifty. Happily, it's one of the few things you can truly rebuild at any age — studies have had people in their seventies, eighties and nineties get measurably stronger.",
     sourceDisplay:
       "Sarcopenia reviews + resistance-training trials in older adults (to 2025).",
     register: "encouraging",
@@ -145,7 +145,7 @@ export const STATS: Stat[] = [
     id: "cognitive-bilingual",
     area: "cognitive",
     claim:
-      "People who become genuinely bilingual tend to show dementia symptoms about four and a half years later than people who stay monolingual.",
+      "People who become fully bilingual tend to show dementia symptoms about four and a half years later than people who stay monolingual.",
     sourceDisplay:
       "Alladi et al., Neurology, 2013; meta-analysis 2020. Worth knowing: strongest for lifelong bilinguals; it delays, doesn't prevent.",
     register: "mixed",
@@ -177,7 +177,7 @@ export const STATS: Stat[] = [
     evidence: "solid-but-contested", // VERIFY
     trigger: () => true,
     hookInstruction:
-      "Affirm the genuinely engaging things they chose; the contrast does the rest.",
+      "Affirm the truly engaging things they chose; the contrast does the rest.",
   },
   {
     id: "cognitive-enrichment-40",
@@ -207,7 +207,7 @@ export const STATS: Stat[] = [
     id: "cognitive-learn-new-skill",
     area: "cognitive",
     claim:
-      "Here's the active version: when adults aged 60–90 spent three months learning a genuinely new, demanding skill — digital photography, quilting — their memory measurably improved. The people who just socialised or did easy puzzles didn't see the same gain. It's the new and hard that does it.",
+      "Here's the active version: when adults aged 60–90 spent three months learning a truly new, demanding skill — digital photography, quilting — their memory measurably improved. The people who just socialised or did easy puzzles saw far less. It's the new and hard that does it.",
     sourceDisplay: "Park et al. ('Synapse Project'), Psychological Science, 2014.",
     register: "encouraging",
     evidence: "solid-but-contested", // VERIFY
@@ -297,7 +297,7 @@ export const STATS: Stat[] = [
     claim:
       "The good you do for other people loops back: across 120 of 136 countries, people who spent on or helped others were happier for it — strongest when they freely chose it and could see the difference they made. Among older adults, helping others is even linked to better health.",
     sourceDisplay:
-      "Aknin et al., 2013 (136-country study); Brown et al., 2003 (older-adult health). Worth knowing: the lift is biggest when giving is chosen, not dutiful.",
+      "Aknin et al., 2013 (136-country study); Brown et al., 2003 (older-adult health). Worth knowing: the lift is biggest when giving is freely chosen.",
     register: "encouraging",
     evidence: "solid-but-contested", // VERIFY
     trigger: (ctx) => ctx.caring || ctx.contribution,
@@ -372,9 +372,9 @@ export const STATS: Stat[] = [
     id: "purpose-optimism",
     area: "purpose",
     claim:
-      "Optimists don't just feel better — the most optimistic people lived 11–15% longer on average and were 50–70% more likely to reach 85. And optimism isn't fixed at birth; it's a habit of outlook you can practise.",
+      "Optimists tend to live longer: the most optimistic people lived 11–15% longer on average and were 50–70% more likely to reach 85. And optimism is a habit of outlook you can practise, open to anyone at any age.",
     sourceDisplay:
-      "Lee et al., PNAS, 2019 (70,000+ people). Worth knowing: it's a strong association, not proof of cause.",
+      "Lee et al., PNAS, 2019 (70,000+ people). Worth knowing: it's a strong association, with cause still an open question.",
     register: "encouraging",
     evidence: "solid-but-contested", // VERIFY
     trigger: () => true,
@@ -411,7 +411,7 @@ export const STATS: Stat[] = [
     id: "vitality-sedentary",
     area: "vitality",
     claim:
-      "Long sitting is its own risk: around 10 hours a day was linked to 34–52% higher mortality than an hour — and a single workout doesn't fully cancel a day in the chair. The fix is breaking it up, not one big effort.",
+      "Long sitting is its own risk: around 10 hours a day was linked to 34–52% higher mortality than an hour — and a single workout only partly offsets a day in the chair. The fix is breaking it up across the day.",
     sourceDisplay:
       "Meta-analyses of sitting time, to 2019; UC San Diego women's study.",
     register: "alarming",
@@ -424,7 +424,7 @@ export const STATS: Stat[] = [
     id: "vitality-sleep-ushape",
     area: "vitality",
     claim:
-      "More isn't better with sleep: risk rises below about seven hours and above it too. The target is the right amount, regularly — not simply more.",
+      "With sleep, the right amount wins out: risk rises below about seven hours and above it too. The target is the right amount, regularly.",
     sourceDisplay:
       "Dose-response meta-analysis, J. American Heart Association, 2017.",
     register: "mixed",
@@ -436,9 +436,9 @@ export const STATS: Stat[] = [
     id: "vitality-napping",
     area: "vitality",
     claim:
-      "A surprising one: long or frequent daytime naps in later life are linked to higher mortality — but mostly as a signal of disrupted sleep or underlying strain, not the cause. A short nap is fine; a creeping need for long ones is worth noticing.",
+      "A surprising one: long or frequent daytime naps in later life are linked to higher mortality — though mostly as a signal of disrupted sleep or underlying strain rather than the cause. A short nap is fine; a creeping need for long ones is worth noticing.",
     sourceDisplay:
-      "British Regional Heart Study (2023); JAMA Network Open (2026). Worth knowing: naps are likely a marker of poor night sleep, not the problem themselves.",
+      "British Regional Heart Study (2023); JAMA Network Open (2026). Worth knowing: naps are likely a marker of poor night sleep rather than the problem themselves.",
     register: "mixed",
     evidence: "solid-but-contested", // VERIFY
     trigger: (ctx) => ctx.energyFlagged,

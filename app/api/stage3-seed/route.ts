@@ -53,7 +53,7 @@ For each value you choose, give:
 - "label": the value, copied verbatim from the list above.
 - "evidence": ONE short clause in the person's own terms pointing to where it showed up in their answers — name the domain or activity it sits beneath (e.g. "the vegetable patch in your dream home", "the hours you pictured with the grandchildren"). Ground it in something they actually said; never invent specifics.
 Choose distinct values with real grounding — a smaller honest set beats a padded one. JSON shape: {"cards":[{"label":"...","evidence":"..."}, ...]}`,
-  "priority-choices": `Produce real either/or trade-offs built from THIS person's picture, plus the pool of values they're weighing. Each pair sets two genuinely appealing directions against each other in their own terms (e.g. "A free, unstructured week" vs "A week with people and plans in it"). Give:
+  "priority-choices": `Produce real either/or trade-offs built from THIS person's picture, plus the pool of values they're weighing. Each pair sets two truly appealing directions against each other in their own terms (e.g. "A free, unstructured week" vs "A week with people and plans in it"). Give:
 - "pairs": 6–10 objects, each {"left":"...","right":"..."} — short, concrete, drawn from their answers, never abstract value names.
 - "values": 3–6 short value labels these trade-offs are really about (e.g. Freedom, Connection, Growth).
 JSON shape: {"pairs":[{"left":"...","right":"..."}, ...],"values":["...", ...]}`,
@@ -61,7 +61,7 @@ JSON shape: {"pairs":[{"left":"...","right":"..."}, ...],"values":["...", ...]}`
 - "value": the value label.
 - "description": the short personal description they already gave this value in the values module, copied in THEIR terms, lower case, no full stop (e.g. "choosing your own pace, not over-committing"). If they didn't describe it, write a brief one grounded in their picture — never invent specifics about their life.
 - "threat": the SINGLE most likely SPECIFIC thing that would get in the way of living this value on a regular basis — a real, recognisable situation from THEIR own picture (a named commitment, person, habit, place, or pull on their time), not a vague drift or abstract erosion. ONE complete sentence beginning with a capital letter, honest not softened, naming the actual thing that would crowd it out. GOOD (specific, real): "Saying yes to every babysitting request until your own week has nothing left in it." TOO VAGUE (avoid): "The reliable presence you pictured quietly becomes occasional visits."
-- "protectors": an array of exactly 3 DISTINCT candidate protectors — each a SIMPLE, concrete thing they could commit to as a regular part of their plan to keep the value alive (e.g. "Keeping one weekday morning free for the grandchildren"). Small enough to actually hold to week to week, drawn from their picture, and genuinely different from each other so they're real choices. Do NOT make them grand resolutions, schedules, or multi-step plans.
+- "protectors": an array of exactly 3 DISTINCT candidate protectors — each a SIMPLE, concrete thing they could commit to as a regular part of their plan to keep the value alive (e.g. "Keeping one weekday morning free for the grandchildren"). Small enough to actually hold to week to week, drawn from their picture, and clearly different from each other so they're real choices. Do NOT make them grand resolutions, schedules, or multi-step plans.
 Ground everything in their own picture. JSON shape: {"values":[{"value":"...","description":"...","threat":"...","protectors":["...","...","..."]}, ...]}`,
   "hopes-fears": `This surface has two parts: a short hopes line at the top, then candidate fear cards the person reacts to. Produce BOTH.
 
@@ -94,6 +94,8 @@ function systemPrompt(seedType: Stage3SeedType, hasPartner: boolean): string {
 ${spec}
 
 Voice: warm, specific, plain. Never use these words: reflect, explore, unpack, journey, growth, share, deep dive. Evidence clauses are tentative observations, not verdicts.
+- Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"; "It isn't this, it's that"). Speak directly, confidently, and entirely in the affirmative.
+- Never use the word "genuinely".
 
 Respond with ONLY the JSON object described above — no markdown, no preamble, no commentary.`;
 }

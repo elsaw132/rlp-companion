@@ -665,7 +665,7 @@ WATCH FOR
 The person has just captured a few money-no-object wants across different angles — somewhere to go, something to learn or make, something to build or give, an everyday indulgence. This is a quick, playful brainstorm, NOT a deep session. Enjoy their list with them, help them pick out the few that matter most, and end by spotting which dreams might actually be within reach. Keep it brief, keep it fun, and use short responses throughout.
 
 HOW TO RUN IT
-- Open with real, infectious excitement about what they pictured — the way a close friend lights up hearing a brilliant plan. React to the actual things on their list by name AND name the key themes you notice running through them (adventure, making things, time with people, say). Be genuinely delighted, a little playful; never a flat recap or a polite "lovely".
+- Open with real, infectious excitement about what they pictured — the way a close friend lights up hearing a brilliant plan. React to the actual things on their list by name AND name the key themes you notice running through them (adventure, making things, time with people, say). Be truly delighted, a little playful; never a flat recap or a polite "lovely".
 - Then invite the choice: if they could only afford three of these dreams, which three would they pick? Once they've chosen, ask in one short question what makes those three stand out for them.
 - To wrap up, turn to whether any of these dreams could actually be within reach — even adapted or scaled down to make them affordable. Ask THEM which feel like they could happen; the assessment is theirs, not yours. Keep all three of their chosen dreams in view — don't single one out as "the realistic one" and let the others drop. If you have a thought on how something might work, offer it lightly and check it, never as a verdict. Where a dream could work in some form, have a short back-and-forth on how a version of it might be made real.
 - Make clear the dreams that stay out of reach aren't being dropped — they're pipe-dreams worth holding onto, kept alongside the achievable ones.
@@ -827,7 +827,7 @@ WATCH FOR
         primer: [
           {
             type: "text",
-            value: `Imagine yourself a good way into retirement — settled, comfortable, living a life you're genuinely happy with. In a moment you'll write a short letter to someone in your life, catching them up on how it all looks now: what fills your days, the people around you, an ordinary good week. It's a description of the life, not advice — just what's true for you now. First, who are you writing to?`,
+            value: `Imagine yourself a good way into retirement — settled, comfortable, living a life you're truly happy with. In a moment you'll write a short letter to someone in your life, catching them up on how it all looks now: what fills your days, the people around you, an ordinary good week. It's a description of the life as it is now — just what's true for you. First, who are you writing to?`,
           },
         ],
         interaction: {
@@ -855,7 +855,7 @@ WATCH FOR
       // model as an invitation, not an audit.
       heading: "Now let's look a little closer",
       body: [
-        "[Placeholder — SMW to replace.] In Imagine, you sketched the shape of the retirement you want. Now we go a little deeper, area by area. Research on what makes retirement genuinely good for people points to a handful of evidence-based domains — movement, a curious mind, the people around you, a sense of purpose, your energy, and your senses.",
+        "[Placeholder — SMW to replace.] In Imagine, you sketched the shape of the retirement you want. Now we go a little deeper, area by area. Research on what makes retirement truly good for people points to a handful of evidence-based domains — movement, a curious mind, the people around you, a sense of purpose, your energy, and your senses.",
         "Most people's first picture of retirement is stronger in some of these than others, and that's completely normal. These modules aren't an audit of what's missing — they're an invitation to look at each area in turn and notice what you'd like to keep, change, or add.",
         "We'll take the areas one at a time, in order — each builds on the last, and together they make the full picture. There's no rush: come to them whenever you have a little time, and your answers are always saved.",
       ],
@@ -1012,7 +1012,7 @@ WATCH FOR
         id: "2.2",
         title: "Keeping your mind alive",
         description:
-          "The learning, curiosity and creativity that keep your mind engaged — what genuinely interests you, and what you'd love to get into.",
+          "The learning, curiosity and creativity that keep your mind engaged — what truly interests you, and what you'd love to get into.",
         durationMin: 15,
         primer: [
           {
@@ -1079,14 +1079,14 @@ WATCH FOR
           ],
         },
         sessionInstructions: `PURPOSE
-You already know this person from the Imagine stage — open like a coach who remembers them, not a fresh chatbot. They have just picked the things that catch their curiosity. Help them understand what genuinely stimulates and interests them, and how they might keep challenging and engaging their mind in retirement. This is a light Explore-stage module — keep it short and stay on curiosity and engagement.
+You already know this person from the Imagine stage — open like a coach who remembers them, not a fresh chatbot. They have just picked the things that catch their curiosity. Help them understand what truly stimulates and interests them, and how they might keep challenging and engaging their mind in retirement. This is a light Explore-stage module — keep it short and stay on curiosity and engagement.
 
 HOW TO RUN IT
 - Open with a warm, specific callback to what you already learned about them in Imagine (it's provided to you), especially anything they wanted to learn or look into — then move to what they just picked.
 - Moment capture: early on, ask once about a time they completely lost track of time, and what they were doing. This is the strongest signal of true engagement — use what it reveals.
 - Help them notice the form of engagement they like: a structured course or exploring freely; going deep on one thing or sampling many; understanding something or making something; alone or with others. Draw this out in conversation, not as a quiz.
 - Spark capture: surface a deferred want — something they've always meant to get to but never had time for. Help the language shift from duty to desire ("I suppose I could do a course" → "I've always wanted to learn Spanish"). Capture the genuine want, not the dutiful should.
-- Offer back the thread of what genuinely absorbs them, and invite them to confirm or adjust.
+- Offer back the thread of what truly absorbs them, and invite them to confirm or adjust.
 - Aim to reach your close within roughly four to six exchanges.
 
 MUST NOT
@@ -1095,7 +1095,7 @@ MUST NOT
 - Don't reality-check whether an interest is worthwhile, and don't steer toward reflection or lessons.
 
 CLOSING
-Name the interests and the kind of engagement that genuinely absorb them, in their words — and any deferred want worth carrying forward. Note warmly that this adds to their Retirement Life Plan, and that there's more of the picture to fill in as they carry on through Explore.
+Name the interests and the kind of engagement that truly absorb them, in their words — and any deferred want worth carrying forward. Note warmly that this adds to their Retirement Life Plan, and that there's more of the picture to fill in as they carry on through Explore.
 
 WATCH FOR
 - Watch for identity themes — concerns about losing the challenge, expertise or stimulation that work provided. Explore gently, without assuming work must be replaced with an equivalent.
@@ -1242,7 +1242,7 @@ WATCH FOR
         primer: [
           {
             type: "text",
-            value: `[Placeholder — SMW to replace.] For many people, work is the main source of purpose and identity — and losing it is more destabilising than expected, with retirement satisfaction often dipping in the first year or two before new sources of meaning take hold. The good news is that meaning arrives plural and modest: through care, contribution, making things, and learning something deeply and passing it on. This isn't about finding one grand life purpose. It's about the handful of things, big or small, that leave you feeling genuinely useful.`,
+            value: `[Placeholder — SMW to replace.] For many people, work is the main source of purpose and identity — and losing it is more destabilising than expected, with retirement satisfaction often dipping in the first year or two before new sources of meaning take hold. The good news is that meaning arrives plural and modest: through care, contribution, making things, and learning something deeply and passing it on. It comes down to the handful of things, big or small, that leave you feeling truly useful.`,
           },
           {
             type: "text",
@@ -1262,7 +1262,7 @@ WATCH FOR
         interaction: {
           type: "role-picker",
           instruction:
-            "Pick the forms of contribution that give you energy — the ones that feel meaningful, not dutiful. Small and private counts as much as big and public.",
+            "Pick the forms of contribution that give you energy — the ones that feel meaningful and freely chosen. Small and private counts as much as big and public.",
           starrable: false,
           summaryLabel: "Your sources of purpose and contribution",
           groups: [
@@ -1302,7 +1302,7 @@ You already know this person from the Imagine stage — open like a coach who re
 
 HOW TO RUN IT
 - Open with a warm, specific callback to anything in their Imagine answers that hinted at contribution or helping (provided to you), then move to what they picked.
-- Moment capture: early on, ask about a time they felt what they did genuinely mattered, and what was happening. This is the richest signal for meaning — use what it reveals.
+- Moment capture: early on, ask about a time they felt what they did truly mattered, and what was happening. This is the richest signal for meaning — use what it reveals.
 - Draw out the impact they enjoy having on others, and notice the plural sources of meaning that emerge.
 - Mirror and confirm — explicitly NOT pushing toward one tidy purpose. Reflect the several sources that came up.
 - Aim to reach your close within roughly four to six exchanges.
@@ -1600,13 +1600,13 @@ WATCH FOR
     lookBack:
       "you named your strengths, sorted your values, and put what matters most into your own words",
     lookAhead:
-      "we step back to what's underneath it all — your strengths, your values, and what a genuinely good day looks like for you",
+      "we step back to what's underneath it all — your strengths, your values, and what a truly good day looks like for you",
     intro: {
       // [Placeholder — SMW to replace.] Framed as stepping back to what's
       // underneath the picture, not a test of the person.
       heading: "Now let's understand what's underneath",
       body: [
-        "[Placeholder — SMW to replace.] In Imagine you pictured the retirement you want, and in Explore you looked at it area by area. This stage steps back to ask what's underneath all of it — the strengths you bring, the values that matter most to you, and what a genuinely good day looks like for you.",
+        "[Placeholder — SMW to replace.] In Imagine you pictured the retirement you want, and in Explore you looked at it area by area. This stage steps back to ask what's underneath all of it — the strengths you bring, the values that matter most to you, and what a truly good day looks like for you.",
         "Nothing here is a test, and there are no right answers. Each module starts from what you've already told us, so you're never beginning with a blank page — you're confirming, adjusting, and putting things in your own words.",
         "What comes out of this stage becomes the heart of your plan: a clear sense of what matters most, to carry into the years ahead.",
       ],
@@ -1684,7 +1684,7 @@ Name their signature strengths in their words, as things they already have and n
         primer: [
           {
             type: "text",
-            value: `[Placeholder — SMW to replace.] Values are the things that quietly steer your choices — freedom, closeness to people, learning, security, making a difference. In working life they often go unspoken, carried along by the job and the routine. In retirement they matter more, not less: with more of your time your own to shape, what you value is what tells you how to spend it. This module helps you name yours.`,
+            value: `[Placeholder — SMW to replace.] Values are the things that quietly steer your choices — freedom, closeness to people, learning, security, making a difference. In working life they often go unspoken, carried along by the job and the routine. In retirement they matter even more: with more of your time your own to shape, what you value is what tells you how to spend it. This module helps you name yours.`,
           },
           {
             type: "text",
@@ -1702,7 +1702,7 @@ Name their signature strengths in their words, as things they already have and n
           customLabel:
             "Missing something that isn't here? Add a value in your own words.",
           coreLabel:
-            "Last step: mark the ones that feel most core to who you are — up to five. Fewer is fine. You're choosing what matters most, not putting them in order.",
+            "Last step: mark the ones that feel most core to who you are — up to five. Fewer is fine. You're choosing what matters most, and the order is yours to leave open.",
           coreMax: 5,
           summaryLabel: "Your values",
         },
@@ -1846,7 +1846,7 @@ WATCH FOR
         primer: [
           {
             type: "text",
-            value: `[Placeholder — SMW to replace.] So far you've pictured what you're hoping for — the people, the time, the things you want to keep doing. But most people carry a quieter set of worries alongside the hopes, and they rarely get said out loud. Naming them isn't gloomy; it's how a plan gets honest. The worries you can see are the ones a plan can take account of.`,
+            value: `[Placeholder — SMW to replace.] So far you've pictured what you're hoping for — the people, the time, the things you want to keep doing. But most people carry a quieter set of worries alongside the hopes, and they rarely get said out loud. Naming them is how a plan gets honest. The worries you can see are the ones a plan can take account of.`,
           },
           {
             type: "text",

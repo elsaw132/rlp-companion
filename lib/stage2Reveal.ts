@@ -69,7 +69,7 @@ export const FALLBACK_STAGE2_SYNTHESIS: Stage2Synthesis = {
     {
       area: "cognitive",
       areaLabel: "Keeping your mind alive",
-      forwardLine: "You want to keep following what genuinely interests you.",
+      forwardLine: "You want to keep following what truly interests you.",
     },
     {
       area: "social",

@@ -41,6 +41,8 @@ Return up to FIVE values (fewer is fine — most people live by a handful). For 
 Order them most important first, following the ranking they gave where there is one.
 
 Voice: warm, specific, plain. Never use these words: reflect, explore, unpack, journey, growth, share, deep dive.
+- Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"; "It isn't this, it's that"). Speak directly, confidently, and entirely in the affirmative.
+- Never use the word "genuinely".
 
 Respond with ONLY a JSON object of exactly this shape, and nothing else:
 {"values":[{"value":"...","meaning":"...","confidence":"certain"}, ...]}`;
