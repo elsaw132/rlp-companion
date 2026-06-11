@@ -369,6 +369,51 @@ export function hasCarryForward(stage2Id: string): boolean {
   return stage2Id in CARRY_FORWARD;
 }
 
+// ---- Stage 3 context (feeds the seeding call) ----
+// Stage 3 (Understand) infers strengths and values from the whole picture, so it
+// wants the raw, structured picks — not just the prose takeaways. This pulls the
+// most telling signals from across Stages 1–2 into a compact block the seeding
+// API reads alongside the prose reflections. Returns "" when nothing's on file.
+
+// A generic "all picks" extractor for a role-picker build, with a lead stem;
+// starred picks (where present) are named as the ones most alive.
+function allPicks(lead: string): Extractor {
+  return (build) => {
+    if (!build || build.type !== "role-picker") return null;
+    const r = build as RolePickerResult;
+    if (r.picked.length === 0) return null;
+    const starred = r.starred.length ? ` (most alive: ${r.starred.join(", ")})` : "";
+    return `${lead}: ${r.picked.join(", ")}${starred}.`;
+  };
+}
+
+// The Stage 1/2 picks that read most directly onto strengths and values, each
+// with a terse extractor. This is the registry the assembler walks.
+const STAGE3_SOURCES: Stage1Source[] = [
+  { moduleId: "1.roles", extract: allPicks("Roles they want to play") },
+  { moduleId: "2.2", extract: allPicks("What catches their curiosity") },
+  { moduleId: "2.3", extract: allPicks("The people in their world") },
+  {
+    moduleId: "2.4",
+    extract: allPicks("Their sources of purpose and contribution"),
+  },
+  { moduleId: "1.letter", extract: letterSceneExcerpt },
+  { moduleId: "1.money", extract: sparkEntry("learn", "Something they'd love to learn or master") },
+  { moduleId: "1.money", extract: sparkEntry("build", "Something they'd build, fund, or give") },
+];
+
+export function buildStage3Context(source: CarrySource): string {
+  const lines = STAGE3_SOURCES.flatMap((s) => {
+    const line = s.extract(source.getBuild(s.moduleId), source.getTakeaway(s.moduleId));
+    return line ? [`- ${line}`] : [];
+  });
+  if (lines.length === 0) return "";
+  return [
+    "Some of the concrete picks they made earlier (use these to ground what you infer; never invent beyond them):",
+    ...lines,
+  ].join("\n");
+}
+
 // Assemble the carry-forward block for a Stage 2 module, ready to drop into the
 // existing {priorReflections} slot. Returns "" when the module has no entry or
 // nothing relevant was captured in Stage 1.

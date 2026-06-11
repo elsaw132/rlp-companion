@@ -15,6 +15,12 @@
   --area-purpose-base:#F4E9C8;--area-purpose-sel:#E8D08A;--area-purpose-fg:#6B5310;
   --area-vitality-base:#DCF1E9;--area-vitality-sel:#9FE1CB;--area-vitality-fg:#0A5544;
   --area-senses-base:#E6EDF2;--area-senses-sel:#C2D2DE;--area-senses-fg:#3A5566;
+  /* Stage 3 (Understand) reveal accents — content-coded card washes (soft fill / readable darkened foreground). Placeholder values per the reveal spec; no orange. */
+  --reveal-strengths-wash:#FAEEDA;--reveal-strengths-fg:#8A5A12;
+  --reveal-values-wash:#FBEAF0;--reveal-values-fg:#8E3957;
+  --reveal-protect-wash:#EAF3DE;--reveal-protect-fg:#3C6312;
+  --reveal-clear-wash:#E9EFF6;--reveal-clear-fg:#2E517D;
+  --reveal-forward-wash:#E8EEF6;--reveal-forward-fg:#013281;
   --r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-pill:999px;
   --shadow-sm:0 1px 2px rgba(16,32,46,.05),0 1px 3px rgba(16,32,46,.04);
   --shadow-md:0 2px 6px rgba(16,32,46,.05),0 10px 28px rgba(16,32,46,.06);

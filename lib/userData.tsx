@@ -32,6 +32,11 @@ import type {
   Stage2Synthesis,
   SavedStage2Reveal,
 } from "@/lib/stage2Reveal";
+import type {
+  Stage3Synthesis,
+  SavedStage3Reveal,
+} from "@/lib/stage3Reveal";
+import type { Stage3Seed, Stage3ValuesSummary } from "@/lib/stage3Seed";
 
 // ---- Shapes shared across the app ----
 
@@ -67,6 +72,12 @@ const KEYS = {
   stage1Summary: "stage1-summary",
   stage1Reveal: "stage1-reveal",
   stage2Reveal: "stage2-reveal",
+  // The generated Stage 3 (Understand) stage-close reveal — the Wrapped-style
+  // card portrait. Stored so it's stable on revisit / back-navigation.
+  stage3Reveal: "stage3-reveal",
+  // The confirmed Stage 3 (Understand) values, distilled at the stage close —
+  // feeds Stage 4 planning.
+  stage3Values: "stage3-values",
   // The set of Stage 2 discovery-stat ids this user has already been shown, so
   // the reveal rotates to fresh stats on a return visit (the annual review).
   seenStats: "seen-stats",
@@ -81,6 +92,9 @@ const KEYS = {
   // and the achievable/pipedream split. Distinct from the raw spark-prompts
   // interaction (which holds the full typed list) and the prose takeaway.
   dreams: (id: string) => `dreams:${id}`,
+  // The pre-seeded candidate content for a Stage 3 surface, persisted so a
+  // refresh never regenerates it.
+  seed: (id: string) => `seed:${id}`,
 };
 
 // The Stage 1 opening capture ("Where you're starting from") is stored as a
@@ -647,6 +661,27 @@ export function useUserData() {
       savedAt: new Date().toISOString(),
     } satisfies SavedStage2Reveal);
 
+  // ---- Stage 3 reveal (Understand: the Wrapped-style card portrait) ----
+  const getStage3Reveal = (): SavedStage3Reveal | null => {
+    const v = snapshot[KEYS.stage3Reveal];
+    if (
+      v &&
+      typeof v === "object" &&
+      typeof (v as SavedStage3Reveal).synthesis?.opener === "string"
+    ) {
+      return v as SavedStage3Reveal;
+    }
+    return null;
+  };
+
+  const hasStage3Reveal = (): boolean => getStage3Reveal() !== null;
+
+  const saveStage3Reveal = (synthesis: Stage3Synthesis) =>
+    setKey(KEYS.stage3Reveal, {
+      synthesis,
+      savedAt: new Date().toISOString(),
+    } satisfies SavedStage3Reveal);
+
   // ---- Seen discovery stats (Stage 2 reveal rotation) ----
   const getSeenStats = (): string[] => asArray<string>(snapshot[KEYS.seenStats]);
 
@@ -681,6 +716,32 @@ export function useUserData() {
   const saveBuild = (id: string, result: BuildResult) =>
     setKey(KEYS.interaction(id), result);
 
+  // ---- Stage 3 seed (pre-filled candidate content for a surface) ----
+  const getSeed = (id: string): Stage3Seed | null => {
+    const v = snapshot[KEYS.seed(id)];
+    if (v && typeof v === "object" && "type" in (v as object)) {
+      return v as Stage3Seed;
+    }
+    return null;
+  };
+
+  const saveSeed = (id: string, seed: Stage3Seed) =>
+    setKey(KEYS.seed(id), seed);
+
+  const clearSeed = (id: string) => removeKey(KEYS.seed(id));
+
+  // ---- Stage 3 confirmed values (the stage-close summary, feeds Stage 4) ----
+  const getStage3Values = (): Stage3ValuesSummary | null => {
+    const v = snapshot[KEYS.stage3Values];
+    if (v && typeof v === "object" && Array.isArray((v as Stage3ValuesSummary).values)) {
+      return v as Stage3ValuesSummary;
+    }
+    return null;
+  };
+
+  const saveStage3Values = (summary: Stage3ValuesSummary) =>
+    setKey(KEYS.stage3Values, summary);
+
   // ---- Closing commitment (a concrete plan entry) ----
   const getCommitment = (id: string): ScreeningCommitment | null => {
     const v = snapshot[KEYS.commitment(id)];
@@ -705,6 +766,7 @@ export function useUserData() {
   const resetModule = async (id: string) => {
     await removeKey(KEYS.conversation(id));
     await removeKey(KEYS.interaction(id));
+    await clearSeed(id);
     await clearCommitment(id);
     await clearTakeaway(id);
     await clearDreams(id);
@@ -750,12 +812,20 @@ export function useUserData() {
     getStage2Reveal,
     hasStage2Reveal,
     saveStage2Reveal,
+    getStage3Reveal,
+    hasStage3Reveal,
+    saveStage3Reveal,
     getSeenStats,
     addSeenStats,
     getConversation,
     saveConversation,
     getBuild,
     saveBuild,
+    getSeed,
+    saveSeed,
+    clearSeed,
+    getStage3Values,
+    saveStage3Values,
     getCommitment,
     saveCommitment,
     clearCommitment,

@@ -44,6 +44,9 @@ export default function HomeDashboard() {
   // Whether the Stage 2 (Explore) reveal has been generated yet — same loud vs.
   // calm distinction as Stage 1.
   const [hasStage2Reveal, setHasStage2Reveal] = useState(false);
+  // Whether the Stage 3 (Understand) reveal has been generated yet — same loud
+  // vs. calm distinction as the earlier stages.
+  const [hasStage3Reveal, setHasStage3Reveal] = useState(false);
   // The stage the person is currently looking at. null means "follow the current
   // stage"; clicking a finished stage (in the nav or the arc) pins it to a number.
   const [viewedStage, setViewedStage] = useState<number | null>(null);
@@ -68,6 +71,7 @@ export default function HomeDashboard() {
     setDisplayName(userData.getDisplayName(user));
     setHasStage1Reveal(userData.hasStage1Reveal());
     setHasStage2Reveal(userData.hasStage2Reveal());
+    setHasStage3Reveal(userData.hasStage3Reveal());
     // Show the current stage's intro once, the first time it's the active stage.
     // Tying it to the current stage (not the viewed one) means navigating back to
     // a finished stage never re-triggers it, and anyone already past a stage
@@ -190,6 +194,27 @@ export default function HomeDashboard() {
   } else if (!lastCompleted) {
     heroIntro =
       "We'll start by picturing a single ordinary day in your retirement — not the big questions yet, just what the day actually feels like.";
+  } else if (lastCompleted.stageNumber !== nextModule.stageNumber) {
+    // Crossing into a new stage: don't echo the last module's takeaway, which
+    // reads as an arbitrary fragment here. Speak to the whole stage just closed
+    // and frame the one beginning, then hand off to today's first module.
+    const finishedStage = STAGES.find(
+      (s) => s.number === lastCompleted.stageNumber
+    );
+    const startingStage = STAGES.find(
+      (s) => s.number === nextModule.stageNumber
+    );
+    const finishedName = finishedStage?.name ?? "the last stage";
+    const startingName = startingStage?.name ?? "this stage";
+    const backNod = finishedStage?.lookBack?.trim();
+    const aheadNod = startingStage?.lookAhead?.trim();
+    const backPart = backNod
+      ? `That's the whole of ${finishedName} behind you now — ${backNod}.`
+      : `That's the whole of ${finishedName} behind you now.`;
+    const aheadPart = aheadNod
+      ? ` Next comes ${startingName}, where ${aheadNod}.`
+      : ` Next comes ${startingName}.`;
+    heroIntro = `${backPart}${aheadPart} Today, let's look at "${nextModule.title}".`;
   } else if (priorTakeaway?.text) {
     // Vita reads the recap directly to the user here, so use the second-person
     // version; older takeaways without it fall back to the third-person text.
@@ -442,6 +467,41 @@ export default function HomeDashboard() {
                     <span className="pc-sub">
                       A fuller picture across the six areas of a balanced
                       retirement — and a few things worth knowing along the way.
+                    </span>
+                  </span>
+                  <span className="pc-chev" aria-hidden="true">
+                    ›
+                  </span>
+                </Link>
+              )
+            )}
+
+            {/* STAGE 3 PICTURE — only within the Understand view, once all six
+                Understand modules are done. Loud "is ready" prompt until viewed,
+                then a calmer persistent entry. */}
+            {viewedStageNumber === 3 && isStageDone(STAGES[2]) && (
+              hasStage3Reveal ? (
+                <Link className="picture-card is-calm" href="/stage/3">
+                  <span className="pc-icon" aria-hidden="true">
+                    ✦
+                  </span>
+                  <span className="pc-body">
+                    <span className="pc-title">View your Understand reveal</span>
+                  </span>
+                  <span className="pc-chev" aria-hidden="true">
+                    ›
+                  </span>
+                </Link>
+              ) : (
+                <Link className="picture-card" href="/stage/3">
+                  <span className="pc-icon" aria-hidden="true">
+                    ✦
+                  </span>
+                  <span className="pc-body">
+                    <span className="pc-title">Your Understand reveal is ready</span>
+                    <span className="pc-sub">
+                      The person inside the picture — your strengths, your values,
+                      and what these years are for, in your own words.
                     </span>
                   </span>
                   <span className="pc-chev" aria-hidden="true">

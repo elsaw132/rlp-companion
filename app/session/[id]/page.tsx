@@ -63,11 +63,11 @@ export default async function SessionPage({
   const nextModuleTitle = nextId ? (getModule(nextId)?.module.title ?? null) : null;
 
   // The last module of a stage that has a stage-close reveal (Imagine = stage 1,
-  // Explore = stage 2) closes into that reveal — offered as the primary
-  // completion action so the reveal is reached on purpose rather than stumbled on
-  // later from the hub.
+  // Explore = stage 2, Understand = stage 3) closes into that reveal — offered as
+  // the primary completion action so the reveal is reached on purpose rather than
+  // stumbled on later from the hub.
   const revealHref =
-    !nextId && (stageNumber === 1 || stageNumber === 2)
+    !nextId && (stageNumber === 1 || stageNumber === 2 || stageNumber === 3)
       ? `/stage/${stageNumber}`
       : null;
 

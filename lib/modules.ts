@@ -93,6 +93,121 @@ export type CompositeInteraction = {
   stepHeadings?: (string | null)[];
 };
 
+// ---- Stage 3 (Understand) interaction surfaces ----
+// Every Stage 3 surface is pre-seeded by a one-off AI call (/api/stage3-seed)
+// that reads the person's earlier answers and returns candidate content. The
+// static config here (instructions, palettes, tag pools) is fixed; the seeded
+// candidates arrive at runtime as a Stage3Seed (see lib/stage3Seed.ts) and are
+// passed into the component alongside the interaction.
+
+// 3.1 "Your strengths" — a mirror surface built on the fixed VIA character
+// strengths (see VIA_CLUSTERS in lib/stage3Seed.ts), so the whole module is
+// recognition against a known list, never open generation. Three movements on
+// one surface: confirm the seeded ones that fit; scan the rest of the list and
+// tap any that have been leaned on but haven't come up; then star a signature
+// few and name how each might show up in retirement.
+export type MirrorCardsInteraction = {
+  type: "mirror-cards";
+  // Movement 1 — the ones that fit. Heads the seeded candidate cards.
+  instruction: string;
+  // Movement 2 — the rest of the list. The remaining VIA strengths, shown as a
+  // compact tappable set; tapping adds a card the person can note a line on.
+  restLabel: string;
+  restIntro: string;
+  // Placeholder for the optional one-line "where it shows up" note on a card
+  // the person added from the rest of the list.
+  notePlaceholder: string;
+  // Movement 3 — narrow. starLabel/starMax gate the signature few (no more than
+  // five). Starring is the last action on the surface; where these strengths
+  // might show up in retirement is drawn out later in the Vita conversation.
+  starLabel: string;
+  starMax: number;
+  // Heading for the recap card and the coach summary (e.g. "Your strengths").
+  summaryLabel: string;
+};
+
+// 3.2 "Your values" — a triage surface built on the fixed value set, so the
+// module is recognition against a known set (the same way 3.1 uses VIA). Seeded
+// candidate value cards are sorted into three trays (that's me / not sure / not
+// really); "not sure" is a first-class tray that carries forward. The rest of
+// the set, grouped by cluster, is browsable beneath; a rare free-text escape
+// hatch adds a value of the person's own.
+export type ValueTriageInteraction = {
+  type: "value-triage";
+  instruction: string;
+  // Heading and intro for "the rest of the set" — the values not surfaced,
+  // shown grouped by cluster (the component owns the set itself).
+  paletteLabel: string;
+  paletteIntro: string;
+  // Label for the de-emphasised free-text "add your own" row (meant to be rare).
+  customLabel: string;
+  // After sorting, the person marks the few values that feel most core — a
+  // selection from the "that's me" tray (up to coreMax), never a ranking.
+  // Fewer than coreMax is fine. These five become the module's output, and the
+  // conversation draws out a description for each.
+  coreLabel: string;
+  coreMax: number;
+  summaryLabel: string;
+};
+
+// 3.3 "What matters most" — quick-fire either/or choices built from the person's
+// own picture, then an adjustable ranking of the values that pulled hardest.
+export type PriorityChoicesInteraction = {
+  type: "priority-choices";
+  instruction: string;
+  // Prompt shown above the ranking step.
+  rankLabel: string;
+  summaryLabel: string;
+};
+
+// 3.4 "Living your values" — one card per priority value. Each shows the
+// description the person wrote for it in 3.2 (read-only), then a single two-beat
+// flow: a seeded threat (one way the value quietly erodes in retirement) they
+// confirm/swap, and a protector (what they'd protect to keep it alive) seeded as
+// a candidate they accept or rewrite.
+export type ValueDefinitionsInteraction = {
+  type: "value-definitions";
+  instruction: string;
+  threatLabel: string;
+  protectorLabel: string;
+  protectorPlaceholder: string;
+  summaryLabel: string;
+};
+
+// 3.5 "Hopes and fears" — a recognition surface for the quieter half of the
+// picture. A short read-only hopes line opens it as a warm on-ramp; then the
+// person reacts to candidate fear cards grouped into three time horizons (on my
+// mind / not me / hadn't thought about it, but yes), with an optional note on the
+// ones that land and a light "weighs heavily" flag. The rest of each horizon's
+// bank is browsable, and there's an add-your-own escape hatch.
+export type HopesFearsInteraction = {
+  type: "hopes-fears";
+  instruction: string;
+  hopesLabel: string;
+  // The three reaction-button labels, in fixed order: on-my-mind, not-me,
+  // newly-recognised.
+  reactionLabels: { onMyMind: string; notMe: string; newlyRecognised: string };
+  noteLabel: string;
+  notePlaceholder: string;
+  weighsLabel: string;
+  paletteLabel: string;
+  paletteIntro: string;
+  customLabel: string;
+  summaryLabel: string;
+};
+
+// 3.6 "The bigger picture" — a reflective writing surface in the spirit of the
+// Stage 1 letter, seeded with honest starting threads (and optionally a short
+// editable draft). What these years stood for is drawn out through the writing
+// itself and Vita's conversation, not a separate marking step.
+export type BiggerPictureInteraction = {
+  type: "bigger-picture";
+  prompt: string;
+  placeholder: string;
+  threadsLabel: string;
+  summaryLabel: string;
+};
+
 export type Interaction =
   | DayBuilderInteraction
   | RolePickerInteraction
@@ -100,7 +215,13 @@ export type Interaction =
   | LetterInteraction
   | SparkPromptsInteraction
   | ScreeningCheckInteraction
-  | CompositeInteraction;
+  | CompositeInteraction
+  | MirrorCardsInteraction
+  | ValueTriageInteraction
+  | PriorityChoicesInteraction
+  | ValueDefinitionsInteraction
+  | HopesFearsInteraction
+  | BiggerPictureInteraction;
 
 // What the person actually built in an interaction step. Stored (as JSON) so
 // the conversation can show it back and a refresh keeps it. The union grows
@@ -169,6 +290,78 @@ export type CompositeResult = {
   results: BuildResult[];
 };
 
+// ---- Stage 3 result shapes (self-contained, like the others) ----
+
+// 3.1 — the strengths the person kept (with their possibly-edited wording and
+// the seed's evidence line), the ones they rejected, and the signature few.
+export type MirrorCardsResult = {
+  type: "mirror-cards";
+  // evidence is the seed's grounding line; note is the person's own one-liner
+  // on where a strength they added from the rest of the list shows up.
+  kept: { label: string; evidence?: string; note?: string }[];
+  rejected: string[];
+  starred: string[];
+  summaryLabel: string;
+};
+
+// 3.2 — every value the person placed, with its tray and any evidence. The
+// "unsure" tray is kept deliberately, not dropped.
+export type ValueTriageResult = {
+  type: "value-triage";
+  sorted: { label: string; tray: "me" | "unsure" | "not"; evidence?: string }[];
+  // The values marked most core — a subset of the "me" tray, up to coreMax.
+  core: string[];
+  summaryLabel: string;
+};
+
+// 3.3 — each either/or choice (which side pulled, optional reason), and the
+// resulting ranking of values, most-protected first.
+export type PriorityChoicesResult = {
+  type: "priority-choices";
+  choices: { left: string; right: string; chose: string; why?: string }[];
+  ranked: string[];
+  summaryLabel: string;
+};
+
+// 3.4 — one entry per priority value: the description carried over from 3.2, the
+// single threat the person confirmed, and the one or more protectors they chose
+// or wrote — simple things they could commit to as part of their plan.
+export type ValueDefinitionsResult = {
+  type: "value-definitions";
+  values: {
+    value: string;
+    description: string;
+    threat: string;
+    protectors: string[];
+  }[];
+  summaryLabel: string;
+};
+
+// 3.5 — the hopes line carried at the open, plus every fear card the person
+// reacted to. reaction is which tray it landed in; "on-my-mind" and
+// "newly-recognised" are the live ones the conversation works with. note is the
+// optional specific worry; weighs marks the ones heavy enough to want the plan to
+// take account of them.
+export type HopesFearsResult = {
+  type: "hopes-fears";
+  hopes: string;
+  fears: {
+    label: string;
+    horizon: string;
+    reaction: "on-my-mind" | "not-me" | "newly-recognised";
+    note?: string;
+    weighs?: boolean;
+  }[];
+  summaryLabel: string;
+};
+
+// 3.6 — the reflective passage the person wrote, looking back.
+export type BiggerPictureResult = {
+  type: "bigger-picture";
+  body: string;
+  summaryLabel: string;
+};
+
 export type BuildResult =
   | DayBuilderResult
   | RolePickerResult
@@ -176,7 +369,13 @@ export type BuildResult =
   | LetterResult
   | SparkPromptsResult
   | ScreeningCheckResult
-  | CompositeResult;
+  | CompositeResult
+  | MirrorCardsResult
+  | ValueTriageResult
+  | PriorityChoicesResult
+  | ValueDefinitionsResult
+  | HopesFearsResult
+  | BiggerPictureResult;
 
 // A concrete plan entry captured after a module's conversation closes — distinct
 // from reflection data: it's an actionable commitment the person sets for their
@@ -252,6 +451,13 @@ export type Stage = {
   subtitle: string;
   // Shown once on first forward entry into the stage; omit until copy exists.
   intro?: StageIntro;
+  // Short fragments for the dashboard hero when crossing a stage line. lookBack
+  // is a past-tense nod to what the person did in this stage (read after "That's
+  // the whole of {name} behind you now — …"); lookAhead frames what this stage
+  // is for (read after "Next comes {name}, where …"). Kept brief; omit either to
+  // fall back gracefully.
+  lookBack?: string;
+  lookAhead?: string;
   modules: Module[];
 };
 
@@ -266,6 +472,10 @@ export const STAGES: Stage[] = [
     number: 1,
     name: "Imagine",
     subtitle: "Picture your future",
+    lookBack:
+      "you pictured ordinary days and started to see the retirement you'd want",
+    lookAhead:
+      "you picture the retirement you want — starting with a single ordinary day",
     intro: {
       heading: "Let's start by imagining",
       body: [
@@ -636,6 +846,10 @@ WATCH FOR
     number: 2,
     name: "Explore",
     subtitle: "Go deeper, area by area",
+    lookBack:
+      "you went through your picture area by area, noticing what to keep, change, and add",
+    lookAhead:
+      "you go deeper area by area — movement, mind, people, purpose, energy, and the senses",
     intro: {
       // [Placeholder — SMW to replace.] Framed on the WHO's Intrinsic Capacity
       // model as an invitation, not an audit.
@@ -1383,7 +1597,355 @@ WATCH FOR
     number: 3,
     name: "Understand",
     subtitle: "What matters most",
-    modules: [],
+    lookBack:
+      "you named your strengths, sorted your values, and put what matters most into your own words",
+    lookAhead:
+      "we step back to what's underneath it all — your strengths, your values, and what a genuinely good day looks like for you",
+    intro: {
+      // [Placeholder — SMW to replace.] Framed as stepping back to what's
+      // underneath the picture, not a test of the person.
+      heading: "Now let's understand what's underneath",
+      body: [
+        "[Placeholder — SMW to replace.] In Imagine you pictured the retirement you want, and in Explore you looked at it area by area. This stage steps back to ask what's underneath all of it — the strengths you bring, the values that matter most to you, and what a genuinely good day looks like for you.",
+        "Nothing here is a test, and there are no right answers. Each module starts from what you've already told us, so you're never beginning with a blank page — you're confirming, adjusting, and putting things in your own words.",
+        "What comes out of this stage becomes the heart of your plan: a clear sense of what matters most, to carry into the years ahead.",
+      ],
+      buttonLabel: "Let's carry on",
+    },
+    modules: [
+      {
+        id: "3.1",
+        title: "Your strengths",
+        description:
+          "The things you're naturally good at and energised by — drawn from your own picture, for you to confirm and make your own.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Most people are clearer on what they're not good at than on what they are. But the retirement that suits you is one that leans on your real strengths — the things you're naturally good at, or that leave you more energised than drained. This module isn't a personality test, and there's no score. It draws on the VIA character strengths, a recognised set of 24, and works like a mirror: a few that already show up in what you've told us, for you to recognise or set aside.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] In a moment you'll see some character strengths drawn from your own answers. Keep the ones that fit and set aside the rest, then look through the remaining strengths for anything we've missed. Finally, mark the few that feel most like your signature.`,
+          },
+        ],
+        coachOpening: `Here are the strengths you kept — and the few you marked as most you. Let's take one of those: where do you picture it actually living in the retirement you've been designing?`,
+        interaction: {
+          type: "mirror-cards",
+          instruction:
+            "These come from the VIA character strengths — a recognised set of 24. Here are the ones I think I can see in you, drawn from what you've told me. For each, Keep it if it feels like you, or Set aside if it doesn't.",
+          restLabel: "Look through the rest",
+          restIntro:
+            "Here's the rest of the 24 character strengths. Is there anything here you've leaned on — in your working life, or at home — that hasn't come up yet? Tap any that fit to add them.",
+          notePlaceholder: "Where does this one show up? (optional)",
+          starLabel:
+            "Which feel most like your signature — the ones most you? Pick up to five.",
+          starMax: 5,
+          summaryLabel: "Your strengths",
+        },
+        sessionInstructions: `PURPOSE
+You already know this person from the Imagine and Explore stages — open like a coach who remembers them. They have just worked through the VIA character strengths: kept the ones that fit, added any they'd leaned on that hadn't come up, and starred a signature few. They did NOT say where any of these might show up in retirement — that work is this conversation's, not theirs to arrive with. Help each signature strength find a real home in the retirement they're designing. This is recognition, not assessment.
+
+MOST IMPORTANT
+The bridge from a strength to where it shows up is the heart of this — and it's yours to draw out through dialogue, not theirs to supply. Don't expect them to arrive with an answer. For their signature strengths, keep returning to one question in different forms: where might this live in the retirement you've been picturing? Work from the days, roles, people, and interests they described in Imagine and Explore, so a strength becomes a concrete part of the picture rather than a label.
+
+HOW TO RUN IT
+- Open on one they starred and go straight to where it might live — not whether it's really theirs.
+- Take one strength at a time. Offer a possible home for it drawn from their own earlier picture, tentatively, and let them place it.
+- Aim to reach your close within roughly four to six exchanges.
+
+DIG DEEPER WHERE
+- A signature strength has no obvious home in the picture they've built — ask gently where it might go, or what would have to be there for it to show up.
+- A strength has only ever lived in a work role they're leaving — help them find where it lives once the job no longer carries it.
+- A strength stays abstract — bring it down to one concrete thing it could look like in an ordinary week.
+
+HOLD BACK WHERE
+- The set already feels right to them — don't relitigate it; move to where it lives.
+- They set a card aside — one light check at most, then let it go; don't argue them back into it.
+- You feel the urge to pile on praise — resist it. No "that's wonderful", no "what a great strength". Name things plainly and let them stand.
+
+STOP AT THE THRESHOLD OF PLANNING
+This module settles where a strength could live and what form it might take — not how or when to begin. When the conversation starts pulling toward first steps, sequencing, or the lowest-barrier way in, that's the edge of this stage. Name that there's something here for the planning stage to pick up, and let it rest there rather than working it out now.
+
+HOW
+- Always work through their own picture and their own words, never a generic strengths lecture.
+- Stay tentative: offer, don't declare. One thread at a time, not a summary of all of them.
+- Their signature strengths are an unranked set — they chose them together, in no particular order. Never call one the "top" strength, never say one "leads the list", and don't read any meaning into the order they appear in.
+
+CLOSING
+Name their signature strengths in their words, as things they already have and now have somewhere to live. Note warmly that this adds to their Retirement Life Plan, and that the next modules look at what they value most.`,
+      },
+      {
+        id: "3.2",
+        title: "Your values",
+        description:
+          "The things that matter most to you, sorted in your own way — including the ones you're still not sure about.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Values are the things that quietly steer your choices — freedom, closeness to people, learning, security, making a difference. In working life they often go unspoken, carried along by the job and the routine. In retirement they matter more, not less: with more of your time your own to shape, what you value is what tells you how to spend it. This module helps you name yours.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] In a moment you'll see some values that seem to matter to you, drawn from your answers. Sort each one: that's me, not sure, or not really. There's no right answer, and leaving something in "not sure" is completely fine — some values take time to settle.`,
+          },
+        ],
+        coachOpening: `Here are the values you marked as most core. A couple of these run right through everything you've told me — let's start there, and get underneath the word to what it actually means for you.`,
+        interaction: {
+          type: "value-triage",
+          instruction:
+            "These come from a recognised set of values. Here are the ones I think I can see mattering to you, drawn from what you've told me. Sort each into a tray — there's no right answer, and \"not sure\" is a fine place to leave one.",
+          paletteLabel: "Look through the rest",
+          paletteIntro:
+            "Here's the rest of the set. Is there anything here that matters to you that hasn't come up yet? Tap any that fit to add them.",
+          customLabel:
+            "Missing something that isn't here? Add a value in your own words.",
+          coreLabel:
+            "Last step: mark the ones that feel most core to who you are — up to five. Fewer is fine. You're choosing what matters most, not putting them in order.",
+          coreMax: 5,
+          summaryLabel: "Your values",
+        },
+        sessionInstructions: `PURPOSE
+They have just worked through a fixed set of values: sorted them into "that's me", "not sure", and "not really" (sorting was unconstrained), and then marked the few that feel most core to who they are. Your job is NOT to reword labels. It is to draw out a short, personal DESCRIPTION of what each core value actually comes down to for them — the gist of what it means in their life. The word is the set's; the description is theirs. Treat the "not sure" pile as legitimate, not a problem to solve.
+
+MOST IMPORTANT
+The goal for each core value is a short description in their own terms — not a swapped label. "Family" doesn't become a different word; it becomes something like "being reliably present for my grandchildren and daughter, there for the everyday, not just the big moments." Aim for that kind of specificity: a line that says what the value really is for this person, drawn from their own picture and language.
+
+LEAD WITH WHAT CARRIES WEIGHT — DON'T MARCH THROUGH THE LIST
+Do NOT go through their core values one by one in order. Open on the two or three that carry the most weight — the ones richest in their Imagine and Explore material, or that they reacted to most strongly — and draw out real descriptions for those. Batch the self-evident ones: name them together and agree a one-line gist rather than working each in turn. Depth goes where it earns its place.
+
+SCAFFOLD BY HOW MUCH YOU ALREADY KNOW
+- Richly evidenced (they've spoken about it a lot): propose the description from that material for them to confirm or sharpen — "You've spoken about this a lot; it seems to come down to [X] — does that fit?" Give them something specific to react to; don't make them start from blank.
+- Thin (often a value they added from the list): ask a concrete question anchored in their life — "This isn't something we've touched on yet — where does it show up in your life today, and what specifically matters about it?" NEVER an abstract "what does this value mean to you?"
+
+DIG DEEPER WHERE
+- A value they set aside still has real evidence behind it — often it's the word that doesn't fit, not the thing. Check gently whether the thing still matters under a different word.
+- The "not sure" pile — ask lightly what makes them uncertain, without pushing them to decide.
+- A feeling surfaces — a value they react to strongly, warmly or otherwise. Follow the reaction; that's where the real description often lives.
+
+HOLD BACK WHERE
+- A core value is already self-evident to them — don't manufacture depth or make them justify it; agree a short gist and move on.
+- They're uncertain — don't resolve it for them. Uncertainty is a valid place to leave a value.
+- You're tempted to go into what supports or threatens a value, or what living it looks like in practice — STOP. That depth belongs to a later module (Living your values). Here you capture only what each value means — the gist, not the how.
+- You feel the pull to weigh their core values against each other or rank them — resist it. They've already chosen what's most core; you're not ordering it. That weighing is the next module's work.
+
+HOW
+- Always work through their own picture and their own words, never a generic values lecture.
+- Stay tentative: offer a description and check it, rather than asserting it.
+- If a core value is one they added themselves, treat it as at least as real as the surfaced ones.
+
+CLOSING
+Read their core values back, each with the description you drew out in their own words. Reflect back warmly how much more specific those descriptions are than the bare labels they started with. Note this adds to their Retirement Life Plan, and that the next module weighs these values against each other.`,
+      },
+      {
+        id: "3.3",
+        title: "What matters most",
+        description:
+          "A few honest either/or choices, then your values in the order that feels true — to see what pulls hardest when you can't have everything.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] It's easy to say everything matters — and it does. But a real life means trade-offs: a free, open week or one full of people and plans; time to yourself or time given to others. You can't max out everything at once, and the choices you lean toward tell you something true about what matters most. This module isn't about ranking your life into a league table. It's a gentle pressure test, to see what pulls hardest when something has to give.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] In a moment you'll see a few either/or choices, built from your own picture. Just lean toward whichever pulls a little harder — there are no wrong answers, and you can say why if you like. Then put your values in the order that feels right.`,
+          },
+        ],
+        coachOpening: `Here's where you landed when things had to give. Looking at what came out on top — does that order feel true to you, or is something not sitting quite right?`,
+        interaction: {
+          type: "priority-choices",
+          instruction:
+            "A few either/or choices, drawn from your own picture. There are no wrong answers — just lean toward whichever pulls a little harder. You can say why if you like.",
+          rankLabel:
+            "Now put these values in the order that feels true — most important at the top.",
+          summaryLabel: "What matters most",
+        },
+        sessionInstructions: `PURPOSE
+They have just made a series of either/or choices and put their values in order. Help them understand what the choices revealed about what matters most — and make room for the discomfort of trade-offs without forcing a tidy answer. This is a pressure test, not a verdict.
+
+HOW TO RUN IT
+- Open by reading back the order they landed on and checking it feels true.
+- Look at one or two of the sharper choices: what pulled them that way, and whether it surprised them.
+- Where they felt torn, name the tension as real and worth keeping — being pulled two ways is information, not indecision.
+- Offer back what seems to matter most when something has to give, in their words, and invite them to adjust the order.
+- Aim to reach your close within roughly four to six exchanges.
+
+MUST NOT
+- Do NOT treat the ranking as fixed or final. It's a snapshot they can keep reshaping.
+- Do NOT push them to resolve a genuine tension — capture it rather than collapse it.
+- Do NOT imply that valuing one thing means abandoning another.
+- Don't judge their priorities or nudge them toward a "healthier" order.
+
+CLOSING
+Name what seems to matter most to them when they can't have everything, in their own words, and acknowledge any trade-off that felt hard. Note warmly that this adds to their Retirement Life Plan, and that the next module puts their top values into practice.
+
+WATCH FOR
+- If a choice clearly unsettled them, meet it warmly and matter-of-factly; don't turn it into a problem.
+- If the ranking feels forced, let them leave some values level — order isn't the point, clarity is.
+- Welcome reshuffles; that's them thinking it through.`,
+      },
+      {
+        id: "3.4",
+        title: "Living your values",
+        description:
+          "What would quietly get in the way of living each of your values — and what you'd protect to keep it.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] A value rarely disappears all at once. It slips away quietly — a regular commitment that crowds it out, a habit that fades, a good intention that keeps getting bumped. This module looks honestly at the specific thing most likely to get in the way of living each of your top values week to week, and at what you'd protect to keep it alive.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] You'll see each of your values with the words you gave it earlier. For each one there's a likely threat to react to — keep it, swap it, or write your own — and then a few simple things you might protect to hold the value in place. Choose any that fit, or write your own; the point is something simple enough to make a real part of your plan.`,
+          },
+        ],
+        coachOpening: `Here's each of your values with what's most likely to get in the way of living it. Let's take the first — does that threat ring true, or is there a more real one?`,
+        interaction: {
+          type: "value-definitions",
+          instruction:
+            "For each of your values, here's the specific thing most likely to get in the way of living it week to week. Keep it, swap it, or write your own — then choose what you'd protect to keep the value alive.",
+          threatLabel: "What would most likely get in the way",
+          protectorLabel: "What you'd protect to keep it",
+          protectorPlaceholder: "Something simple you'd protect…",
+          summaryLabel: "Living your values",
+        },
+        sessionInstructions: `PURPOSE
+For each of their top values, they're naming the specific thing most likely to get in the way of living it week to week, and what they'd protect to keep it alive — one or more simple things they could commit to as part of their plan. Help them see the threat honestly and land on protectors simple and concrete enough to actually hold to.
+
+HOW TO RUN IT
+- Take one value at a time. Name its threat plainly and honestly — a real, specific thing from their own life, not a vague drift. Ask whether that's really the most likely thing that would get in the way week to week, or whether theirs is different.
+- If they swap the threat, take their version; it's more likely to be true than yours.
+- Once the threat feels right, turn to what they'd protect. They can choose more than one. Steer toward things simple enough to commit to — if a protector is vague ("make time for it") or grand, bring it down to something they could actually hold to week to week.
+- Stop at what they'd protect. Do NOT move to how, when, or a plan for doing it.
+- Aim to reach your close within roughly four to six exchanges.
+
+MUST NOT
+- Do NOT soften or hedge the threat to make it comfortable; an honest, specific threat is more useful than a gentle, vague one.
+- Do NOT turn the protectors into a plan, schedule, or to-do list — that's a later stage.
+- Do NOT add values here; this module works with the ones they already chose.
+- Don't moralise about how a value "should" be lived.
+
+CLOSING
+They can already see every value, threat and protector on the summary card, so do NOT read them back or list them — that's just noise. For your wrap-up, reflect in a sentence or two on the overall shape of what they're protecting (a thread or two that stands out), and check it feels right. Plain prose only: no headings, no bold, no dividers, no value-by-value list. Note warmly that this adds to their Retirement Life Plan, and that the next module turns to the quieter half of the picture — their hopes and the worries they carry alongside them.
+
+WATCH FOR
+- If a threat touches something tender (money, health, a relationship), meet it warmly and matter-of-factly; stay with what they can shape and don't probe.
+- If a protector stays vague or sweeping, bring it down to one simple thing they could actually commit to.
+- Welcome rewording at any point.`,
+      },
+      {
+        id: "3.5",
+        title: "Hopes and fears",
+        description:
+          "The quieter half of the picture — what you're hoping for, and what worries you, as you move into retirement and beyond.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] So far you've pictured what you're hoping for — the people, the time, the things you want to keep doing. But most people carry a quieter set of worries alongside the hopes, and they rarely get said out loud. Naming them isn't gloomy; it's how a plan gets honest. The worries you can see are the ones a plan can take account of.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] In a moment you'll see a set of common worries, grouped by when they tend to show up — the change itself, the years that follow, and the longer view. Most won't be yours, and that's the point: just set those aside. For the few that land, you can say a little more, and mark any that weigh heavily enough that you'd want the plan to take account of them.`,
+          },
+        ],
+        coachOpening: `Some of these you set aside, and a few you kept. Let's stay with the ones that landed. Take the one that sits heaviest — what's the worry underneath it for you?`,
+        interaction: {
+          type: "hopes-fears",
+          instruction:
+            "Most of these won't be yours — set those aside. For the few that land, say a little more if you want, and mark any that weigh heavily enough that you'd want the plan to take account of them.",
+          hopesLabel: "What you've been hoping for",
+          reactionLabels: {
+            onMyMind: "On my mind",
+            notMe: "Not me",
+            newlyRecognised: "Hadn't thought of it — but yes",
+          },
+          noteLabel: "The specific worry, if you want to say more",
+          notePlaceholder: "What's the worry underneath it…",
+          weighsLabel: "This weighs heavily — I'd want the plan to take account of it",
+          paletteLabel: "Other worries you might recognise",
+          paletteIntro:
+            "Browse the rest if you like — add any that ring true for you.",
+          customLabel: "A worry in your own words",
+          summaryLabel: "Hopes and fears",
+        },
+        sessionInstructions: `PURPOSE
+This is the highest-safeguarding module in the stage. The person has just gone through a set of common worries about retirement and later life, set most aside, and kept a few. Your job is to stay with the ones that landed, register them plainly, and help separate what the plan can act on from what's about facing rather than fixing. Honest, steady company — not therapy, not reassurance.
+
+HOW TO RUN IT
+- Work ONLY with the fears that landed (the ones they kept or added) — never the whole list, and never the ones they set aside.
+- Acknowledge a weighty one squarely and let them say more without probing. For a vague one, you may ask once, gently: "what's the specific worry underneath that?"
+- Where a transition fear sits next to a strength or value they've already confirmed, note the connection gently — without dismissing the fear.
+- Close forward: name what's within their control and what the plan can take account of. Fears the plan can act on become safeguards or contingencies for Stage 4; some later-life fears are about facing rather than fixing, and you can say that honestly.
+
+MUST NOT
+- Do NOT reassure or try to fix. No "I'm sure it'll be fine", no silver linings, no minimising.
+- Do NOT probe the heaviest fears (declining health, losing a partner, mortality). Acknowledge them with steadiness and move on. You are a coach, not a therapist.
+- Do NOT treat a fear as a symptom or push for more than the person offers.
+- Do NOT end on the fear. Always close on what's in their control and what the plan can hold.
+
+CLOSING
+They can see every fear they kept on the summary card, so do NOT read the list back. In a sentence or two, name plainly what weighs most and draw the honest line: which worries the plan can take account of (safeguards and contingencies for later), and which are more about facing than fixing. Plain prose only — no headings, no bold, no dividers, no list. Note warmly that this adds to their Retirement Life Plan, and that the last module of this stage steps back to the bigger picture.
+
+WATCH FOR
+- If a fear points to isolation, low mood, or real distress, meet it with warmth and without alarm; stay with what they can shape and don't press.
+- If they kept nothing, that's a fine outcome — don't manufacture worry; note lightly that the hopes carry the picture and move to close.
+- Keep your own register steady: honest, not grim, never breezily reassuring.`,
+      },
+      {
+        id: "3.6",
+        title: "The bigger picture",
+        description:
+          "A short, honest piece of writing about how you'd want to have lived these years — and the lines you'd want them to stand for.",
+        durationMin: 20,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] You've looked at your strengths, your values, your hopes and fears. This last module steps all the way back. Picture yourself near the end of these retirement years, looking back — how would you want to have lived them? Not the achievements or the box-ticking, but the texture of it: who you stayed close to, what you kept doing, how it felt. Writing it down, even roughly, has a way of making it real.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] In a moment you'll have a quiet space to write. There are a few starting threads drawn from everything you've told us — pick up any that speak to you, or start wherever you like. Write as much or as little as feels right.`,
+          },
+        ],
+        coachOpening: `Thank you for writing that. There's a lot in what you wrote — let's take one part of it. What is it about that one that made you want to put it down?`,
+        interaction: {
+          type: "bigger-picture",
+          prompt:
+            "Imagine yourself near the end of these years, looking back — how did you live them? Write a few lines. Pick up a thread below, or start your own.",
+          placeholder: "Write as much or as little as you like…",
+          threadsLabel: "Threads you could pick up",
+          summaryLabel: "The bigger picture",
+        },
+        sessionInstructions: `PURPOSE
+This is the most reflective and tender module of the stage, written in the spirit of the Stage 1 letter. They have just written about how they'd want to have lived these years. Help them sit with what they wrote and draw out what it says about what they want — gently, on their terms. This holds; it does not grade.
+
+HOW TO RUN IT
+- Open by honouring what they wrote, then start with one line or thread from it.
+- Move slowly, one thread at a time: what's behind a line, what it would mean to live it.
+- Use their own words back to them; let the writing lead rather than steering it somewhere new.
+- Offer back, warmly, what these years seem to be about for them — drawn straight from what they wrote.
+- Aim to reach your close within roughly four to six exchanges; let them set the pace.
+
+MUST NOT
+- Do NOT analyse, interpret beyond their words, or hand them a neat summary of their "purpose".
+- Do NOT rush, fill silences, or push for more than they want to give.
+- Do NOT treat anything they wrote as a task or a goal to optimise.
+- Don't grade the writing or praise it as "beautiful" — meet it plainly and warmly.
+
+CLOSING
+Name what these years seem to stand for in their own words, drawn from what they wrote. Acknowledge the weight of looking back like this. Note warmly that this completes the Understand stage and becomes the heart of their Retirement Life Plan.
+
+WATCH FOR
+- This is mortality-adjacent and can stir grief, regret, or fear. If strong feeling surfaces, slow right down, meet it humanely, and don't push the exercise on over it.
+- If they wrote very little, that's fine; work gently with what's there rather than coaxing more.
+- Let them leave things unresolved — not everything needs an answer here.`,
+      },
+    ],
   },
   {
     number: 4,

@@ -25,6 +25,30 @@ import ScreeningCheck, {
 } from "./ScreeningCheck";
 import ScreeningCommitment from "./ScreeningCommitment";
 import LetterFlow from "./LetterFlow";
+import MirrorCards, {
+  MirrorCardsSummary,
+  mirrorCardsSummaryText,
+} from "./MirrorCards";
+import ValueTriage, {
+  ValueTriageSummary,
+  valueTriageSummaryText,
+} from "./ValueTriage";
+import PriorityChoices, {
+  PriorityChoicesSummary,
+  priorityChoicesSummaryText,
+} from "./PriorityChoices";
+import ValueDefinitions, {
+  ValueDefinitionsSummary,
+  valueDefinitionsSummaryText,
+} from "./ValueDefinitions";
+import HopesFears, {
+  HopesFearsSummary,
+  hopesFearsSummaryText,
+} from "./HopesFears";
+import BiggerPicture, {
+  BiggerPictureSummary,
+  biggerPictureSummaryText,
+} from "./BiggerPicture";
 import { FinishControls, type InteractionMode } from "./InteractionShell";
 import type {
   ContentBlock,
@@ -38,7 +62,16 @@ import type {
 } from "@/lib/modules";
 import { useUserData } from "@/lib/userData";
 import type { Dreams } from "@/lib/dreams";
-import { buildCarryForward, hasCarryForward } from "@/lib/carryForward";
+import {
+  isSeededType,
+  type Stage3Seed,
+  type Stage3Value,
+} from "@/lib/stage3Seed";
+import {
+  buildCarryForward,
+  buildStage3Context,
+  hasCarryForward,
+} from "@/lib/carryForward";
 
 // Vita appends this to her closing message so we know the module is finished.
 // It's stripped before display and before storage, so it never shows and never
@@ -80,6 +113,18 @@ function summarizeBuild(result: BuildResult): string {
       return sparkPromptsSummaryText(result);
     case "screening-check":
       return screeningCheckSummaryText(result);
+    case "mirror-cards":
+      return mirrorCardsSummaryText(result);
+    case "value-triage":
+      return valueTriageSummaryText(result);
+    case "priority-choices":
+      return priorityChoicesSummaryText(result);
+    case "value-definitions":
+      return valueDefinitionsSummaryText(result);
+    case "hopes-fears":
+      return hopesFearsSummaryText(result);
+    case "bigger-picture":
+      return biggerPictureSummaryText(result);
     case "composite":
       return result.results.map(summarizeBuild).filter(Boolean).join(" ");
     default:
@@ -113,6 +158,24 @@ function InteractionSummary({
       break;
     case "screening-check":
       body = <ScreeningCheckSummary result={result} />;
+      break;
+    case "mirror-cards":
+      body = <MirrorCardsSummary result={result} />;
+      break;
+    case "value-triage":
+      body = <ValueTriageSummary result={result} />;
+      break;
+    case "priority-choices":
+      body = <PriorityChoicesSummary result={result} />;
+      break;
+    case "value-definitions":
+      body = <ValueDefinitionsSummary result={result} />;
+      break;
+    case "hopes-fears":
+      body = <HopesFearsSummary result={result} />;
+      break;
+    case "bigger-picture":
+      body = <BiggerPictureSummary result={result} />;
       break;
     case "composite":
       body = (
@@ -270,7 +333,17 @@ export default function SessionContainer({
       const carry = buildCarryForward(sessionId, userData);
       if (carry) return carry;
     }
-    return userData.buildPriorReflections(sessionId, includeStartingThoughts);
+    const reflections = userData.buildPriorReflections(
+      sessionId,
+      includeStartingThoughts
+    );
+    // Stage 3 (Understand) infers strengths and values, so it also wants the raw
+    // structured picks from Stages 1–2 alongside the prose recap.
+    if (stageNumber === 3) {
+      const picks = buildStage3Context(userData);
+      if (picks) return `${reflections}\n\n${picks}`;
+    }
+    return reflections;
   }
 
   // The letter module replaces the build → conversation flow with a single
@@ -282,8 +355,11 @@ export default function SessionContainer({
   // "editing" to adjust earlier picks without losing the conversation. The
   // letter module uses "letter" in place of building/conversation.
   const [phase, setPhase] = useState<
-    "reading" | "building" | "conversation" | "editing" | "letter"
+    "reading" | "seeding" | "building" | "conversation" | "editing" | "letter"
   >("reading");
+  // Stage 3 surfaces pre-fill from a seed fetched once after the reading. Loaded
+  // from the snapshot on hydration, or fetched fresh in the "seeding" phase.
+  const [seed, setSeed] = useState<Stage3Seed | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   // Flips true once we've read this module's saved state out of the snapshot, so
@@ -340,6 +416,11 @@ export default function SessionContainer({
 
     const savedBuild = userData.getBuild(sessionId);
     if (savedBuild) setBuildResult(savedBuild);
+
+    // A Stage 3 surface may have a seed saved from a previous visit — load it so
+    // a refresh mid-module keeps the same candidates rather than re-fetching.
+    const savedSeed = userData.getSeed(sessionId);
+    if (savedSeed) setSeed(savedSeed);
 
     if (isLetter) {
       // The letter module has no chat. If it's already complete the completion
@@ -510,6 +591,91 @@ export default function SessionContainer({
     }
   }
 
+  // At the close of the LAST Understand-stage module, synthesise the small set
+  // of values the person confirmed across the stage and store it under
+  // rlp_stage3_values for Stage 4 (and a later reveal) to draw on. Mirrors the
+  // takeaway/dreams pattern: runs in the background, self-guards to the last
+  // Stage 3 module, and falls back to assembling from the stored builds if the
+  // model call fails — so the values are never lost.
+  async function generateAndStoreStage3Values(fullMessages: Message[]) {
+    if (!user) return;
+    const isLastStage3Module =
+      stageNumber === 3 &&
+      stageModuleIds.length > 0 &&
+      stageModuleIds[stageModuleIds.length - 1] === sessionId;
+    if (!isLastStage3Module) return;
+
+    // Gather the structured Stage 3 builds that name values.
+    const stage3Builds = stageModuleIds
+      .map((id) => userData.getBuild(id))
+      .filter((b): b is BuildResult => b !== null);
+    const triage = stage3Builds.find((b) => b.type === "value-triage");
+    const ranking = stage3Builds.find((b) => b.type === "priority-choices");
+    const defs = stage3Builds.find((b) => b.type === "value-definitions");
+
+    // A deterministic assembly from the builds: ranking order first, then any
+    // remaining defined or "that's me" values. "not really" values are dropped;
+    // "not sure" values are kept but marked still-forming. Capped at five.
+    const assembleFallback = (): Stage3Value[] => {
+      const trayOf = new Map<string, "me" | "unsure" | "not">();
+      if (triage?.type === "value-triage") {
+        triage.sorted.forEach((s) => trayOf.set(s.label.toLowerCase(), s.tray));
+      }
+      const meaningOf = new Map<string, string>();
+      if (defs?.type === "value-definitions") {
+        defs.values.forEach((v) =>
+          meaningOf.set(v.value.toLowerCase(), v.description)
+        );
+      }
+      const out: Stage3Value[] = [];
+      const seen = new Set<string>();
+      const add = (label: string) => {
+        const key = label.toLowerCase();
+        if (seen.has(key) || trayOf.get(key) === "not") return;
+        seen.add(key);
+        out.push({
+          value: label,
+          meaning: meaningOf.get(key) ?? "",
+          confidence: trayOf.get(key) === "unsure" ? "still forming" : "certain",
+        });
+      };
+      if (ranking?.type === "priority-choices") ranking.ranked.forEach(add);
+      if (defs?.type === "value-definitions")
+        defs.values.forEach((v) => add(v.value));
+      if (triage?.type === "value-triage")
+        triage.sorted.filter((s) => s.tray === "me").forEach((s) => add(s.label));
+      return out.slice(0, 5);
+    };
+
+    const save = (values: Stage3Value[]) => {
+      const fallback = assembleFallback();
+      const final = (values.length ? values : fallback).slice(0, 5);
+      if (final.length === 0 || !user) return;
+      void userData.saveStage3Values({
+        values: final,
+        savedAt: new Date().toISOString(),
+      });
+    };
+
+    const valuesContext = [triage, ranking, defs]
+      .flatMap((b) => (b ? [summarizeBuild(b)] : []))
+      .filter(Boolean)
+      .join("\n");
+
+    try {
+      const res = await fetch("/api/stage3-values", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: fullMessages, valuesContext }),
+      });
+      if (!res.ok) throw new Error(`Stage 3 values request failed: ${res.status}`);
+      const data = (await res.json()) as { values: Stage3Value[] };
+      save(data.values ?? []);
+    } catch {
+      save([]);
+    }
+  }
+
   // Read the kept-plan recognition exactly as the module starts, then clear the
   // stored plan no matter what — so each cycle starts fresh and a plan is never
   // acknowledged twice. Returns the line only on an exact same-day match; on an
@@ -551,12 +717,63 @@ export default function SessionContainer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, messages.length, buildResult, user]);
 
-  // After the reading: the letter module goes to its writing surface; other
-  // modules with an interaction go to the build step; everything else goes
-  // straight to the conversation.
+  // Pre-seed a Stage 3 surface: assemble the person's context (including a terse
+  // recap of what they built in earlier Stage 3 modules) and ask /api/stage3-seed
+  // for candidate content. Whatever comes back is saved and passed to the
+  // surface; on failure the surface still renders from its own palette/empty
+  // state. Either way, end on the build step.
+  async function runSeeding() {
+    if (!interaction || !isSeededType(interaction.type)) {
+      setPhase("building");
+      return;
+    }
+    setPhase("seeding");
+    const idx = stageModuleIds.indexOf(sessionId);
+    const priorBuilds = stageModuleIds
+      .slice(0, idx === -1 ? 0 : idx)
+      .flatMap((id) => {
+        const b = userData.getBuild(id);
+        return b ? [summarizeBuild(b)] : [];
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    try {
+      const res = await fetch("/api/stage3-seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          seedType: interaction.type,
+          onboardingContext: userData.buildOnboardingContext(),
+          priorReflections: userData.buildPriorReflections(sessionId),
+          carryForward: buildStage3Context(userData),
+          priorBuilds,
+          hasPartner: userData.hasPartner(),
+        }),
+      });
+      if (!res.ok) throw new Error(`Seed request failed: ${res.status}`);
+      const data = (await res.json()) as { seed: Stage3Seed | null };
+      if (data.seed) {
+        setSeed(data.seed);
+        void userData.saveSeed(sessionId, data.seed);
+      }
+    } catch {
+      // Leave the seed null — the surface renders from its palette/empty state.
+    } finally {
+      setPhase("building");
+    }
+  }
+
+  // After the reading: the letter module goes to its writing surface; a Stage 3
+  // surface goes through the seeding step first (unless it already has a seed);
+  // other interaction modules go straight to the build step; everything else
+  // goes straight to the conversation.
   function handleReadingDone() {
     if (isLetter) {
       setPhase("letter");
+    } else if (interaction && isSeededType(interaction.type)) {
+      if (seed) setPhase("building");
+      else void runSeeding();
     } else if (interaction) {
       setPhase("building");
     } else {
@@ -720,6 +937,9 @@ export default function SessionContainer({
         // The money module also captures its structured Dreams record (self-guards
         // to 1.money). Re-closing regenerates and overwrites it, same as above.
         void generateAndStoreDreams(finalMessages);
+        // The last Understand-stage module also captures the confirmed values
+        // summary (self-guards to that module). Same regenerate-on-reclose pattern.
+        void generateAndStoreStage3Values(finalMessages);
       }
     } catch {
       // Roll the user's bubble back off the conversation and hand their words
@@ -864,11 +1084,25 @@ export default function SessionContainer({
         )}
       </section>
 
+      {/* ZONE 2.4 — SEEDING (Stage 3: preparing the surface) */}
+      {phase === "seeding" && (
+        <section style={styles.seedingStep}>
+          <span className="seeding-dots" aria-hidden="true">
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+          </span>
+          <p style={styles.seedingLine}>Setting this up from what you&apos;ve shared…</p>
+        </section>
+      )}
+
       {/* ZONE 2.5 — INTERACTION (only modules that have one) */}
       {phase === "building" && interaction && (
         <InteractionStep
           interaction={interaction}
+          seed={seed}
           onFinish={handleBuildFinish}
+          hasPartner={userData.hasPartner()}
         />
       )}
 
@@ -876,10 +1110,12 @@ export default function SessionContainer({
       {phase === "editing" && interaction && (
         <InteractionStep
           interaction={interaction}
+          seed={seed}
           onFinish={handleEditSave}
           mode="edit"
           initial={buildResult ?? undefined}
           onCancel={handleEditCancel}
+          hasPartner={userData.hasPartner()}
         />
       )}
 
@@ -1113,18 +1349,24 @@ function CompletionBlock({
 // half-configured module never breaks the screen.
 function InteractionStep({
   interaction,
+  seed = null,
   onFinish,
   mode = "create",
   initial,
   onCancel,
+  hasPartner = false,
 }: {
   interaction: Interaction;
+  // The seeded candidate content for Stage 3 surfaces; null for every other type.
+  seed?: Stage3Seed | null;
   onFinish: (result: BuildResult) => void;
   mode?: InteractionMode;
   // The stored result to pre-fill from in edit mode. Its type always matches
   // the interaction type, so each case narrows it with a cast.
   initial?: BuildResult;
   onCancel?: () => void;
+  // Whether the person has a partner — gates partner-only fear cards in 3.5.
+  hasPartner?: boolean;
 }) {
   switch (interaction.type) {
     case "day-builder":
@@ -1174,6 +1416,73 @@ function InteractionStep({
           onFinish={onFinish}
           mode={mode}
           initial={initial?.type === "screening-check" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "mirror-cards":
+      return (
+        <MirrorCards
+          interaction={interaction}
+          seed={seed}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "mirror-cards" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "value-triage":
+      return (
+        <ValueTriage
+          interaction={interaction}
+          seed={seed}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "value-triage" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "priority-choices":
+      return (
+        <PriorityChoices
+          interaction={interaction}
+          seed={seed}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "priority-choices" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "value-definitions":
+      return (
+        <ValueDefinitions
+          interaction={interaction}
+          seed={seed}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "value-definitions" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "hopes-fears":
+      return (
+        <HopesFears
+          interaction={interaction}
+          seed={seed}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "hopes-fears" ? initial : undefined}
+          onCancel={onCancel}
+          hasPartner={hasPartner}
+        />
+      );
+    case "bigger-picture":
+      return (
+        <BiggerPicture
+          interaction={interaction}
+          seed={seed}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "bigger-picture" ? initial : undefined}
           onCancel={onCancel}
         />
       );
@@ -1515,6 +1824,23 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "var(--fs-sm)",
     color: "var(--text-muted)",
   },
+  seedingStep: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "14px",
+    paddingTop: "48px",
+    paddingBottom: "16px",
+    marginTop: "8px",
+    borderTop: "1px solid var(--border)",
+  },
+  seedingLine: {
+    fontFamily: "var(--font-serif)",
+    fontStyle: "italic",
+    fontSize: "var(--fs-body)",
+    color: "var(--text-muted)",
+    margin: 0,
+  },
   summaryCard: {
     background: "var(--bg)",
     border: "1px solid var(--border)",
@@ -1791,6 +2117,10 @@ const focusCss = `
     outline: none;
     box-shadow: var(--focus-ring);
     border-radius: var(--r-sm);
+  }
+  .seeding-dots {
+    display: inline-flex;
+    gap: 5px;
   }
   .typing-dot {
     width: 7px;
