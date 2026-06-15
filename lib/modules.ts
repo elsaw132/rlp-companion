@@ -208,6 +208,251 @@ export type BiggerPictureInteraction = {
   summaryLabel: string;
 };
 
+// 4.1 "When and how do you want to leave work?" — a readiness snapshot. Three
+// parts: a transition spectrum (clean break ↔ gradual wind-down, with an
+// optional shape/period follow-up that appears when the lean is toward
+// gradual); a retirement window picked as a band, not a date; and a readiness
+// profile rating a fixed set of factors at one of three levels. The finance
+// factor is paired with a confidence-only follow-up (Consumer Duty: we ask how
+// settled the timing feels, never give advice).
+export type ReadinessSnapshotInteraction = {
+  type: "readiness-snapshot";
+  transitionInstruction: string;
+  transition: { left: string; right: string };
+  // Shown when the slider leans toward "gradual" (position >= 50).
+  shapeLabel: string;
+  shapeOptions: string[];
+  periodLabel: string;
+  periodOptions: string[];
+  // The retirement window, chosen as a from–to band over these ordered marks.
+  windowInstruction: string;
+  windowMarks: string[];
+  // The readiness factors to rate, and the three levels they're rated at. A
+  // factor may override `levels` with its own scale when readiness isn't the
+  // right axis for it (e.g. "things I still want to finish" → none/some/lots).
+  factorsInstruction: string;
+  factors: { id: string; label: string; levels?: string[] }[];
+  levels: string[];
+  // The id (within `factors`) that is the financial-readiness factor, plus the
+  // confidence-only follow-up shown beneath it.
+  financeFactorId: string;
+  financeQuestion: { prompt: string; options: string[] };
+  summaryLabel: string;
+};
+
+// The "seasons board" (Module 4.2). The person sorts cards — pre-populated from
+// their earlier answers and passed in at render time — into broad retirement
+// seasons (early / middle / later) or an enduring lane that runs across all of
+// them. A card may sit in more than one season. The seasons and enduring lane
+// are configured here; the cards themselves come from the user model.
+export type SeasonsBoardInteraction = {
+  type: "seasons-board";
+  boardInstruction: string;
+  seasons: { id: string; label: string; hint?: string }[];
+  // The lane running across all seasons (e.g. "Throughout / enduring").
+  enduringLane: { id: string; label: string; hint?: string };
+  addOwnLabel: string;
+  addOwnPlaceholder: string;
+  summaryLabel: string;
+};
+
+// "Your balanced retirement" (Module 4.3). The module turns what the person has
+// already said into specific goals, organised across the five areas of a
+// balanced retirement: Restore, Move, Think, Connect, Contribute. The person
+// works through the areas one at a time. Under each, springboards drawn from
+// their earlier words (assembled from the user model and passed in at render
+// time) prompt them to shape one or two real goals — using a gentle, SMART-
+// informed framework with two tracks: a thing to do/achieve, or a way to live.
+// Then, across all areas, they spotlight the handful whose absence would leave
+// retirement incomplete, noting the season each belongs to. Balance is the
+// point: a sparse area is a prompt, never a blank to fill anxiously.
+export type BalancedAreaId =
+  | "restore"
+  | "move"
+  | "think"
+  | "connect"
+  | "contribute";
+
+export type BalancedGoalsInteraction = {
+  type: "balanced-goals";
+  // The five fixed areas, in order, each with a one-line sense of what it holds.
+  areas: { id: BalancedAreaId; label: string; blurb: string }[];
+  // Shown on the warm surface while Vita drafts the goals.
+  draftingLabel: string;
+  // One plain line at the top of the curation view.
+  curationInstruction: string;
+  // The balance picture shown across the five areas.
+  balanceHint: string;
+  // The two goal tracks. "Do" is a thing to do/achieve; "be" is a way to live.
+  trackDoLabel: string;
+  trackBeLabel: string;
+  // do-goals: a rough "when / how often". be-goals: what an ordinary week holds.
+  cadenceLabel: string;
+  cadencePlaceholder: string;
+  ordinaryWeekLabel: string;
+  ordinaryWeekPlaceholder: string;
+  // One-tap swap to a bolder or quieter phrasing of the same goal.
+  bolderLabel: string;
+  quieterLabel: string;
+  // Set a suggestion aside.
+  rejectLabel: string;
+  // Start a fresh goal of your own in an area.
+  addGoalLabel: string;
+  addGoalPlaceholder: string;
+  // Move from curating the draft to the focus pass.
+  toFocusLabel: string;
+  // The focus pass — spotlight the vital few (a spotlight, never a gate).
+  focusInstruction: string;
+  absencePrompt: string;
+  maxFocus: number;
+  noteLabel: string;
+  notePlaceholder: string;
+  seasonLabel: string;
+  seasons: { id: string; label: string }[];
+  // Naming an empty area as a deliberate choice rather than a gap.
+  deliberateGapLabel: string;
+  summaryLabel: string;
+};
+
+// "The path to your goals" (Module 4.4). For every goal the person spotlighted
+// in 4.3, Vita drafts the route to it, and the person curates the draft —
+// editing, reordering, adding, removing, or marking a step already done. Two
+// shapes, by the goal's track: a do/achieve goal gets a short MILESTONE LADDER
+// (3–5 stepping stones from where they are now to the goal, in rough order, a
+// foundation-that-needs-work folded in as an early rung); a way-of-being goal
+// gets no ladder, just a light note — what already supports it and the one or
+// two things that would help it take root. Milestones are planning-level (the
+// route, with at most a rough sense of when) — never dated tasks or a schedule,
+// which belong to Stage 5 (Act). The draft comes from /api/goal-paths; the tone
+// throughout shows how much of each path is already behind them.
+export type GoalPathsInteraction = {
+  type: "goal-paths";
+  // Shown on the warm surface while Vita drafts the paths.
+  draftingLabel: string;
+  // One plain line at the top of the curation view.
+  curationInstruction: string;
+  // do-goals: the milestone ladder.
+  ladderLabel: string;
+  whenLabel: string;
+  whenPlaceholder: string;
+  doneLabel: string;
+  addStepLabel: string;
+  addStepPlaceholder: string;
+  // be-goals: the light support note (no ladder).
+  alreadyHelpsLabel: string;
+  wouldHelpLabel: string;
+  addSupportPlaceholder: string;
+  // Both tracks: the one strength or resource to lean on.
+  leanLabel: string;
+  // A gentle reminder of the planning-level boundary (route, not schedule).
+  boundaryHint: string;
+  summaryLabel: string;
+};
+
+// 4.5 — "When you can't do it all". Vita drafts a few concrete trade-off
+// scenarios from the person's emerging plan (their goals, their finance signal),
+// plus a few candidate decision principles; the person curates all three parts:
+// places a slider and writes what they'd protect / what would be too great a
+// sacrifice on each scenario, sorts their core values into non-negotiable vs
+// flexible, and shapes the decision principles.
+export type TradeOffsInteraction = {
+  type: "trade-offs";
+  // Shown on the warm surface while Vita drafts the scenarios.
+  draftingLabel: string;
+  // One plain line at the top of the curation view.
+  curationInstruction: string;
+  // The trade-off scenarios block.
+  scenariosLabel: string;
+  protectLabel: string;
+  protectPlaceholder: string;
+  sacrificeLabel: string;
+  sacrificePlaceholder: string;
+  // The values sort block.
+  valuesLabel: string;
+  valuesInstruction: string;
+  nonNegotiableLabel: string;
+  flexibleLabel: string;
+  // The decision-principles block.
+  principlesLabel: string;
+  principlesInstruction: string;
+  addPrincipleLabel: string;
+  principlePlaceholder: string;
+  // A gentle reminder this explores priorities, never advises on finances.
+  boundaryHint: string;
+  summaryLabel: string;
+};
+
+// 4.6 — "The rhythm of your week". Vita reads back the person's real, recurring
+// activities (drawn from everything heard across the programme, including the
+// actual conversations); for each, the person sets a rough frequency, whether it's
+// a regular anchor, and whether it gives energy. No day of the week, no time of
+// day — false precision this far out. They also set the overall structure–freedom
+// feel (pre-set to where they landed in Stage 1).
+export type WeekShapeInteraction = {
+  type: "week-shape";
+  // Shown on the warm surface while Vita drafts the rhythm.
+  draftingLabel: string;
+  // One plain line at the top of the curation view.
+  curationInstruction: string;
+  // The structure–freedom slider block.
+  structureLabel: string;
+  structurePoleLeft: string;
+  structurePoleRight: string;
+  structureHint: string;
+  // Shown under the slider when its starting point came from the person's
+  // earlier "ideal week" answer (Stage 1), so they know where it's drawn from.
+  structureFromEarlierHint: string;
+  // The recurring-activities block.
+  activitiesLabel: string;
+  activitiesInstruction: string;
+  // Per-activity controls.
+  frequencyLabel: string;
+  anchorLabel: string;
+  energyLabel: string;
+  addActivityLabel: string;
+  activityPlaceholder: string;
+  // The light read of the overall texture (full vs spacious, sociable vs quiet).
+  textureLabel: string;
+  // A gentle reminder this is the character of a sustainable week, not a timetable.
+  boundaryHint: string;
+  summaryLabel: string;
+};
+
+// 4.7 — "Your first year, as a journey". Vita assembles year one onto one visible
+// timeline (four broad phases left to right, plus an across-the-year lane and a
+// work band underneath) and writes a short first-person story of it. The person
+// reshapes it mainly by telling Vita in natural language — the chat is the control
+// surface, and both the timeline and the narrative update in front of them — with
+// light direct moves (drag a piece between phases, star a headline, remove
+// something) for precise single edits.
+export type FirstYearInteraction = {
+  type: "first-year";
+  // Shown on the warm surface while Vita assembles the year.
+  draftingLabel: string;
+  // The four phases of the year, left to right, with their display labels. The
+  // result stores the stable ids ("s1".."s4"); these supply what the person sees.
+  seasons: { id: string; label: string }[];
+  // The label for the across-the-year lane (the steady weekly rhythm).
+  allYearLabel: string;
+  // The work band beneath the timeline, and the line shown when it's a clean break.
+  workLaneLabel: string;
+  noWorkLabel: string;
+  // The Vita-written narrative block heading.
+  narrativeLabel: string;
+  // Vita's first line in the editing chat, and the cues around the composer.
+  introMessage: string;
+  reshapeHint: string;
+  chatPlaceholder: string;
+  // The star control for a headline moment.
+  topLabel: string;
+  // The finish affordance and Vita's closing acknowledgement after it.
+  finishLabel: string;
+  closingAck: string;
+  // A gentle reminder this sets the shape and order, never dated steps.
+  boundaryHint: string;
+  summaryLabel: string;
+};
+
 export type Interaction =
   | DayBuilderInteraction
   | RolePickerInteraction
@@ -221,7 +466,14 @@ export type Interaction =
   | PriorityChoicesInteraction
   | ValueDefinitionsInteraction
   | HopesFearsInteraction
-  | BiggerPictureInteraction;
+  | BiggerPictureInteraction
+  | ReadinessSnapshotInteraction
+  | SeasonsBoardInteraction
+  | BalancedGoalsInteraction
+  | GoalPathsInteraction
+  | TradeOffsInteraction
+  | WeekShapeInteraction
+  | FirstYearInteraction;
 
 // What the person actually built in an interaction step. Stored (as JSON) so
 // the conversation can show it back and a refresh keeps it. The union grows
@@ -362,6 +614,159 @@ export type BiggerPictureResult = {
   summaryLabel: string;
 };
 
+// 4.1 — the readiness snapshot. transition.position is the 0–100 slider value;
+// lean is which side it settled on; shape/period are present only when the lean
+// was gradual and the person answered them. window is the chosen from–to band
+// (null until they set it). factors carries each factor's confirmed level. The
+// finance follow-up records only how settled the timing feels (confidence, not
+// advice).
+export type ReadinessSnapshotResult = {
+  type: "readiness-snapshot";
+  transition: {
+    position: number;
+    lean: "clean-break" | "gradual";
+    shape?: string;
+    period?: string;
+  };
+  window: { fromLabel: string; toLabel: string } | null;
+  factors: { id: string; label: string; level: string }[];
+  // The finance factor's level (above) is the plan-confidence signal; this
+  // records the separate "do you know when you'll be financially ready" answer.
+  finance: { dateKnown?: string };
+  summaryLabel: string;
+};
+
+export type SeasonsBoardResult = {
+  type: "seasons-board";
+  // Each card, with the season labels it sits in. A card may carry more than one
+  // season, or the enduring lane's label. An empty `seasons` means it was left
+  // unplaced. `own` marks cards the person added rather than pre-populated ones.
+  placements: {
+    label: string;
+    category?: string;
+    seasons: string[];
+    own?: boolean;
+  }[];
+  // The season labels in display order (early → later → enduring), so the recap
+  // and coach-facing text can group and order without the interaction config.
+  seasonOrder: string[];
+  summaryLabel: string;
+};
+
+export type BalancedGoalsResult = {
+  type: "balanced-goals";
+  // Every goal the person shaped, each sitting in one balanced area. `track`
+  // says whether it's a thing to do/achieve or a way to live. The do/achieve
+  // fields (looksLike/cadence/stretch) and the way-of-living field (ordinaryWeek)
+  // are optional and only carry where the person gave them. `focus` marks the
+  // spotlit handful; on those, `rank` (1-based) gives their order, `note` the
+  // personal meaning, and `season` where it belongs.
+  goals: {
+    label: string;
+    area: BalancedAreaId;
+    track: "do" | "be";
+    springboard?: string;
+    looksLike?: string;
+    cadence?: string;
+    stretch?: string;
+    ordinaryWeek?: string;
+    focus?: boolean;
+    rank?: number;
+    note?: string;
+    season?: string;
+  }[];
+  // The five areas in order, with labels, so the recap and the "balanced
+  // retirement" overview render without the interaction config.
+  areas: { id: BalancedAreaId; label: string }[];
+  // Areas the person named as deliberately empty — a choice, not a gap to fill.
+  deliberateGaps: BalancedAreaId[];
+  summaryLabel: string;
+};
+
+// 4.4 — the curated path for each spotlighted goal. One entry per goal, carrying
+// its track. A do/achieve goal carries an ordered `milestones` ladder (each rung
+// with an optional rough `when` and a `done` flag for the rungs already behind
+// them). A way-of-being goal carries no ladder — instead `alreadyHelps` (what
+// already supports it) and `wouldHelp` (the one or two things that would help it
+// take root). Both may carry `lean`: one strength or resource to lean on.
+export type GoalPathsResult = {
+  type: "goal-paths";
+  paths: {
+    goal: string;
+    track: "do" | "be";
+    milestones?: { label: string; when?: string; done?: boolean }[];
+    alreadyHelps?: string[];
+    wouldHelp?: string[];
+    lean?: string;
+  }[];
+  summaryLabel: string;
+};
+
+// 4.5 — the curated trade-offs. `scenarios` holds each concrete dilemma Vita
+// drafted, with where the person leaned (`lean`, 0–100, 50 = balanced) and what
+// they'd most want to protect / what would feel like too great a sacrifice.
+// `values` is each core value sorted into non-negotiable, flexible, or left
+// unsorted. `principles` are the personal decision principles they shaped.
+export type TradeOffsResult = {
+  type: "trade-offs";
+  scenarios: {
+    title: string;
+    situation: string;
+    optionA: string;
+    optionB: string;
+    lean: number;
+    protect?: string;
+    sacrifice?: string;
+  }[];
+  values: { value: string; bucket: "non-negotiable" | "flexible" | "unsorted" }[];
+  principles: string[];
+  summaryLabel: string;
+};
+
+// 4.6 — the week's rhythm. `structure` (0–100) is the overall feel, from highly
+// structured (0) to largely open (100). `activities` is the real, recurring things
+// that fill the week. Each carries a rough `frequency` (one of "Most days", "A few
+// times a week", "Weekly", "Now and then") — never a day or time. `anchor` marks
+// the regular fixed points the week is built around; `energy` marks what gives
+// them energy; `fixed` marks ongoing work they plan around; `own` marks ones they
+// added.
+export type WeekShapeResult = {
+  type: "week-shape";
+  structure: number;
+  activities: {
+    label: string;
+    category?: string;
+    frequency: string;
+    anchor?: boolean;
+    energy?: boolean;
+    fixed?: boolean;
+    own?: boolean;
+  }[];
+  summaryLabel: string;
+};
+
+// 4.7 — the sequenced first year. `items` is everything that makes up year one:
+// goals and trips, threads of the weekly rhythm, and any ongoing-work footprint.
+// Each carries a `kind` (trip / goal / project / rhythm / work), a `season` (one
+// of "s1".."s4" for which phase it lands in, or "all-year" for things that run
+// throughout), `top` for a headline moment, `fixed` for the ongoing-work
+// footprint, and `own` for ones added during editing. `narrative` is Vita's short
+// first-person story of the year, kept in sync with the timeline.
+export type FirstYearResult = {
+  type: "first-year";
+  items: {
+    label: string;
+    kind: "trip" | "goal" | "project" | "rhythm" | "work";
+    season: string;
+    top?: boolean;
+    note?: string;
+    fixed?: boolean;
+    own?: boolean;
+  }[];
+  narrative: string;
+  summaryLabel: string;
+};
+
 export type BuildResult =
   | DayBuilderResult
   | RolePickerResult
@@ -375,7 +780,14 @@ export type BuildResult =
   | PriorityChoicesResult
   | ValueDefinitionsResult
   | HopesFearsResult
-  | BiggerPictureResult;
+  | BiggerPictureResult
+  | ReadinessSnapshotResult
+  | SeasonsBoardResult
+  | BalancedGoalsResult
+  | GoalPathsResult
+  | TradeOffsResult
+  | WeekShapeResult
+  | FirstYearResult;
 
 // A concrete plan entry captured after a module's conversation closes — distinct
 // from reflection data: it's an actionable commitment the person sets for their
@@ -1951,7 +2363,566 @@ WATCH FOR
     number: 4,
     name: "Plan",
     subtitle: "Shape the years ahead",
-    modules: [],
+    modules: [
+      {
+        id: "4.1",
+        title: "When and how do you want to leave work?",
+        description:
+          "The shape of your move out of work — your own timing, and what would make you feel ready by choice.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Many people don't so much decide to retire as get tipped into it — by a health scare, their own or someone close, or a milestone birthday that suddenly makes retirement feel due. Those are common and understandable triggers, and they turn the decision into a reaction to circumstance rather than a considered choice. This module takes a different route: deciding on your own terms, by understanding the deeper factors sitting under the decision. The visible retirement date is only the surface; beneath it sit finances, confidence, identity, relationships, purpose, timing, health and the things you still want to do. The aim is to feel ready by choice, not pushed by events.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] In a moment you'll build a readiness snapshot. First, place where you picture your move out of work — a clean break at one end, a gradual wind-down at the other. Then mark the rough window you have in mind, as a band rather than a single date. Last, rate how ready each part of the picture feels — finances, health, who you are beyond work, relationships, purpose, and the things you still want to finish. There are no right answers, and "not yet" is one of them.`,
+          },
+        ],
+        coachOpening: `Here's the readiness snapshot you've just built. Before we look at where it feels strong and where it feels shaky, tell me — when you picture leaving work, does it feel like a single event, or more of a gradual process?`,
+        interaction: {
+          type: "readiness-snapshot",
+          transitionInstruction:
+            "When you picture leaving work, where do you imagine yourself? Slide the marker to wherever feels closest.",
+          transition: { left: "A clean break", right: "A gradual wind-down" },
+          shapeLabel:
+            "If you're winding down gradually, what shape does that take?",
+          shapeOptions: [
+            "A steady taper — fewer working days over a few years",
+            "A portfolio of smaller commitments",
+            "One small ongoing gig — a few hours a week or month",
+            "Not sure yet",
+          ],
+          periodLabel: "And roughly over what period?",
+          periodOptions: [
+            "Under a year",
+            "One to two years",
+            "Three to five years",
+            "Longer, or open-ended",
+          ],
+          windowInstruction:
+            "Roughly when do you picture this happening? Drag out a band rather than a single date — this is a window, not a deadline.",
+          windowMarks: [
+            "Now",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+          ],
+          factorsInstruction:
+            "How ready does each part of the picture feel right now? There's no right answer, and \"low\" simply marks where there's still work to do.",
+          factors: [
+            { id: "finances", label: "Finances" },
+            { id: "health", label: "Health" },
+            { id: "identity", label: "Who I am beyond work" },
+            { id: "relationships", label: "Relationships" },
+            { id: "purpose", label: "Sense of purpose" },
+            {
+              id: "unfinished",
+              label: "Things I still want to finish",
+              levels: ["None", "Some", "Lots"],
+            },
+          ],
+          levels: ["Low", "Building", "Strong"],
+          financeFactorId: "finances",
+          financeQuestion: {
+            prompt:
+              "Do you have a sense of when you'll be financially ready to retire?",
+            options: ["Yes, I have a clear sense", "Roughly", "Not yet"],
+          },
+          summaryLabel: "Your readiness snapshot",
+        },
+        sessionInstructions: `PURPOSE
+You already know this person from the earlier stages — open like a coach who remembers them. They have just built a readiness snapshot: where they place themselves between a clean break and a gradual wind-down (and, if gradual, its shape and rough period); the rough window they have in mind; and how ready each part of the picture feels — finances, health, identity beyond work, relationships, purpose, and things they still want to finish. Your job is to help them feel ready BY CHOICE rather than pushed by circumstance. The aim is clarity about what would make them ready, not a committed retirement date. A thoughtful "not yet — and here's what would need to change" is a complete and valuable outcome.
+
+MOST IMPORTANT
+This module does not ask "what's your retirement date?". It asks "what would make you feel ready?" and "what would need to be true for you to feel comfortable leaving?". The visible date is the surface; underneath sit finances, confidence, identity, relationships, purpose, timing, health and unfinished ambitions. Work the snapshot they built — lead with where readiness feels strong and where it feels shaky — and draw out what sits underneath, in their own words.
+
+HOW TO RUN IT
+- Open by reflecting the relevant prior-stage material back first — what they're moving toward, and anything they value or draw identity from in work that might be hard to leave — then use the snapshot as the anchor.
+- Lead with the contrast in the readiness profile: name one part that feels strong and one that feels shaky, and ask what's underneath each.
+- Draw on these framing questions as they fit, not as a checklist: what appeals about stepping away; what, if anything, would be hard to leave; what would need to be true to feel comfortable; what would give confidence the time was right; anything they'd like to complete or resolve before retiring; what might delay the decision.
+- If they leaned toward a gradual wind-down, take the shape seriously — it determines how full the early years really are, and later modules build on it.
+- Aim to reach your close within roughly five to seven exchanges.
+
+FINANCIAL CONFIDENCE — HANDLE WITH CARE (CONSUMER DUTY)
+The finance factor is paired with a confidence-only follow-up. You surface and signpost financial confidence; you must NEVER provide, imply, or substitute for regulated financial advice, never estimate figures, and never comment on whether their finances are adequate.
+- If they rated finances strong and have a sense of when they'll be financially ready: acknowledge it warmly and move on.
+- If finances feel low or building, or they don't yet know when they'll be financially ready: gently encourage them to build that clarity in the right place — their pension provider, their existing financial plan, or a financial adviser — and note it as an open area to return to. That's the whole of your role here.
+
+HOLD BACK WHERE
+- They're not ready to name a date — don't push for one. Many people are years away, and the goal is clarity, not commitment.
+- Hesitation surfaces — treat it as information, not a problem to fix. Explore it with curiosity rather than nudging them toward a premature decision.
+- Their relationship with work is their own — some are eager to leave, others draw real meaning from it. Neither is more valid; don't imply leaving sooner is healthier.
+- You're tempted to plan first steps, sequencing, or how to begin — STOP. This stage settles direction and readiness; the concrete steps belong to Stage 5 (Act). Note there's something for the planning to pick up, and let it rest.
+
+CLOSING
+Mirror back, in their words: the window or timing they're picturing (however wide or provisional), the transition style they lean toward (and its shape and period if gradual), what supports their readiness, any conditions they'd want in place, and any concerns that remain. Reflect their financial-confidence signal plainly — including whether they know their financial readiness date, and that exploring it further is the natural next step if it's still open. Note warmly that this adds to their Retirement Life Plan, and that the next module looks at how retirement itself changes over time.`,
+      },
+      {
+        id: "4.2",
+        title: "The seasons of retirement",
+        description:
+          "Retirement isn't one long chapter — it unfolds in seasons. A map of how your priorities might shift over the years, and what you'd want to keep throughout.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Retirement is often spoken about as though it were one long, unchanging stage of life. In reality it tends to unfold through a series of seasons. Early years may bring greater freedom, energy and opportunity. Later years bring different priorities, relationships and ways of spending time. Many people carry an unspoken pressure that retirement must be fully designed before it begins. The truer, gentler picture: you are not planning a single fixed future, you are planning for a life that will keep evolving.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] In Stage 1 you pictured a single day. Now widen the lens to decades. Below is a board with three broad seasons — early, middle and later years — and a lane that runs across all of them for the things you'd want to hold onto throughout. You'll find some cards drawn from what you've already told us: hopes, activities, people, sources of purpose. Place each one where it feels most alive, in more than one season if it belongs there, or in the enduring lane if it runs through everything. Add your own where something's missing.`,
+          },
+        ],
+        coachOpening: `Here's the board you've laid out — your retirement sketched as seasons rather than one long stretch. Let's start at the beginning: in those early years, while you've got the most energy and freedom, what matters most to you to do?`,
+        interaction: {
+          type: "seasons-board",
+          boardInstruction:
+            "Place each card in the season where it feels most alive. Something can sit in more than one season, or in the enduring lane if it runs across all of them. Add your own where a card is missing.",
+          seasons: [
+            {
+              id: "early",
+              label: "Early years",
+              hint: "Most energy and freedom",
+            },
+            {
+              id: "middle",
+              label: "Middle years",
+              hint: "Settling into the rhythm",
+            },
+            {
+              id: "later",
+              label: "Later years",
+              hint: "What you'd want to continue",
+            },
+          ],
+          enduringLane: {
+            id: "enduring",
+            label: "Throughout",
+            hint: "Runs across every season",
+          },
+          addOwnLabel: "Add your own",
+          addOwnPlaceholder: "Something else that matters…",
+          summaryLabel: "Your seasons board",
+        },
+        sessionInstructions: `PURPOSE
+You already know this person from the earlier stages — open like a coach who remembers them. They have just laid out a "seasons board": cards drawn from their earlier answers (hopes, activities, people, sources of purpose) sorted into early, middle and later years, or an enduring lane for what runs throughout. Your job is to widen their lens — from the single day they pictured in Stage 1 to a life that keeps evolving — and help them see how priorities may shift across the seasons while certain threads endure. The outcome is a broad sense of the shape of their retirement, not a fixed roadmap.
+
+MOST IMPORTANT
+The deeper purpose is how meaning, connection and fulfilment evolve over time — not simply how hobbies change. Two things to capture before closing: their priorities for early retirement (what they most want while energy and freedom are greatest), and the enduring threads (the values and relationships they want to hold throughout). Work the board they built — start with the early years, move through to later years, then name what runs across all of them.
+
+HOW TO RUN IT
+- Open by widening the lens explicitly: they imagined a Tuesday in Stage 1; now you're looking at decades. Reflect the relevant prior-stage material as you introduce the seasons.
+- Early years: while energy and flexibility are greatest, what do they most want to do? Are there experiences or ambitions they would not want to postpone?
+- Middle years: what feels important about that stretch?
+- Later years: approach with continuity and adaptation, never decline. Which relationships do they hope grow more important over time? What sources of purpose or enjoyment feel sustainable across stages?
+- Enduring lane: what would they want to remain constant, regardless of age or circumstance?
+- Help them distinguish aspirations that belong to a particular season from those that are enduring priorities.
+- Aim to reach your close within roughly five to seven exchanges.
+
+HOLD BACK WHERE
+- Do NOT frame later retirement as decline, loss or limitation — broaden the perspective without creating anxiety about ageing.
+- Do NOT treat the seasons as a rigid prediction. They are a planning lens; retirement unfolds differently for everyone, and the board can change.
+- Do NOT over-focus on activities and hobbies. Keep returning to meaning, connection and what gives a season its purpose.
+- The person should leave with a sense of direction, not a locked-in roadmap. Encourage flexibility.
+
+CLOSING
+Reflect back the broad shape of the chapters they've sketched, in their own words: what stands out for the early years, anything they wouldn't want to postpone, how the middle and later years feel, and — most importantly — the enduring threads of value and relationship that run throughout. Note warmly that this adds to their Retirement Life Plan, and that the next module turns to the goals that matter most.`,
+      },
+      {
+        id: "4.3",
+        title: "Your most important goals",
+        description:
+          "The handful of goals whose absence would leave retirement feeling incomplete — ranked, with what each one means to you.",
+        durationMin: 20,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] A full retirement tends to keep five things in some kind of balance: time to Restore (rest and recharge), to Move (an active body), to Think (a curious, engaged mind), to Connect (the people who matter), and to Contribute (giving something beyond yourself). You don't need a goal in every one, and a quiet area can be a deliberate choice. But seeing your plans laid across all five shows where life feels full and where a gap might be worth a goal.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] To save you starting from a blank page, Vita has drafted a handful of goals from everything you've told us — sorted into the five areas, already written as real, specific goals. They're a starting point, not a verdict: keep the ones that fit, edit any to your own words, swap one for a bolder or quieter version, set aside any that miss, and add your own. Then, across all five areas, mark the handful whose absence would leave retirement feeling incomplete. You can do the whole thing without typing a word.`,
+          },
+        ],
+        coachOpening: `Here's your retirement laid across the five areas of a balanced life — Restore, Move, Think, Connect, Contribute — with the goals you've kept and the few you've put in the spotlight. We can leave them just as they are. If you'd like to make any bolder, or talk one through, I'm right here.`,
+        interaction: {
+          type: "balanced-goals",
+          areas: [
+            {
+              id: "restore",
+              label: "Restore",
+              blurb: "Rest, recovery and the things that recharge you",
+            },
+            {
+              id: "move",
+              label: "Move",
+              blurb: "Keeping an active, capable body",
+            },
+            {
+              id: "think",
+              label: "Think",
+              blurb: "A curious, engaged mind — learning, making, creating",
+            },
+            {
+              id: "connect",
+              label: "Connect",
+              blurb: "The people and relationships that matter most",
+            },
+            {
+              id: "contribute",
+              label: "Contribute",
+              blurb: "Giving something beyond yourself",
+            },
+          ],
+          draftingLabel: "Drawing a few goals from everything you've told us…",
+          curationInstruction:
+            "Vita drafted these from what you've told us. Keep the ones that fit, edit any to your own words, swap for a bolder or quieter version, set aside any that miss — or add your own. Nothing here is fixed.",
+          balanceHint:
+            "Balance is the point, not a full set. A quiet area can be a deliberate choice, or a gap worth one goal.",
+          trackDoLabel: "A thing to do",
+          trackBeLabel: "A way to live",
+          cadenceLabel: "Roughly when, or how often?",
+          cadencePlaceholder: "Once a year, a morning a week, the first summer…",
+          ordinaryWeekLabel: "What it looks like in an ordinary week",
+          ordinaryWeekPlaceholder: "How it would show up in everyday life…",
+          bolderLabel: "Bolder",
+          quieterLabel: "Quieter",
+          rejectLabel: "Set aside",
+          addGoalLabel: "Add your own",
+          addGoalPlaceholder: "Name this goal…",
+          toFocusLabel: "Next: choose your focus →",
+          focusInstruction:
+            "Across all five areas, mark the handful that matter most — the ones whose absence would leave retirement feeling incomplete. Order them, and say which season each belongs to. A line on what it means to you is welcome but optional.",
+          absencePrompt: "If this were missing, would retirement feel incomplete?",
+          maxFocus: 5,
+          noteLabel: "What it means to you (optional)",
+          notePlaceholder: "A line on why this one matters…",
+          seasonLabel: "Which season does it belong to?",
+          seasons: [
+            { id: "early", label: "Early years" },
+            { id: "middle", label: "Middle years" },
+            { id: "later", label: "Later years" },
+            { id: "throughout", label: "Throughout" },
+          ],
+          deliberateGapLabel: "We left this one deliberately quiet",
+          summaryLabel: "Your balanced retirement",
+        },
+        sessionInstructions: `PURPOSE
+You already know this person from the earlier stages — open like a coach who remembers them. You drafted a handful of goals for them across the five areas of a balanced life — Restore, Move, Think, Connect, Contribute — and they have just curated that draft: keeping, editing, swapping, setting aside, and adding their own, then spotlighting the handful that matter most (each with a season, sometimes a note on its meaning). The work is essentially done. Your job is light: reflect the balance back warmly, offer an OPTIONAL chance to refine, and let them close whenever they're ready. This handful, and the balance across the five areas, is the spine of the rest of the plan.
+
+MOST IMPORTANT — DO NOT INTERROGATE, AND DO NOT READ THE GOALS BACK
+You drafted these goals; you must NOT now drag them back out through a long question-and-answer, and you must NOT recite them. Their goals are already on the screen in front of them — listed area by area, with the spotlight marked. Repeating them in prose is noise, and it is the main thing that makes this module feel clunky. Your opening is a SHORT, warm note on the SHAPE they've struck — how the balance sits across the five areas, and perhaps one thing that genuinely stands out — never an inventory. Then ONE optional offer, and follow their lead. If they have nothing to add, that is a complete and good outcome: close. The person must be able to finish this module without sending a single message.
+
+PLAIN TEXT, SHORT MESSAGES
+- Write in plain sentences only. No markdown, no asterisks, no bold, no bullet points, no headings — any of those show up to the person as raw symbols and look broken.
+- Two to four sentences per message. This is a warm word between two people, not a written report.
+
+HOW TO RUN IT
+- Opening: a brief, warm note on the balance and shape of what they've built — full where it's full, quiet where they chose to leave an area quiet, one standout only if something truly stands out. Do NOT enumerate the goals. End with one light, genuinely optional invitation ("If you'd like to make any of these bolder, or talk one through, I'm here — otherwise it's a lovely, balanced picture to build on") AND append the completion marker, so someone who's happy can simply move on.
+- If they take up the offer, help with just that one goal — a bolder version of a "thing to do", or what a "way to live" goal looks like in an ordinary week. Stay with meaning; never tip into action planning. Then offer to close again.
+- THE MOMENT they signal they're happy, done, or have nothing to change ("happy with that", "looks good", "no thanks", a thumbs-up): give ONE short, warm sign-off line and append the completion marker. Do NOT summarise, do NOT list anything, do NOT ask another question — just close cleanly.
+- Two or three exchanges at most. This is light refinement, not a fresh exercise.
+
+HOLD BACK WHERE
+- Do NOT walk goal-by-goal asking what each means or why it matters — that turns a finished draft back into an interview.
+- Do NOT push for a metric on "way to live" goals — relationships, contribution, restoration, staying curious. An ordinary-week picture is enough; a number would diminish them.
+- Do NOT turn this into action planning, sequencing or first steps — that belongs to Stage 5 (Act).
+- Do NOT widen the list back out, chase quantity, or push them to fill every area. Honour the few they chose and the balance they struck.
+
+CLOSING
+A short, warm sign-off — one or two sentences. Note that these goals are now the heart of their Retirement Life Plan, and that the next module looks at what would help them happen. Do NOT list the goals again. Always append the completion marker when you close.`,
+      },
+      {
+        id: "4.4",
+        title: "The path to your goals",
+        description:
+          "The route to each goal you spotlighted — a few stepping stones from where you are now to there, with much of the way already behind you.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] A goal rarely happens in one leap. Most come true as a handful of stepping stones — small, doable moves that build on each other until the thing you pictured is simply where you've arrived. Seeing those stones laid out makes a big goal feel a great deal more reachable.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Vita has sketched a path for each of the goals you put in the spotlight. For the things you want to do, that's a short ladder of stepping stones, roughly in order. For the ways you want to live, it's a light note on what already helps and what would help it take root. Nudge any of it into shape — edit a stone, reorder, add or remove one, or mark the ones you've already passed. No typing needed, and these are the route, not a diary; the precise first steps come later.`,
+          },
+        ],
+        coachOpening: `Here's a path for each goal you spotlighted — a few stepping stones from where you are now to there. A good part of several of them is already behind you, which is worth noticing. Nudge any stone into shape, mark the ones you've passed, and if you'd like to talk one path through I'm right here.`,
+        interaction: {
+          type: "goal-paths",
+          draftingLabel: "Vita is sketching a path for each of your goals…",
+          curationInstruction:
+            "Here's a path for each goal. Edit a stepping stone, reorder, add or remove one, or mark the ones you've already passed.",
+          ladderLabel: "Stepping stones",
+          whenLabel: "Roughly when",
+          whenPlaceholder: "e.g. first year, somewhere down the line…",
+          doneLabel: "Already done",
+          addStepLabel: "Add a stepping stone",
+          addStepPlaceholder: "Another step on the way…",
+          alreadyHelpsLabel: "What already helps",
+          wouldHelpLabel: "What would help it take root",
+          addSupportPlaceholder: "Something that helps…",
+          leanLabel: "A strength to lean on",
+          boundaryHint:
+            "These are the route, not a diary. The precise first steps come in the next stage.",
+          summaryLabel: "The path to your goals",
+        },
+        sessionInstructions: `PURPOSE
+You already know this person from the earlier stages — open like a coach who remembers them. For every goal they put in the spotlight last module, you sketched a path: for the things they want to do, a short ladder of stepping stones from where they are now to the goal; for the ways they want to live, a light note on what already helps and what would help it take root. They've nudged those drafts into shape — editing stones, reordering, adding or removing, marking the ones they've already passed. Your job is light and encouraging: show how much of each path is already behind them, so the goals feel more reachable, not more daunting. Then let them close whenever they're ready.
+
+MOST IMPORTANT — HOW MUCH IS ALREADY BEHIND THEM; AND DO NOT READ THE PATHS BACK
+The whole point is that a big goal becomes a handful of doable moves, and several of those moves are already done. Lead with that. Their paths are on the screen in front of them — do NOT recite them stone by stone. Your opening is a SHORT, warm note on the SHAPE of it: how much ground is already covered, how few stones really remain on the goals that matter most. Then ONE optional offer, and follow their lead. If they have nothing to add, that is a complete and good outcome: close. The person must be able to finish this module without sending a single message.
+
+PLAIN TEXT, SHORT MESSAGES
+- Write in plain sentences only. No markdown, no asterisks, no bold, no bullet points, no headings — any of those show up to the person as raw symbols and look broken.
+- Two to four sentences per message. This is a warm word between two people, not a written report.
+
+HOW TO RUN IT
+- Opening: a brief, warm note that leads with how much is already behind them, then perhaps names the next stone on one goal — never an inventory of every path. End with one light, optional invitation ("If you'd like to talk a path through, I'm here — otherwise this is a clear route to build on") AND append the completion marker, so someone who's happy can simply move on.
+- If they take up the offer, stay at the level of the route: which stone comes next, whether the order feels right, what already-existing strength they could lean on for the early steps. Keep it to the path, never the diary.
+- THE MOMENT they signal they're happy, done, or have nothing to change ("happy with that", "looks good", "no thanks", a thumbs-up): give ONE short, warm sign-off line and append the completion marker. Do NOT summarise, do NOT list anything, do NOT ask another question — just close cleanly.
+- Two or three exchanges at most. This is light shaping, not a fresh exercise.
+
+THE STAGE 5 BOUNDARY — ROUTE, NOT SCHEDULE
+These stepping stones are planning-level: the route to each goal, with at most a rough sense of when. Do NOT turn them into dated tasks, a week-by-week schedule, or a precise list of first actions — that granular layer is the next stage (Act). If they start reaching for exact dates or first steps, gently note that's exactly what the next stage is for, and keep this one about the shape of the route.
+
+MEANS — HANDLE WITH CARE (CONSUMER DUTY)
+A stepping stone may touch money — saving for something, covering a cost. You surface and signpost; you must NEVER provide, imply, or substitute for regulated financial advice, never estimate figures, and never comment on whether their finances are adequate. If a path leans on money, acknowledge it plainly and, if it's natural, gently encourage them to build that clarity in the right place — their pension provider, their existing financial plan, or a financial adviser. That's the whole of your role here.
+
+HOLD BACK WHERE
+- Do NOT turn this into dated tasks, scheduling or precise first steps — that belongs to the next stage (Act).
+- Do NOT dwell on what's hard or far off. Spend your words on how much is already behind them and how doable the next stone is.
+- Do NOT create pressure for immediate action.
+- Do NOT walk path-by-path asking about each — that turns a finished draft back into an interview.
+
+CLOSING
+A short, warm sign-off — one or two sentences. Note that these paths now sit in their Retirement Life Plan, and that the next stage turns the next stones into first steps. Do NOT list the paths again. Always append the completion marker when you close.`,
+      },
+      {
+        id: "4.5",
+        title: "When you can't do it all",
+        description:
+          "The trade-offs retirement really asks of you — what you'd protect, where you'll flex, and a few principles for the close calls.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Having priorities that pull against each other is normal — it usually means several things matter to you deeply. Retirement draws on a finite supply of time, energy, attention and money, so choosing between good things is unavoidable. Making a choice is not the same as losing something. The work here is not to resolve every tension, but to know how you'd want to respond when one arrives.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Vita has drawn a few real trade-offs out of the plan you've been building. On each, place where you lean — the middle is a fine place to sit — and note what you'd most want to protect and what would feel like too great a sacrifice. Then sort the things you value into what you'd hold firm on and what you could flex, and shape a few decision principles for the close calls. These weigh what matters most to you; they're never advice about your money.`,
+          },
+        ],
+        coachOpening: `Here are the trade-offs you've just weighed. Before we draw out a few principles from them, tell me — looking back over these, which one was hardest to call?`,
+        interaction: {
+          type: "trade-offs",
+          draftingLabel: "Vita is drawing a few trade-offs out of your plan…",
+          curationInstruction:
+            "Here are a few real trade-offs your plan could bring. On each, place where you lean, and note what you'd most want to protect and what would feel like too great a sacrifice.",
+          scenariosLabel: "Trade-offs to weigh",
+          protectLabel: "What you'd most want to protect",
+          protectPlaceholder: "The thing you'd hold onto…",
+          sacrificeLabel: "What would feel like too great a sacrifice",
+          sacrificePlaceholder: "The line you wouldn't want to cross…",
+          valuesLabel: "Your values, sorted",
+          valuesInstruction:
+            "Sort the things you value into the ones you'd hold firm on and the ones you could flex when something has to give. Leave any you're unsure about unsorted.",
+          nonNegotiableLabel: "Non-negotiable",
+          flexibleLabel: "Important, but flexible",
+          principlesLabel: "Your decision principles",
+          principlesInstruction:
+            "A few rules of thumb for the close calls. Vita has suggested some starting points from your plan — make them yours, add or remove any.",
+          addPrincipleLabel: "Add a principle",
+          principlePlaceholder: "A rule of thumb for when priorities pull apart…",
+          boundaryHint:
+            "These scenarios weigh what matters most to you — they're never advice on what to do with your money. That stays with your financial plan or adviser.",
+          summaryLabel: "When you can't do it all",
+        },
+        sessionInstructions: `PURPOSE
+You already know this person from the earlier stages — open like a coach who remembers them. They have just worked through a few concrete trade-offs drawn from their own emerging plan: on each they placed where they lean between two real options and noted what they'd most want to protect and what would feel like too great a sacrifice. They also sorted the things they value into "non-negotiable" and "important but flexible", and shaped a few decision principles. Your job is light: help them name a small, clear set of personal decision principles and fallback positions they can carry into real choices — drawn from the pattern in what they just did, in their own words.
+
+MOST IMPORTANT — CONCRETE, NEVER ABSTRACT; AND NOT A RE-RUN OF STAGE 3
+Stage 3 already named their values and the tensions between them in the abstract. Do NOT re-run that comparison. Stay with the real, consequential choices in front of them — the goals and trips, the money question, the rhythm of their week. It is by weighing choices like these that what matters most becomes clear. Their trade-offs are on the screen — do NOT recite them back one by one. Lead with the shape: where they held firm, where they were willing to flex, and what that says about how they decide.
+
+HOW TO RUN IT
+- Open by drawing on the trade-offs they made, then help them put words to a few decision principles — short rules of thumb for when priorities pull apart ("when money is tight I'd rather do fewer things properly", "time with the people I love comes before any opportunity"). They've drafted some already; sharpen and confirm rather than starting over.
+- Where it helps, explore fallback positions: if their preferred outcome wasn't possible, what would still honour what matters most.
+- Normalise tension — conflicting priorities are part of a thoughtful plan, not a sign of confusion. Don't push for perfect resolution; enough clarity to decide well is the goal.
+- Two or three exchanges at most. This is light shaping on top of a finished exercise.
+
+KEEP OWNERSHIP WITH THEM
+Never tell them which value should win or which choice is right. Reflect the pattern in their own choices and help them articulate their own principles. Where they framed something as either/or, it's fine to wonder aloud whether a creative middle exists — but the call is always theirs.
+
+MEANS — HANDLE WITH CARE (CONSUMER DUTY)
+A scenario may touch money — stretching to several trips, freeing up cash, downsizing. Posing it explores their priorities and what they'd trade; it is NEVER a view on whether any financial course of action is wise. You must never provide, imply, or substitute for regulated financial advice, never estimate figures, and never comment on whether their finances are adequate. If a money trade-off is live, keep it about what they'd want to protect, and leave the financial judgement to their plan or adviser.
+
+PLAIN TEXT, SHORT MESSAGES
+- Write in plain sentences only. No markdown, no asterisks, no bold, no bullet points, no headings — any of those show up to the person as raw symbols and look broken.
+- Two to four sentences per message. This is a warm word between two people, not a written report.
+
+HOLD BACK WHERE
+- Do NOT turn this into action planning or first steps — that belongs to the next stage (Act).
+- Do NOT seek a tidy resolution to every tension; some are meant to be held, not solved.
+- Do NOT re-open the abstract values comparison from Stage 3.
+
+CLOSING
+A short, warm sign-off — one or two sentences. Note that their non-negotiables, where they'll flex, and these decision principles now sit at the front of their Retirement Life Plan as a compass for the choices ahead. Do NOT list them back. Always append the completion marker when you close.`,
+      },
+      {
+        id: "4.6",
+        title: "The rhythm of your week",
+        description:
+          "The character of an ordinary week — how much structure you want, the real activities that recur, and the few anchors that give it rhythm.",
+        durationMin: 15,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] So much of planning looks at the big moments — the goals, the trips, the decisions. This is about something smaller and just as important: the ordinary weeks that make up most of retirement. A good retirement is built less from the highlights than from how an everyday week feels. The question underneath it: what kind of week could you happily live, not for a holiday, but for years?`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Vita has gathered the real, recurring things you've talked about — the activities you keep coming back to, the people you see, the movement and rest that run through your week. Set the overall feel from structured to open, then for each thing note roughly how often it happens, whether it's a regular anchor, and whether it gives you energy. Most things being loose is a fine answer — this is the character of a week, not a timetable.`,
+          },
+        ],
+        coachOpening: `Here's the rhythm of your week, built from the real things you've talked about. Looking at it like this — the overall feel, the few anchors, what gives you energy — does it feel like a week you could live happily for years?`,
+        interaction: {
+          type: "week-shape",
+          draftingLabel:
+            "Vita is gathering the real things that run through your week…",
+          curationInstruction:
+            "Here are the recurring things in your week, gathered from what you've talked about. Set the overall feel, note roughly how often each happens and which are regular anchors, and mark the ones that give you energy.",
+          structureLabel: "The overall feel",
+          structurePoleLeft: "Highly structured",
+          structurePoleRight: "Largely open",
+          structureHint:
+            "Slide to the balance of structure and freedom that fits you — the middle is fine",
+          structureFromEarlierHint:
+            "We've started this where you placed your ideal week earlier on. Move it if it feels different now.",
+          activitiesLabel: "What recurs in your week",
+          activitiesInstruction:
+            "For each thing, set roughly how often it happens and whether it's a regular anchor or stays loose. Mark the ones that give you energy. Add anything that's missing, or remove what doesn't belong.",
+          frequencyLabel: "How often",
+          anchorLabel: "A regular anchor",
+          energyLabel: "Gives me energy",
+          addActivityLabel: "Add something",
+          activityPlaceholder: "Something else that recurs in your week…",
+          textureLabel: "The feel of it",
+          boundaryHint:
+            "This is the character of an ordinary week, lived for years — not a timetable to keep to. The few anchors and the overall feel matter; most things can stay loose.",
+          summaryLabel: "The rhythm of your week",
+        },
+        sessionInstructions: `PURPOSE
+You already know this person well from the earlier stages — open like a coach who remembers them. They have just shaped the rhythm of a week: they set an overall structure-to-freedom feel, and for the real recurring things in their life they set a rough frequency (most days / a few times a week / weekly / now and then), marked which are regular anchors, and tagged the ones that give them energy. There is no day-of-week or time-of-day here, by design — that precision is false this far out. Your job is light: help them put words to the rhythm that fits them — the balance of structure and freedom, the few anchors they want fixed, and what gives them energy.
+
+MOST IMPORTANT — REFLECT THE RHYTHM BACK; PLANNING, NOT DREAMING
+Reflect the overall rhythm back to them in a sentence or two, the way a friend would sum it up: how full or spacious it is, how sociable or quiet, the one or two real anchors, and what energises them. For example: "active most days, sociable, badminton a couple of times a week as a real anchor, and otherwise pretty open." Use THEIR actual activities, not generic ones. Then let them adjust. In Stage 1 they imagined a single representative day — do NOT re-open that or ask them to picture a nice day afresh. The shift here is from imagining to planning: does this rhythm hold up lived for years, not for a holiday?
+
+HOW TO RUN IT
+- Open by reading the rhythm back as above, then help them pressure-test it: does it feel sustainable for years, or more like a holiday week? Are the few anchors the right ones? Is anything quietly recreating the pressures of work, and is anything recurring missing that they'd regret leaving out?
+- Most things being loose is a good answer, not a gap — never push them to add anchors or fill the week. The point is the few anchors plus the overall feel.
+- If they are phasing out of work, their ongoing work sits in the rhythm as a fixed anchor. Check the rest of the week has room to breathe around it.
+- Notice where they thrive — more routine, more flexibility, or a blend — and reflect back the rhythm that fits their values and energy. Some people flourish with structure, others with openness; neither is better.
+- Two or three exchanges at most. This is light shaping on top of a finished exercise. They can finish without typing anything.
+
+KEEP OWNERSHIP WITH THEM
+Never imply that more structure is always better, or that a fuller week is a better week. The aim is meaningful rhythm, not filling every hour. Reflect their own preferences back rather than prescribing a shape.
+
+PLAIN TEXT, SHORT MESSAGES
+- Write in plain sentences only. No markdown, no asterisks, no bold, no bullet points, no headings — any of those show up to the person as raw symbols and look broken.
+- Two to four sentences per message. This is a warm word between two people, not a written report.
+
+HOLD BACK WHERE
+- Do NOT turn this into action planning or a timetable — the concrete steps belong to the next stage (Act).
+- Do NOT re-run the Stage 1 representative-day exercise or ask them to imagine a day from scratch.
+- Do NOT idealise — an ordinary week has dull stretches too, and that is fine.
+
+CLOSING
+A short, warm sign-off — one or two sentences. Note that the rhythm they've shaped now sits in their Retirement Life Plan as how they want their week to feel. Do NOT list the activities back. Always append the completion marker when you close.`,
+      },
+      {
+        id: "4.7",
+        title: "Your first year",
+        description:
+          "Everything you've built, drawn together into a specific, sequenced picture of your first year of retirement — and how it fits around any ongoing work.",
+        durationMin: 20,
+        primer: [
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Look at how much you've built. You've pictured your days, clarified what matters most, named the goals worth the years ahead, and shaped the rhythm of an ordinary week. This is where it comes together. The first year of retirement is unlike any other — the bridge between one chapter and the next. Where the rest of the programme has been about imagining and planning, this is about arriving.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] Vita has laid your first year out as a single journey — the goals and trips likely to begin, the rhythm running underneath, and how any ongoing work lands across the year — and written it up as a short story you can picture. The main way to reshape it is to tell Vita how you'd like the year to feel: "a gentle start, then the big trip mid-year", "put family at the centre of the autumn". The timeline and the story both shift in front of you. You can also nudge a single piece by hand.`,
+          },
+        ],
+        coachOpening: `Here's your first year, laid out as one journey — and a short story of how it could unfold. Tell me how you'd like it to feel and I'll reshape it, or nudge anything yourself.`,
+        interaction: {
+          type: "first-year",
+          draftingLabel:
+            "Vita is laying your first year out as a journey…",
+          seasons: [
+            { id: "s1", label: "The opening months" },
+            { id: "s2", label: "Settling in" },
+            { id: "s3", label: "Well into the year" },
+            { id: "s4", label: "Closing the year" },
+          ],
+          allYearLabel: "Across the whole year",
+          workLaneLabel: "Work",
+          noWorkLabel: "A clean break — your time is your own",
+          narrativeLabel: "The story of your year",
+          introMessage:
+            "Here's your first year, laid out as one journey, with a short story of how it could unfold underneath. Have a look — then tell me how you'd like it to feel and I'll reshape it. You can also drag a single thing between phases, star a headline moment, or remove anything yourself.",
+          reshapeHint:
+            "Try: \"a gentle start, then the big adventure mid-year\" · \"the second half feels too packed\" · \"put family at the centre of the autumn\"",
+          chatPlaceholder: "Tell me how you'd like the year to feel…",
+          topLabel: "Headline moment",
+          finishLabel: "This is my year",
+          closingAck:
+            "This is your first year — the shape of it, the story of it. It's the front of your plan now, the year you're stepping into.",
+          boundaryHint:
+            "This sets the shape and order of your year — what comes first, roughly when, and how it sits around any work. The detailed steps come next, in Act.",
+          summaryLabel: "Your first year",
+        },
+        sessionInstructions: `PURPOSE
+This is the assembly module — the moment everything comes together into a specific, sequenced first year. The person has just reacted to a draft you assembled from their own earlier work: the goals and trips they shaped (4.3), the rhythm of their week (4.6), what they wanted early in retirement (4.2), and how they're leaving work (4.1). They have placed each thing across a four-part arc of the year, marked what's top of the list, noted what can run alongside other things, and seen how much of the year is free. The emotional centre is ARRIVAL — stepping into the life they've designed.
+
+ASSEMBLY, NOT RE-INTERVIEW
+Build on what they have already said — do NOT re-ask it, and do NOT ask for another piece of reflective writing (they have done that earlier in the programme). Their first year is on the screen. Your job is to help them get it specific and sequenced, and to put words to the themes and intentions that define it, pulling their own earlier answers forward rather than asking them to dream again.
+
+HOW TO RUN IT
+- Open from what's on the screen. Help them get concrete and sequenced: of the things they want to travel to or start, what's top of the list and roughly when? Which goals come first, and which can run alongside each other? Looking at it all together, does year one feel realistic, or are they fitting too much in?
+- Match the year to how they're leaving work. If they are phasing out gradually, year one may be far from empty — plan around the ongoing work rather than assuming a clean break, and be honest with them if there is less free time than they're imagining.
+- Worth drawing out gently: what's the one thing they'd most regret not starting this year, and by the end of year one, what would tell them they'd begun well? These name the intentions that define the year.
+- Sequence, don't schedule. The order and rough shape of the year is the work here; the granular, step-by-step task list belongs to the next stage (Act).
+- Two to four exchanges. They can finish without typing anything.
+
+KEEP OWNERSHIP WITH THEM
+Don't idealise — the first year can hold excitement, uncertainty and adjustment all at once, and that is normal. A spacious year is as valid as a full one. Reflect their own plan back rather than prescribing what year one should hold.
+
+PLAIN TEXT, SHORT MESSAGES
+- Write in plain sentences only. No markdown, no asterisks, no bold, no bullet points, no headings — any of those show up to the person as raw symbols and look broken.
+- Two to four sentences per message. This is a warm word between two people, not a written report.
+
+HOLD BACK WHERE
+- Do NOT turn this into a step-by-step action plan or a dated schedule — that belongs to Act.
+- Do NOT re-run earlier exercises or ask for fresh reflective writing.
+- Do NOT pretend a phase-out is a clean break — be honest about committed versus free time.
+
+CLOSING
+A short, warm sign-off — one or two sentences. Note that this first-year picture now sits at the front of their Retirement Life Plan as the year they're stepping into, and point gently toward turning it into first steps in the stage ahead. Do NOT list the year back. Always append the completion marker when you close.`,
+      },
+    ],
   },
   {
     number: 5,

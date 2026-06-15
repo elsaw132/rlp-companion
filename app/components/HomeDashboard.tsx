@@ -511,6 +511,27 @@ export default function HomeDashboard() {
               )
             )}
 
+            {/* Stage 4 (Plan): the Retirement Life Plan document, once the seven
+                Plan modules are done. A calm, persistent entry to the document
+                they keep and return to. */}
+            {viewedStageNumber === 4 && isStageDone(STAGES[3]) && (
+              <Link className="picture-card is-calm" href="/plan">
+                <span className="pc-icon" aria-hidden="true">
+                  ✦
+                </span>
+                <span className="pc-body">
+                  <span className="pc-title">View your Retirement Life Plan</span>
+                  <span className="pc-sub">
+                    Everything you&apos;ve shaped, drawn together into one document
+                    to keep and return to.
+                  </span>
+                </span>
+                <span className="pc-chev" aria-hidden="true">
+                  ›
+                </span>
+              </Link>
+            )}
+
             {/* STAGE SESSIONS */}
             <div className="sec-row">
               <div className="sec-head">Your modules in {viewedStageData.name}</div>

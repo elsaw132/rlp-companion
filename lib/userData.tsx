@@ -37,6 +37,13 @@ import type {
   SavedStage3Reveal,
 } from "@/lib/stage3Reveal";
 import type { Stage3Seed, Stage3ValuesSummary } from "@/lib/stage3Seed";
+import type { BalancedGoalsSeed } from "@/lib/balancedGoalsSeed";
+import type { GoalPathsSeed } from "@/lib/goalPathsSeed";
+import type { TradeOffsSeed } from "@/lib/tradeOffsSeed";
+import type { WeekShapeSeed } from "@/lib/weekShapeSeed";
+import type { FirstYearSeed } from "@/lib/firstYearSeed";
+import type { PlanIntro } from "@/lib/planIntro";
+import { stripStructuredLeak } from "@/lib/coachText";
 
 // ---- Shapes shared across the app ----
 
@@ -95,6 +102,30 @@ const KEYS = {
   // The pre-seeded candidate content for a Stage 3 surface, persisted so a
   // refresh never regenerates it.
   seed: (id: string) => `seed:${id}`,
+  // The goals Vita drafted for the balanced-goals module (4.3), persisted so a
+  // refresh never re-drafts them — distinct from the Stage 3 `seed` shape.
+  // v2: the draft shape changed to nested intensity variants. The old key is
+  // left unread so any cached flat-shape drafts are simply re-fetched.
+  goalSeed: (id: string) => `goal-seed-v2:${id}`,
+  // The path Vita drafted for each spotlighted goal in the goal-paths module
+  // (4.4), persisted so a refresh never re-drafts it.
+  goalPathSeed: (id: string) => `goal-path-v1:${id}`,
+  // The trade-off scenarios and candidate decision principles Vita drafted for
+  // the trade-offs module (4.5), persisted so a refresh never re-drafts them.
+  tradeOffSeed: (id: string) => `trade-off-v1:${id}`,
+  weekShapeSeed: (id: string) => `week-shape-v2:${id}`,
+  // The assembled first-year draft Vita built for "Your first year" (4.7), kept in
+  // sync with the working timeline so a mid-session refresh resumes it.
+  firstYearSeed: (id: string) => `first-year-v1:${id}`,
+  // The editing chat for "Your first year" (4.7), persisted separately from the
+  // module conversation so a refresh resumes the reshaping in progress.
+  firstYearChat: (id: string) => `first-year-chat-v1:${id}`,
+  // The Retirement Life Plan's generated opening (chapter title + self-intro
+  // drafts), the member's edits to those drafts, and the generated scene images —
+  // each cached so the plan is generated once at creation, not per view.
+  planIntro: "plan-prose-v5",
+  planSelfIntroEdits: "plan-self-intro-v2",
+  planImages: "plan-images-v4",
 };
 
 // The Stage 1 opening capture ("Where you're starting from") is stored as a
@@ -523,7 +554,10 @@ export function useUserData() {
     const fallback = "No earlier modules completed yet.";
     const lines = getModulesBefore(moduleId).flatMap((m) => {
       const t = getTakeaway(m.id);
-      return t && t.text.trim() ? [`- ${m.title}: ${t.text.trim()}`] : [];
+      // Guard against a takeaway that was stored as raw {thirdPerson,...} JSON, so
+      // the model is never fed the structure to echo back.
+      const text = t ? stripStructuredLeak(t.text).trim() : "";
+      return text ? [`- ${m.title}: ${text}`] : [];
     });
     // The opening capture sits before every module, so when asked for it leads
     // the list — what they already had in mind before any module framed it.
@@ -730,6 +764,104 @@ export function useUserData() {
 
   const clearSeed = (id: string) => removeKey(KEYS.seed(id));
 
+  // ---- Balanced-goals draft (Module 4.3's AI-drafted goal suggestions) ----
+  const getGoalSeed = (id: string): BalancedGoalsSeed | null => {
+    const v = snapshot[KEYS.goalSeed(id)];
+    if (
+      v &&
+      typeof v === "object" &&
+      Array.isArray((v as BalancedGoalsSeed).suggestions)
+    ) {
+      return v as BalancedGoalsSeed;
+    }
+    return null;
+  };
+
+  const saveGoalSeed = (id: string, seed: BalancedGoalsSeed) =>
+    setKey(KEYS.goalSeed(id), seed);
+
+  const clearGoalSeed = (id: string) => removeKey(KEYS.goalSeed(id));
+
+  // ---- Goal-paths draft (Module 4.4's AI-drafted path per spotlighted goal) ----
+  const getGoalPathSeed = (id: string): GoalPathsSeed | null => {
+    const v = snapshot[KEYS.goalPathSeed(id)];
+    if (
+      v &&
+      typeof v === "object" &&
+      Array.isArray((v as GoalPathsSeed).paths)
+    ) {
+      return v as GoalPathsSeed;
+    }
+    return null;
+  };
+
+  const saveGoalPathSeed = (id: string, seed: GoalPathsSeed) =>
+    setKey(KEYS.goalPathSeed(id), seed);
+
+  const clearGoalPathSeed = (id: string) => removeKey(KEYS.goalPathSeed(id));
+
+  // ---- Trade-offs draft (Module 4.5's scenarios + candidate principles) ----
+  const getTradeOffSeed = (id: string): TradeOffsSeed | null => {
+    const v = snapshot[KEYS.tradeOffSeed(id)];
+    if (
+      v &&
+      typeof v === "object" &&
+      Array.isArray((v as TradeOffsSeed).scenarios)
+    ) {
+      return v as TradeOffsSeed;
+    }
+    return null;
+  };
+
+  const saveTradeOffSeed = (id: string, seed: TradeOffsSeed) =>
+    setKey(KEYS.tradeOffSeed(id), seed);
+
+  const clearTradeOffSeed = (id: string) => removeKey(KEYS.tradeOffSeed(id));
+
+  const getWeekShapeSeed = (id: string): WeekShapeSeed | null => {
+    const v = snapshot[KEYS.weekShapeSeed(id)];
+    if (
+      v &&
+      typeof v === "object" &&
+      Array.isArray((v as WeekShapeSeed).activities)
+    ) {
+      return v as WeekShapeSeed;
+    }
+    return null;
+  };
+
+  const saveWeekShapeSeed = (id: string, seed: WeekShapeSeed) =>
+    setKey(KEYS.weekShapeSeed(id), seed);
+
+  const clearWeekShapeSeed = (id: string) =>
+    removeKey(KEYS.weekShapeSeed(id));
+
+  const getFirstYearSeed = (id: string): FirstYearSeed | null => {
+    const v = snapshot[KEYS.firstYearSeed(id)];
+    if (
+      v &&
+      typeof v === "object" &&
+      Array.isArray((v as FirstYearSeed).items)
+    ) {
+      return v as FirstYearSeed;
+    }
+    return null;
+  };
+
+  const saveFirstYearSeed = (id: string, seed: FirstYearSeed) =>
+    setKey(KEYS.firstYearSeed(id), seed);
+
+  const clearFirstYearSeed = (id: string) =>
+    removeKey(KEYS.firstYearSeed(id));
+
+  const getFirstYearChat = (id: string): ConversationMessage[] | null => {
+    const v = snapshot[KEYS.firstYearChat(id)];
+    return Array.isArray(v) ? (v as ConversationMessage[]) : null;
+  };
+
+  const saveFirstYearChat = (id: string, messages: ConversationMessage[]) =>
+    setKey(KEYS.firstYearChat(id), messages);
+
   // ---- Stage 3 confirmed values (the stage-close summary, feeds Stage 4) ----
   const getStage3Values = (): Stage3ValuesSummary | null => {
     const v = snapshot[KEYS.stage3Values];
@@ -741,6 +873,41 @@ export function useUserData() {
 
   const saveStage3Values = (summary: Stage3ValuesSummary) =>
     setKey(KEYS.stage3Values, summary);
+
+  // ---- Retirement Life Plan: generated opening, edits, and scene images ----
+  const getPlanIntro = (): PlanIntro | null => {
+    const v = snapshot[KEYS.planIntro];
+    if (
+      v &&
+      typeof v === "object" &&
+      typeof (v as PlanIntro).chapterTitle === "string" &&
+      typeof (v as PlanIntro).selfIntro === "string"
+    ) {
+      return v as PlanIntro;
+    }
+    return null;
+  };
+
+  const savePlanIntro = (intro: PlanIntro) => setKey(KEYS.planIntro, intro);
+
+  // The member's own (edited / re-toned) self-introduction — a single string.
+  const getPlanSelfIntro = (): string | null => {
+    const v = snapshot[KEYS.planSelfIntroEdits];
+    return typeof v === "string" ? v : null;
+  };
+
+  const savePlanSelfIntro = (text: string) =>
+    setKey(KEYS.planSelfIntroEdits, text);
+
+  // Generated scene images, keyed by slot ("hero", "s1"…). Cached so each is
+  // generated once, not per view.
+  const getPlanImages = (): Record<string, string> => {
+    const v = snapshot[KEYS.planImages];
+    return v && typeof v === "object" ? (v as Record<string, string>) : {};
+  };
+
+  const savePlanImage = (slot: string, dataUrl: string) =>
+    setKey(KEYS.planImages, { ...getPlanImages(), [slot]: dataUrl });
 
   // ---- Closing commitment (a concrete plan entry) ----
   const getCommitment = (id: string): ScreeningCommitment | null => {
@@ -767,6 +934,7 @@ export function useUserData() {
     await removeKey(KEYS.conversation(id));
     await removeKey(KEYS.interaction(id));
     await clearSeed(id);
+    await clearGoalSeed(id);
     await clearCommitment(id);
     await clearTakeaway(id);
     await clearDreams(id);
@@ -824,8 +992,31 @@ export function useUserData() {
     getSeed,
     saveSeed,
     clearSeed,
+    getGoalSeed,
+    saveGoalSeed,
+    clearGoalSeed,
+    getGoalPathSeed,
+    saveGoalPathSeed,
+    clearGoalPathSeed,
+    getTradeOffSeed,
+    saveTradeOffSeed,
+    clearTradeOffSeed,
+    getWeekShapeSeed,
+    saveWeekShapeSeed,
+    clearWeekShapeSeed,
+    getFirstYearSeed,
+    saveFirstYearSeed,
+    clearFirstYearSeed,
+    getFirstYearChat,
+    saveFirstYearChat,
     getStage3Values,
     saveStage3Values,
+    getPlanIntro,
+    savePlanIntro,
+    getPlanSelfIntro,
+    savePlanSelfIntro,
+    getPlanImages,
+    savePlanImage,
     getCommitment,
     saveCommitment,
     clearCommitment,

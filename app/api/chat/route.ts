@@ -87,6 +87,11 @@ function buildSystemPrompt(body: ChatRequest): string {
 
   sections.push(
     "",
+    "THE MARKER IS A LITERAL TOKEN. When you close, write the marker exactly as these eight characters — two open brackets, MODULE_COMPLETE, two close brackets: [[MODULE_COMPLETE]]. Never reword it, translate it, wrap it in tildes, asterisks or other punctuation, and never write any variant such as ~~COMPLETION_MARKER~~ or \"completion marker\". It is invisible plumbing the person never sees, so it must match exactly or it will leak into your message."
+  );
+
+  sections.push(
+    "",
     "You have already opened this conversation by saying, word for word:",
     `"${body.coachOpening}"`
   );

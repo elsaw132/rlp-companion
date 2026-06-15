@@ -100,10 +100,24 @@ export async function POST(request: Request) {
     takeaway = (parsed.thirdPerson ?? "").trim();
     takeawayDirect = (parsed.secondPerson ?? "").trim();
   } catch {
-    // Model didn't return clean JSON — treat the whole reply as the third-person
-    // summary and derive the direct version mechanically.
-    takeaway = rawText;
-    takeawayDirect = toSecondPerson(rawText);
+    // Model returned the fields but not as parseable JSON (a stray quote, smart
+    // quotes, trailing prose). Lift the two fields out by regex before giving up,
+    // so the raw {thirdPerson:...} object is never stored as the summary.
+    const third = rawText.match(
+      /["“]?thirdPerson["”]?\s*:\s*["“]([\s\S]*?)["”]\s*[,}]/
+    );
+    const second = rawText.match(
+      /["“]?secondPerson["”]?\s*:\s*["“]([\s\S]*?)["”]\s*[,}]/
+    );
+    if (third?.[1] || second?.[1]) {
+      takeaway = (third?.[1] ?? second?.[1] ?? "").trim();
+      takeawayDirect = (second?.[1] ?? "").trim();
+    } else {
+      // No structure at all — treat the whole reply as the third-person summary
+      // and derive the direct version mechanically.
+      takeaway = rawText;
+      takeawayDirect = toSecondPerson(rawText);
+    }
   }
   if (!takeaway) takeaway = rawText;
   if (!takeawayDirect) takeawayDirect = toSecondPerson(takeaway);

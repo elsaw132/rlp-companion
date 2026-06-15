@@ -49,6 +49,57 @@ import BiggerPicture, {
   BiggerPictureSummary,
   biggerPictureSummaryText,
 } from "./BiggerPicture";
+import ReadinessSnapshot, {
+  ReadinessSnapshotSummary,
+  readinessSnapshotSummaryText,
+} from "./ReadinessSnapshot";
+import SeasonsBoard, {
+  SeasonsBoardSummary,
+  seasonsBoardSummaryText,
+} from "./SeasonsBoard";
+import BalancedGoals, {
+  BalancedGoalsSummary,
+  balancedGoalsSummaryText,
+} from "./BalancedGoals";
+import GoalPaths, {
+  GoalPathsSummary,
+  goalPathsSummaryText,
+} from "./GoalPaths";
+import TradeOffs, {
+  TradeOffsSummary,
+  tradeOffsSummaryText,
+} from "./TradeOffs";
+import WeekShape, {
+  WeekShapeSummary,
+  weekShapeSummaryText,
+} from "./WeekShape";
+import FirstYearJourney, {
+  FirstYearSummary,
+  firstYearSummaryText,
+} from "./FirstYearJourney";
+import {
+  fetchFirstYearDraft,
+  firstYearGoalInputs,
+  firstYearRhythmInputs,
+  firstYearSeasonInputs,
+} from "@/lib/firstYearSeed";
+import { fetchBalancedGoalsDraft } from "@/lib/balancedGoalsSeed";
+import {
+  fetchGoalPathsDraft,
+  spotlightGoalInputs,
+} from "@/lib/goalPathsSeed";
+import {
+  fetchTradeOffsDraft,
+  tradeOffGoalInputs,
+  financeSignal,
+  valueInputs,
+} from "@/lib/tradeOffsSeed";
+import {
+  fetchWeekShapeDraft,
+  weekShapeGoalInputs,
+  transitionShape,
+  weekTranscripts,
+} from "@/lib/weekShapeSeed";
 import { FinishControls, type InteractionMode } from "./InteractionShell";
 import type {
   ContentBlock,
@@ -57,9 +108,15 @@ import type {
   BuildResult,
   CompositeResult,
   LetterResult,
+  BalancedGoalsResult,
+  ReadinessSnapshotResult,
+  SeasonsBoardResult,
+  WeekShapeResult,
   ClosingCommitment,
   ScreeningCommitment as ScreeningCommitmentResult,
 } from "@/lib/modules";
+import { getModulesBefore } from "@/lib/modules";
+import { stripStructuredLeak } from "@/lib/coachText";
 import { useUserData } from "@/lib/userData";
 import type { Dreams } from "@/lib/dreams";
 import {
@@ -72,11 +129,55 @@ import {
   buildStage3Context,
   hasCarryForward,
 } from "@/lib/carryForward";
+import {
+  buildUserModel,
+  renderUserModel,
+  seasonCardsFromModel,
+  balancedSpringboardsFromModel,
+  type SeasonCard,
+  type BalancedSeed,
+} from "@/lib/userModel";
 
-// Vita appends this to her closing message so we know the module is finished.
-// It's stripped before display and before storage, so it never shows and never
-// re-enters the conversation history.
-const MODULE_COMPLETE_MARKER = "[[MODULE_COMPLETE]]";
+// Vita appends a close signal to her final message so we know the module is
+// finished. It's stripped before display and before storage, so it never shows
+// and never re-enters the conversation history. The canonical token is
+// [[MODULE_COMPLETE]], but the model occasionally invents a wrapped variant
+// (e.g. ~~COMPLETION_MARKER~~, [[COMPLETION_MARKER]], **MODULE_COMPLETE**). Catch
+// those too so a stray marker can never leak into a bubble — and so the close is
+// still recognised when it does. Returns whether a close was signalled and the
+// text with every marker artifact removed.
+const COMPLETION_MARKER_RE =
+  /[~*_[\]<>#-]{0,2}\s*(?:MODULE[_\s-]?COMPLETE|COMPLETION[_\s-]?MARKER)\s*[~*_[\]<>#-]{0,2}/gi;
+function stripCompletionMarker(reply: string): {
+  isClosing: boolean;
+  text: string;
+} {
+  COMPLETION_MARKER_RE.lastIndex = 0;
+  const isClosing = COMPLETION_MARKER_RE.test(reply);
+  const text = reply.replace(COMPLETION_MARKER_RE, "").trim();
+  return { isClosing, text };
+}
+
+// Vita's opening can occasionally run long (especially if it echoes a carried-
+// forward summary). Cap it: truncate to the word limit, then trim back to the last
+// sentence end for a clean stop, or add an ellipsis if there isn't one nearby.
+const OPENING_WORD_CAP = 110;
+function capWords(text: string, max: number): string {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= max) return text;
+  let clipped = words.slice(0, max).join(" ");
+  const lastStop = Math.max(
+    clipped.lastIndexOf("."),
+    clipped.lastIndexOf("!"),
+    clipped.lastIndexOf("?")
+  );
+  if (lastStop > clipped.length * 0.5) {
+    clipped = clipped.slice(0, lastStop + 1);
+  } else {
+    clipped = `${clipped.replace(/[,;:\s]+$/, "")}…`;
+  }
+  return clipped;
+}
 
 // A hidden user turn that only exists to make Vita speak first when generating
 // her dynamic opening. It is never rendered as a bubble or saved — it lives in
@@ -125,6 +226,20 @@ function summarizeBuild(result: BuildResult): string {
       return hopesFearsSummaryText(result);
     case "bigger-picture":
       return biggerPictureSummaryText(result);
+    case "readiness-snapshot":
+      return readinessSnapshotSummaryText(result);
+    case "seasons-board":
+      return seasonsBoardSummaryText(result);
+    case "balanced-goals":
+      return balancedGoalsSummaryText(result);
+    case "goal-paths":
+      return goalPathsSummaryText(result);
+    case "trade-offs":
+      return tradeOffsSummaryText(result);
+    case "week-shape":
+      return weekShapeSummaryText(result);
+    case "first-year":
+      return firstYearSummaryText(result);
     case "composite":
       return result.results.map(summarizeBuild).filter(Boolean).join(" ");
     default:
@@ -176,6 +291,27 @@ function InteractionSummary({
       break;
     case "bigger-picture":
       body = <BiggerPictureSummary result={result} />;
+      break;
+    case "readiness-snapshot":
+      body = <ReadinessSnapshotSummary result={result} />;
+      break;
+    case "seasons-board":
+      body = <SeasonsBoardSummary result={result} />;
+      break;
+    case "balanced-goals":
+      body = <BalancedGoalsSummary result={result} />;
+      break;
+    case "goal-paths":
+      body = <GoalPathsSummary result={result} />;
+      break;
+    case "trade-offs":
+      body = <TradeOffsSummary result={result} />;
+      break;
+    case "week-shape":
+      body = <WeekShapeSummary result={result} />;
+      break;
+    case "first-year":
+      body = <FirstYearSummary result={result} />;
       break;
     case "composite":
       body = (
@@ -343,19 +479,32 @@ export default function SessionContainer({
       const picks = buildStage3Context(userData);
       if (picks) return `${reflections}\n\n${picks}`;
     }
+    // Stage 4 (Plan) opens every module by reflecting the whole person back, so
+    // it leads with the curated user model assembled from Stages 1–3.
+    if (stageNumber === 4) {
+      const model = renderUserModel(buildUserModel(userData));
+      if (model) return `${model}\n\n${reflections}`;
+    }
     return reflections;
   }
 
   // The letter module replaces the build → conversation flow with a single
   // writing surface (LetterFlow), so it takes its own "letter" phase.
   const isLetter = interaction?.type === "letter";
+  const isFirstYear = interaction?.type === "first-year";
 
   // Where the person is in the module: the reading, the build step (only for
   // modules with an interaction), the conversation, then optionally back into
   // "editing" to adjust earlier picks without losing the conversation. The
   // letter module uses "letter" in place of building/conversation.
   const [phase, setPhase] = useState<
-    "reading" | "seeding" | "building" | "conversation" | "editing" | "letter"
+    | "reading"
+    | "seeding"
+    | "building"
+    | "conversation"
+    | "editing"
+    | "letter"
+    | "journey"
   >("reading");
   // Stage 3 surfaces pre-fill from a seed fetched once after the reading. Loaded
   // from the snapshot on hydration, or fetched fresh in the "seeding" phase.
@@ -384,6 +533,10 @@ export default function SessionContainer({
   // re-reveals the composer. Vita signing off again returns to the finished
   // state (this flips back to false).
   const [reopened, setReopened] = useState(false);
+  // When Vita signals a close, we don't finish the module straight away — we
+  // offer the person a choice (keep talking, or wrap up here). True while that
+  // choice is on screen, between Vita's sign-off and the person deciding.
+  const [pendingClose, setPendingClose] = useState(false);
   // The return-home path shows one optional plan-capture step before the hub.
   // "Next module" never sets this — they're carrying straight on.
   const [showPlan, setShowPlan] = useState(false);
@@ -394,6 +547,9 @@ export default function SessionContainer({
   // Vita's closing line for the letter module, shown above the completion block
   // once the letter is finalised (the letter module has no chat transcript).
   const [letterAck, setLetterAck] = useState<string | null>(null);
+  // Vita's closing line for the first-year journey, shown above the completion
+  // block once the person settles their year (it has its own editing chat).
+  const [firstYearAck, setFirstYearAck] = useState<string | null>(null);
 
   // Load any saved conversation and built day from the snapshot as soon as the
   // user is signed in and the data layer has finished loading. We read during
@@ -427,6 +583,12 @@ export default function SessionContainer({
       // block shows; otherwise resume on the writing surface (LetterFlow
       // pre-fills from any saved draft). Never enter the conversation phase.
       if (!completedIds.includes(sessionId)) setPhase("letter");
+    } else if (isFirstYear) {
+      // The first-year journey owns its own editing chat and timeline. If it's
+      // already complete the recap + completion block shows; otherwise resume on
+      // the journey surface (it pre-fills from the saved working state). Never
+      // enter the standard conversation phase.
+      if (!completedIds.includes(sessionId)) setPhase("journey");
     } else {
       const saved = userData.getConversation(sessionId);
       if (saved && saved.length > 0) {
@@ -451,6 +613,159 @@ export default function SessionContainer({
     // are what actually gate this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, hydrated, sessionId]);
+
+  // The balanced-goals draft (4.3) is a slow Claude call. Kick it off as soon as
+  // the module opens — while the person reads the intro — and stash it in the
+  // cache the surface reads, so the goals are usually ready by the time they
+  // arrive. The surface still drafts on its own if this hasn't landed yet.
+  const goalsPrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (interaction?.type !== "balanced-goals") return;
+    if (goalsPrefetchedRef.current || userData.getGoalSeed(sessionId)) return;
+    goalsPrefetchedRef.current = true;
+    const balanced = balancedSpringboardsFromModel(userData);
+    const springboards = interaction.areas.map((a) => ({
+      area: a.id,
+      labels: balanced.springboards
+        .filter((s) => s.areas.includes(a.id))
+        .map((s) => s.label),
+    }));
+    void (async () => {
+      const draft = await fetchBalancedGoalsDraft({
+        userModel: renderUserModel(buildUserModel(userData)),
+        onboarding: userData.buildOnboardingContext(),
+        hasPartner: userData.hasPartner(),
+        springboards,
+      });
+      if (draft) void userData.saveGoalSeed(sessionId, draft);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interaction, sessionId]);
+
+  // The goal-paths draft (4.4) is the same slow Claude call. Prefetch a path for
+  // each spotlighted goal (read from 4.3's saved result) while the person reads
+  // the intro, into the cache the surface reads. The surface still drafts on its
+  // own if this hasn't landed yet.
+  const pathsPrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (interaction?.type !== "goal-paths") return;
+    if (pathsPrefetchedRef.current || userData.getGoalPathSeed(sessionId)) return;
+    const goals = spotlightGoalInputs(
+      (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
+    );
+    if (!goals.length) return;
+    pathsPrefetchedRef.current = true;
+    void (async () => {
+      const draft = await fetchGoalPathsDraft({
+        userModel: renderUserModel(buildUserModel(userData)),
+        onboarding: userData.buildOnboardingContext(),
+        hasPartner: userData.hasPartner(),
+        goals,
+      });
+      if (draft) void userData.saveGoalPathSeed(sessionId, draft);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interaction, sessionId]);
+
+  // The trade-offs draft (4.5) is the same slow Claude call. Prefetch the
+  // scenarios and candidate principles — grounded in the spotlighted goals
+  // (4.3), the finance signal (4.1) and the Stage 3 values — while the person
+  // reads the intro, into the cache the surface reads. The surface still drafts
+  // on its own if this hasn't landed yet.
+  const tradeOffsPrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (interaction?.type !== "trade-offs") return;
+    if (tradeOffsPrefetchedRef.current || userData.getTradeOffSeed(sessionId))
+      return;
+    const goals = tradeOffGoalInputs(
+      (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
+    );
+    const finance = financeSignal(
+      (userData.getBuild("4.1") as ReadinessSnapshotResult | null) ?? null
+    );
+    const values = valueInputs(userData.getStage3Values());
+    if (!goals.length && !values.length) return;
+    tradeOffsPrefetchedRef.current = true;
+    void (async () => {
+      const draft = await fetchTradeOffsDraft({
+        userModel: renderUserModel(buildUserModel(userData)),
+        onboarding: userData.buildOnboardingContext(),
+        hasPartner: userData.hasPartner(),
+        goals,
+        finance,
+        values,
+      });
+      if (draft) void userData.saveTradeOffSeed(sessionId, draft);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interaction, sessionId]);
+
+  // The week-shape draft (4.6) is the same slow Claude call. Prefetch the week —
+  // grounded in the spotlighted goals (4.3) and the work-transition shape (4.1)
+  // on top of the user model — while the person reads the intro, into the cache
+  // the surface reads. The surface still drafts on its own if this hasn't landed.
+  const weekShapePrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (interaction?.type !== "week-shape") return;
+    if (weekShapePrefetchedRef.current || userData.getWeekShapeSeed(sessionId))
+      return;
+    weekShapePrefetchedRef.current = true;
+    void (async () => {
+      const draft = await fetchWeekShapeDraft({
+        userModel: renderUserModel(buildUserModel(userData)),
+        onboarding: userData.buildOnboardingContext(),
+        hasPartner: userData.hasPartner(),
+        goals: weekShapeGoalInputs(
+          (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
+        ),
+        transition: transitionShape(
+          (userData.getBuild("4.1") as ReadinessSnapshotResult | null) ?? null
+        ),
+        transcripts: weekTranscripts(
+          getModulesBefore(sessionId),
+          userData.getConversation
+        ),
+      });
+      if (draft) void userData.saveWeekShapeSeed(sessionId, draft);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interaction, sessionId]);
+
+  // The first-year draft (4.7) is the same slow Claude call. Prefetch the
+  // assembled year — grounded in the goals (4.3), the weekly rhythm (4.6), the
+  // early-retirement priorities (4.2) and the work-transition shape (4.1) on top
+  // of the user model — while the person reads the intro. The surface still drafts
+  // on its own if this hasn't landed.
+  const firstYearPrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (interaction?.type !== "first-year") return;
+    if (firstYearPrefetchedRef.current || userData.getFirstYearSeed(sessionId))
+      return;
+    firstYearPrefetchedRef.current = true;
+    void (async () => {
+      const seasonInputs = firstYearSeasonInputs(
+        (userData.getBuild("4.2") as SeasonsBoardResult | null) ?? null
+      );
+      const draft = await fetchFirstYearDraft({
+        userModel: renderUserModel(buildUserModel(userData)),
+        onboarding: userData.buildOnboardingContext(),
+        hasPartner: userData.hasPartner(),
+        goals: firstYearGoalInputs(
+          (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
+        ),
+        rhythm: firstYearRhythmInputs(
+          (userData.getBuild("4.6") as WeekShapeResult | null) ?? null
+        ),
+        seasonPriorities: seasonInputs.priorities,
+        seasonOrder: seasonInputs.seasonOrder,
+        transition: transitionShape(
+          (userData.getBuild("4.1") as ReadinessSnapshotResult | null) ?? null
+        ),
+      });
+      if (draft) void userData.saveFirstYearSeed(sessionId, draft);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interaction, sessionId]);
 
   // Show the conversation. The opening effect seeds Vita's first message — a
   // dynamic, drawn-from-context one when there's something to draw on, or the
@@ -484,10 +799,22 @@ export default function SessionContainer({
       if (!res.ok) throw new Error(`Opening request failed: ${res.status}`);
 
       const data = (await res.json()) as { reply: string };
-      const text = data.reply.replaceAll(MODULE_COMPLETE_MARKER, "").trim();
-      setMessages([
-        { role: "coach", text: withRecognition(recognition, text || coachOpening) },
-      ]);
+      // Some modules (4.3, 4.4) let Vita's very first message also sign the module
+      // off, so the person can finish without typing. Strip the marker, show the
+      // opening, then offer the close choice — mirroring the chat close.
+      const { isClosing, text } = stripCompletionMarker(data.reply);
+      // Block any leaked {thirdPerson/secondPerson} JSON from reaching the screen,
+      // then cap the length so the opening stays a warm word, not a wall of text.
+      const cleaned = capWords(stripStructuredLeak(text), OPENING_WORD_CAP);
+      const openingMessages: Message[] = [
+        {
+          role: "coach",
+          text: withRecognition(recognition, cleaned || coachOpening),
+        },
+      ];
+      setMessages(openingMessages);
+
+      if (isClosing) setPendingClose(true);
     } catch {
       setMessages([
         { role: "coach", text: withRecognition(recognition, coachOpening) },
@@ -495,6 +822,23 @@ export default function SessionContainer({
     } finally {
       setSending(false);
     }
+  }
+
+  // The person chose to wrap up after Vita signalled a close. Mark the module
+  // finished, clear any reopened/pending state, and capture the background
+  // records (takeaway always; the structured ones self-guard to their module).
+  function finalizeClose(finalMessages: Message[]) {
+    setPendingClose(false);
+    if (!user) return;
+    void userData.markModuleComplete(sessionId);
+    if (!completed) {
+      setCompleted(true);
+      setCompletedCount((n) => n + 1);
+    }
+    setReopened(false);
+    void generateAndStoreTakeaway(finalMessages);
+    void generateAndStoreDreams(finalMessages);
+    void generateAndStoreStage3Values(finalMessages);
   }
 
   // After a module completes, generate a short takeaway of what emerged and
@@ -771,6 +1115,8 @@ export default function SessionContainer({
   function handleReadingDone() {
     if (isLetter) {
       setPhase("letter");
+    } else if (isFirstYear) {
+      setPhase("journey");
     } else if (interaction && isSeededType(interaction.type)) {
       if (seed) setPhase("building");
       else void runSeeding();
@@ -791,6 +1137,27 @@ export default function SessionContainer({
     if (user) {
       void userData.markModuleComplete(sessionId);
       void generateAndStoreTakeaway([], summarizeBuild(result));
+    }
+    if (!completed) {
+      setCompleted(true);
+      setCompletedCount((n) => n + 1);
+    }
+  }
+
+  // The first-year journey is settled. Persist it, mark the module complete, keep
+  // Vita's closing line for the completion block, and capture the takeaway from the
+  // editing chat plus the year's summary — mirroring how the letter module closes.
+  function handleFirstYearComplete(
+    result: BuildResult,
+    vitaMessage: string,
+    finalMessages: Message[]
+  ) {
+    setBuildResult(result);
+    void userData.saveBuild(sessionId, result);
+    setFirstYearAck(vitaMessage);
+    if (user) {
+      void userData.markModuleComplete(sessionId);
+      void generateAndStoreTakeaway(finalMessages, summarizeBuild(result));
     }
     if (!completed) {
       setCompleted(true);
@@ -906,11 +1273,9 @@ export default function SessionContainer({
       const data = (await res.json()) as { reply: string };
 
       // If Vita signalled the close, strip the marker before it's shown or
-      // stored, then flip the module into its complete state and record it.
-      const isClosing = data.reply.includes(MODULE_COMPLETE_MARKER);
-      const replyText = isClosing
-        ? data.reply.replaceAll(MODULE_COMPLETE_MARKER, "").trimEnd()
-        : data.reply;
+      // stored. We don't finish the module here — instead we offer the close
+      // choice (keep talking / wrap up here); finalizeClose does the rest.
+      const { isClosing, text: replyText } = stripCompletionMarker(data.reply);
 
       const finalMessages: Message[] = [
         ...conversation,
@@ -922,25 +1287,7 @@ export default function SessionContainer({
       // doesn't repeat on later turns.
       if (editAckPending) setEditAckPending(false);
 
-      if (isClosing && user) {
-        void userData.markModuleComplete(sessionId);
-        if (!completed) {
-          setCompleted(true);
-          setCompletedCount((n) => n + 1);
-        }
-        // Vita has signed off — return to the finished state even if they had
-        // chosen to keep talking.
-        setReopened(false);
-        // Capture the takeaway in the background — don't block the done state.
-        // Re-closing after "keep talking" regenerates and overwrites it.
-        void generateAndStoreTakeaway(finalMessages);
-        // The money module also captures its structured Dreams record (self-guards
-        // to 1.money). Re-closing regenerates and overwrites it, same as above.
-        void generateAndStoreDreams(finalMessages);
-        // The last Understand-stage module also captures the confirmed values
-        // summary (self-guards to that module). Same regenerate-on-reclose pattern.
-        void generateAndStoreStage3Values(finalMessages);
-      }
+      if (isClosing) setPendingClose(true);
     } catch {
       // Roll the user's bubble back off the conversation and hand their words
       // back to the composer, so retrying is clean. The error is a transient
@@ -984,6 +1331,29 @@ export default function SessionContainer({
     existingPlan && existingPlan.date >= todayISODate()
       ? existingPlan.date
       : undefined;
+
+  // The Stage 4 modules are pre-populated from the person's earlier answers,
+  // deterministic and free, no seed call. 4.2's seasons board takes a flat set
+  // of cards built from the user model; 4.3's balanced-goals springboards are
+  // inherited straight from the Stage 2 area picks, read from userData directly.
+  const seededCards =
+    interaction?.type === "seasons-board"
+      ? seasonCardsFromModel(buildUserModel(userData))
+      : [];
+  const balancedSeed: BalancedSeed | null =
+    interaction?.type === "balanced-goals"
+      ? balancedSpringboardsFromModel(userData)
+      : null;
+  // The rich picture built up across the earlier stages — the input the 4.3 and
+  // 4.4 routes draft from. Only assembled for those modules.
+  const planUserModelText =
+    interaction?.type === "balanced-goals" ||
+    interaction?.type === "goal-paths" ||
+    interaction?.type === "trade-offs" ||
+    interaction?.type === "week-shape" ||
+    interaction?.type === "first-year"
+      ? renderUserModel(buildUserModel(userData))
+      : "";
 
   return (
     <div style={styles.container}>
@@ -1101,8 +1471,13 @@ export default function SessionContainer({
         <InteractionStep
           interaction={interaction}
           seed={seed}
+          seededCards={seededCards}
+          balancedSeed={balancedSeed}
           onFinish={handleBuildFinish}
           hasPartner={userData.hasPartner()}
+          sessionId={sessionId}
+          userModelText={planUserModelText}
+          onboardingContext={userData.buildOnboardingContext()}
         />
       )}
 
@@ -1111,11 +1486,16 @@ export default function SessionContainer({
         <InteractionStep
           interaction={interaction}
           seed={seed}
+          seededCards={seededCards}
+          balancedSeed={balancedSeed}
           onFinish={handleEditSave}
           mode="edit"
           initial={buildResult ?? undefined}
           onCancel={handleEditCancel}
           hasPartner={userData.hasPartner()}
+          sessionId={sessionId}
+          userModelText={planUserModelText}
+          onboardingContext={userData.buildOnboardingContext()}
         />
       )}
 
@@ -1166,6 +1546,11 @@ export default function SessionContainer({
                 onKeepTalking={() => setReopened(true)}
               />
             )
+          ) : pendingClose ? (
+            <CloseChoice
+              onKeepTalking={() => setPendingClose(false)}
+              onWrapUp={() => finalizeClose(messages)}
+            />
           ) : (
             <>
               {error && (
@@ -1230,6 +1615,57 @@ export default function SessionContainer({
           {letterAck && (
             <div style={styles.messageList}>
               <CoachBubble text={letterAck} />
+            </div>
+          )}
+
+          <CompletionBlock
+            showPlan={showPlan}
+            prefillDate={prefillDate}
+            onPlanConfirm={handlePlanConfirm}
+            onPlanSkip={handlePlanSkip}
+            revealHref={revealHref}
+            onReturnHome={handleReturnHome}
+            nextHref={nextHref}
+          />
+        </section>
+      )}
+
+      {/* ZONE 5 — FIRST-YEAR JOURNEY (its own timeline + story + editing chat) */}
+      {isFirstYear &&
+        interaction.type === "first-year" &&
+        phase === "journey" &&
+        !completed && (
+          <FirstYearJourney
+            interaction={interaction}
+            sessionId={sessionId}
+            userModelText={planUserModelText}
+            onboardingContext={userData.buildOnboardingContext()}
+            hasPartner={userData.hasPartner()}
+            sessionInstructions={sessionInstructions ?? ""}
+            onComplete={handleFirstYearComplete}
+          />
+        )}
+
+      {/* ZONE 5.5 — FIRST-YEAR COMPLETE (recap + Vita's line + the CTAs) */}
+      {isFirstYear && completed && (
+        <section style={styles.conversationZone}>
+          {buildResult && buildResult.type === "first-year" && (
+            <section style={styles.summaryCard}>
+              <FirstYearSummary result={buildResult} />
+            </section>
+          )}
+
+          <div style={styles.vitaLockup}>
+            <span style={styles.sun} aria-hidden="true">
+              ☀️
+            </span>
+            <span style={styles.vitaName}>Vita</span>
+            <span style={styles.coachPill}>Your retirement coach</span>
+          </div>
+
+          {firstYearAck && (
+            <div style={styles.messageList}>
+              <CoachBubble text={firstYearAck} />
             </div>
           )}
 
@@ -1344,21 +1780,66 @@ function CompletionBlock({
   );
 }
 
+// When Vita's reply signals a natural finish, the person decides whether to end
+// here or keep going — we never auto-close on their behalf. "Wrap up here"
+// finalises the module; "Keep talking" re-opens the composer.
+function CloseChoice({
+  onKeepTalking,
+  onWrapUp,
+}: {
+  onKeepTalking: () => void;
+  onWrapUp: () => void;
+}) {
+  return (
+    <div style={styles.completeBlock}>
+      <p style={styles.closeChoicePrompt}>Happy to wrap up here, or keep going?</p>
+      <div style={styles.completeActions}>
+        <button
+          type="button"
+          className="home-complete-btn"
+          style={styles.homeCompleteButton}
+          onClick={onWrapUp}
+        >
+          Wrap up here →
+        </button>
+        <button
+          type="button"
+          className="next-complete-btn"
+          style={styles.nextCompleteButton}
+          onClick={onKeepTalking}
+        >
+          Keep talking
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Picks the right interaction UI for the module's interaction type. New types
 // get a case here; until then they fall back to a harmless placeholder so a
 // half-configured module never breaks the screen.
 function InteractionStep({
   interaction,
   seed = null,
+  seededCards = [],
+  balancedSeed = null,
   onFinish,
   mode = "create",
   initial,
   onCancel,
   hasPartner = false,
+  sessionId = "",
+  userModelText = "",
+  onboardingContext = "",
 }: {
   interaction: Interaction;
   // The seeded candidate content for Stage 3 surfaces; null for every other type.
   seed?: Stage3Seed | null;
+  // Pre-populated cards for the Stage 4 seasons board (4.2); empty otherwise.
+  seededCards?: SeasonCard[];
+  // Pre-populated springboards for the balanced-goals exercise (4.3); null
+  // for every other type.
+  balancedSeed?: BalancedSeed | null;
   onFinish: (result: BuildResult) => void;
   mode?: InteractionMode;
   // The stored result to pre-fill from in edit mode. Its type always matches
@@ -1367,6 +1848,11 @@ function InteractionStep({
   onCancel?: () => void;
   // Whether the person has a partner — gates partner-only fear cards in 3.5.
   hasPartner?: boolean;
+  // The module id — balanced-goals (4.3) caches its drafted seed under it.
+  sessionId?: string;
+  // The rendered user model + onboarding line — input for the 4.3 goal draft.
+  userModelText?: string;
+  onboardingContext?: string;
 }) {
   switch (interaction.type) {
     case "day-builder":
@@ -1483,6 +1969,86 @@ function InteractionStep({
           onFinish={onFinish}
           mode={mode}
           initial={initial?.type === "bigger-picture" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "readiness-snapshot":
+      return (
+        <ReadinessSnapshot
+          interaction={interaction}
+          onFinish={onFinish}
+          mode={mode}
+          initial={
+            initial?.type === "readiness-snapshot" ? initial : undefined
+          }
+          onCancel={onCancel}
+        />
+      );
+    case "seasons-board":
+      return (
+        <SeasonsBoard
+          interaction={interaction}
+          cards={seededCards}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "seasons-board" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "balanced-goals":
+      return (
+        <BalancedGoals
+          interaction={interaction}
+          seed={balancedSeed ?? { springboards: [] }}
+          sessionId={sessionId}
+          userModelText={userModelText}
+          onboardingContext={onboardingContext}
+          hasPartner={hasPartner}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "balanced-goals" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "goal-paths":
+      return (
+        <GoalPaths
+          interaction={interaction}
+          sessionId={sessionId}
+          userModelText={userModelText}
+          onboardingContext={onboardingContext}
+          hasPartner={hasPartner}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "goal-paths" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "trade-offs":
+      return (
+        <TradeOffs
+          interaction={interaction}
+          sessionId={sessionId}
+          userModelText={userModelText}
+          onboardingContext={onboardingContext}
+          hasPartner={hasPartner}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "trade-offs" ? initial : undefined}
+          onCancel={onCancel}
+        />
+      );
+    case "week-shape":
+      return (
+        <WeekShape
+          interaction={interaction}
+          sessionId={sessionId}
+          userModelText={userModelText}
+          onboardingContext={onboardingContext}
+          hasPartner={hasPartner}
+          onFinish={onFinish}
+          mode={mode}
+          initial={initial?.type === "week-shape" ? initial : undefined}
           onCancel={onCancel}
         />
       );
@@ -1621,10 +2187,21 @@ function CompositeStep({
   );
 }
 
+// Vita is told to write plain prose, but strip any stray markdown emphasis she
+// slips in — the bubble renders raw text, so a leftover ** or * would otherwise
+// show as literal asterisks.
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1");
+}
+
 function CoachBubble({ text }: { text: string }) {
   return (
     <div style={styles.coachRow}>
-      <div style={styles.coachBubble}>{text}</div>
+      <div style={styles.coachBubble}>{stripMarkdown(text)}</div>
     </div>
   );
 }
@@ -1990,6 +2567,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "var(--fs-body)",
     fontWeight: 600,
     color: "var(--success-text)",
+    margin: 0,
+  },
+  closeChoicePrompt: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-body)",
+    color: "var(--text)",
+    textAlign: "center",
     margin: 0,
   },
   completeActions: {
