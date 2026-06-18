@@ -62,14 +62,26 @@ export default async function SessionPage({
   // guessing. Null on the last module of the stage.
   const nextModuleTitle = nextId ? (getModule(nextId)?.module.title ?? null) : null;
 
-  // The last module of a stage that has a stage-close reveal (Imagine = stage 1,
-  // Explore = stage 2, Understand = stage 3) closes into that reveal — offered as
-  // the primary completion action so the reveal is reached on purpose rather than
-  // stumbled on later from the hub.
-  const revealHref =
-    !nextId && (stageNumber === 1 || stageNumber === 2 || stageNumber === 3)
-      ? `/stage/${stageNumber}`
-      : null;
+  // The last module of a stage that has a stage-close reveal closes into it —
+  // offered as the primary completion action so the reveal is reached on purpose
+  // rather than stumbled on later from the hub. Stages 1–3 (Imagine, Explore,
+  // Understand) close into their /stage reveal; Stage 4 (Plan) closes into the
+  // finished Retirement Life Plan document at /plan.
+  const revealHref = !nextId
+    ? stageNumber === 4
+      ? "/plan"
+      : stageNumber === 1 || stageNumber === 2 || stageNumber === 3
+        ? `/stage/${stageNumber}`
+        : null
+    : null;
+  // The wording on that primary CTA. Stages 1–3 lead into a named "reveal";
+  // Stage 4 leads into the plan itself, which isn't a reveal.
+  const revealLabel =
+    revealHref === null
+      ? null
+      : stageNumber === 4
+        ? "See your Retirement Life Plan →"
+        : `See your ${stageName} reveal →`;
 
   return (
     <main style={{ minHeight: "100vh", background: "var(--bg-alt)" }}>
@@ -88,6 +100,7 @@ export default async function SessionPage({
         nextHref={nextHref}
         nextModuleTitle={nextModuleTitle}
         revealHref={revealHref}
+        revealLabel={revealLabel}
         sessionTitle={mod.title}
         sessionDescription={mod.description}
         durationMin={mod.durationMin}

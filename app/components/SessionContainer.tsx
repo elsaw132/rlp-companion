@@ -381,6 +381,10 @@ type SessionContainerProps = {
   // module of a stage that has one (otherwise null). When set, finishing the
   // module leads straight to the reveal rather than only back to the hub.
   revealHref: string | null;
+  // The wording for that primary completion CTA, matched to the stage it leads
+  // into ("See your Imagine reveal →", "See your Retirement Life Plan →", …).
+  // Null whenever revealHref is null.
+  revealLabel: string | null;
   sessionTitle: string;
   sessionDescription: string;
   durationMin: number;
@@ -436,6 +440,7 @@ export default function SessionContainer({
   nextHref,
   nextModuleTitle,
   revealHref,
+  revealLabel,
   sessionTitle,
   sessionDescription,
   durationMin,
@@ -1541,6 +1546,7 @@ export default function SessionContainer({
                 onPlanConfirm={handlePlanConfirm}
                 onPlanSkip={handlePlanSkip}
                 revealHref={revealHref}
+                revealLabel={revealLabel}
                 onReturnHome={handleReturnHome}
                 nextHref={nextHref}
                 onKeepTalking={() => setReopened(true)}
@@ -1624,6 +1630,7 @@ export default function SessionContainer({
             onPlanConfirm={handlePlanConfirm}
             onPlanSkip={handlePlanSkip}
             revealHref={revealHref}
+            revealLabel={revealLabel}
             onReturnHome={handleReturnHome}
             nextHref={nextHref}
           />
@@ -1675,6 +1682,7 @@ export default function SessionContainer({
             onPlanConfirm={handlePlanConfirm}
             onPlanSkip={handlePlanSkip}
             revealHref={revealHref}
+            revealLabel={revealLabel}
             onReturnHome={handleReturnHome}
             nextHref={nextHref}
           />
@@ -1695,6 +1703,7 @@ function CompletionBlock({
   onPlanConfirm,
   onPlanSkip,
   revealHref,
+  revealLabel,
   onReturnHome,
   nextHref,
   onKeepTalking,
@@ -1704,6 +1713,7 @@ function CompletionBlock({
   onPlanConfirm: (date: string) => void;
   onPlanSkip: () => void;
   revealHref: string | null;
+  revealLabel: string | null;
   onReturnHome: () => void;
   nextHref: string | null;
   onKeepTalking?: () => void;
@@ -1733,7 +1743,7 @@ function CompletionBlock({
               className="home-complete-btn"
               style={styles.homeCompleteButton}
             >
-              See your Imagine reveal →
+              {revealLabel ?? "See your reveal →"}
             </Link>
             <button
               type="button"
