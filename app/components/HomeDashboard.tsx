@@ -16,6 +16,7 @@ import { useUserData } from "@/lib/userData";
 import StageIntro from "./StageIntro";
 import OpeningCapture from "./OpeningCapture";
 import VitaMark from "./VitaMark";
+import PoweredByChorus from "./PoweredByChorus";
 
 // The soft illustrated thumbnail per module, by position within the stage —
 // matches the order in the reference (sunrise, roles, cal, keep, mtn, future).
@@ -299,9 +300,13 @@ export default function HomeDashboard() {
                 <span>{stagePct}%</span>
               </div>
             </div>
-            <div className="lab">Your {viewedStageData.name} score</div>
+            <div className="lab">Your {viewedStageData.name} progress</div>
             <div className="sub">Grows as you complete the modules in this stage.</div>
           </div>
+
+          {/* BRANDING — product-layer "Powered by Chorus Life", pinned to the
+              bottom of the sidebar so it's always present on the home screen. */}
+          <PoweredByChorus />
         </aside>
 
         {/* MAIN */}
@@ -619,8 +624,10 @@ export default function HomeDashboard() {
               <div>
                 <h4>There&apos;s no wrong way to do this</h4>
                 <p>
-                  Take the modules one at a time, at your own pace. Nothing is
-                  graded, and you can come back to anything you&apos;ve said.
+                  Take your time. Each module is designed to be fun and
+                  reflective, not hard or fast. We suggest setting aside 20
+                  minutes each day to do one module at a time, and giving each
+                  module time to settle before moving on to the next.
                 </p>
               </div>
               <a href="#" className="lk">
@@ -647,7 +654,8 @@ const homeCss = `
 .rlp-home :focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
 
 .rlp-home .shell{display:flex;align-items:flex-start;max-width:1180px;margin:0 auto}
-.rlp-home .sidebar{width:var(--sidebar-w);flex-shrink:0;padding:28px 20px 40px;border-right:1px solid var(--border);min-height:calc(100vh - var(--header-h));position:sticky;top:var(--header-h)}
+.rlp-home .sidebar{width:var(--sidebar-w);flex-shrink:0;padding:28px 20px 40px;border-right:1px solid var(--border);min-height:calc(100vh - var(--header-h));position:sticky;top:var(--header-h);display:flex;flex-direction:column}
+.rlp-home .sidebar .rlp-poweredby{margin-top:auto;padding-top:24px;justify-content:flex-start}
 .rlp-home .main{flex:1;min-width:0;padding:34px 40px 80px;display:flex;justify-content:center}
 .rlp-home .col{width:100%;max-width:var(--content-max)}
 

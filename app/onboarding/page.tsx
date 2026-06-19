@@ -79,6 +79,7 @@ export default function OnboardingPage() {
         <div className="column">
           {step === 1 && (
             <Welcome
+              firstName={user?.firstName?.trim() || ""}
               understood={understood}
               setUnderstood={setUnderstood}
               onContinue={() => setStep(2)}
@@ -151,14 +152,21 @@ export default function OnboardingPage() {
 }
 
 function Welcome({
+  firstName,
   understood,
   setUnderstood,
   onContinue,
 }: {
+  firstName: string;
   understood: boolean;
   setUnderstood: (v: boolean) => void;
   onContinue: () => void;
 }) {
+  // Personalised greeting when we know the signed-in user's first name; falls
+  // back to the plain heading when there's no name to use.
+  const heading = firstName
+    ? `${firstName}, your retirement, your way`
+    : "Your retirement, your way";
   return (
     <section className="welcome">
       <div className="scene" aria-hidden="true">
@@ -173,12 +181,19 @@ function Welcome({
           </span>
           <span className="name">Vita</span>
         </div>
-        <h1 className="hero-heading">Your retirement, your way</h1>
+        <h1 className="hero-heading">{heading}</h1>
         <p className="paragraph">
           This is a five-stage programme. Each stage is made up of several short
-          modules — around 10–20 minutes each — that you can work through at your
-          own pace. Every module is an expert-designed exercise to help you think
-          about and get clear on your next chapter.
+          modules — around 10–20 minutes each. We&apos;d suggest about one module
+          a day, so each has time to settle. Every module is an expert-designed
+          exercise to help you think about and get clear on your next chapter.
+        </p>
+        <p className="paragraph">
+          By the end of Stage 4: Plan, you&apos;ll have a Retirement Life Plan
+          that captures your values, goals, and priorities for your retirement,
+          as well as practical information like when you plan to leave work and
+          how. Stage 5: Act is there to help you start putting that plan into
+          practice.
         </p>
         <p className="paragraph">
           Vita, your AI coach, is there to guide you the whole way through. Vita

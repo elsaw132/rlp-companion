@@ -893,7 +893,7 @@ export const STAGES: Stage[] = [
       body: [
         "Before you can plan a retirement, it helps to be able to picture one. These first few modules are for exactly that — getting a vivid sense of what your retirement could actually look like.",
         "There's no right answer here, and nothing to get perfect. This is a first sketch — something you'll come back to, deepen, and reshape as you move through the later stages.",
-        "Take the modules in any order, at whatever pace suits you.",
+        "We'd suggest taking about one a day, so each has time to settle.",
       ],
       buttonLabel: "Let's begin",
     },
