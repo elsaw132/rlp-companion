@@ -5,7 +5,7 @@
 // screen is built so the band stays consistent across dashboard and sessions.
 // All text/icons on the band are navy (--brand-on-band).
 
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { useUserData } from "@/lib/userData";
 
 // The provider whose brand the band carries. This is the one piece that swaps
@@ -29,9 +29,13 @@ function initialsOf(user: ClerkUser): string {
 
 export default function ProviderBand() {
   const { user } = useUser();
+  const { signOut } = useClerk();
   const userData = useUserData();
   const name = userData.loading ? null : userData.getDisplayName(user);
   const initials = initialsOf(user);
+
+  // Sign out via Clerk and return to the sign-in screen.
+  const handleLogout = () => void signOut({ redirectUrl: "/sign-in" });
 
   return (
     <header className="rlp-band">
@@ -50,6 +54,9 @@ export default function ProviderBand() {
             {initials}
           </span>
         </button>
+        <button type="button" className="logout" onClick={handleLogout}>
+          Log out
+        </button>
       </div>
     </header>
   );
@@ -64,4 +71,7 @@ const bandCss = `
 .rlp-band .user{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:var(--brand-on-band);background:none;border:none;cursor:pointer;font-family:inherit;min-height:44px}
 .rlp-band .user:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
 .rlp-band .avatar{width:34px;height:34px;border-radius:50%;background:var(--brand-primary);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700}
+.rlp-band .logout{font-family:inherit;font-size:14px;font-weight:600;color:var(--brand-on-band);background:none;border:1.5px solid var(--brand-on-band);border-radius:var(--r-sm);padding:8px 16px;min-height:44px;cursor:pointer}
+.rlp-band .logout:hover{background:var(--brand-primary);color:var(--brand-band);border-color:var(--brand-primary)}
+.rlp-band .logout:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
 `;
