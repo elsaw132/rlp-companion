@@ -169,6 +169,22 @@ export default function MirrorCards({
       <style>{cardsCss}</style>
       <p style={styles.instruction}>{interaction.instruction}</p>
 
+      {interaction.footnote && (
+        <p style={styles.footnote}>
+          {interaction.footnote.text}{" "}
+          <a
+            href={interaction.footnote.linkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mc-footnote-link"
+            style={styles.footnoteLink}
+          >
+            {interaction.footnote.linkLabel}
+          </a>
+          .
+        </p>
+      )}
+
       {/* Movement 1 — the ones that fit */}
       <div style={styles.cardList}>
         {cards.map((card, i) => (
@@ -338,6 +354,19 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  footnote: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-label)",
+    lineHeight: 1.5,
+    color: "var(--text-muted)",
+    margin: "-12px 0 0",
+  },
+  footnoteLink: {
+    color: "var(--brand-primary)",
+    fontWeight: 600,
+    textDecoration: "underline",
+    textUnderlineOffset: "2px",
   },
   cardList: {
     display: "flex",
@@ -550,5 +579,10 @@ const cardsCss = `
     outline: none;
     box-shadow: var(--focus-ring);
     border-radius: var(--r-sm);
+  }
+  .mc-footnote-link:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--r-xs);
   }
 `;

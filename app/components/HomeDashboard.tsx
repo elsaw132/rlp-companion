@@ -79,7 +79,18 @@ export default function HomeDashboard() {
     // won't suddenly see that stage's intro.
     const currentStage = getActiveStageNumber(ids);
     const stage = STAGES.find((s) => s.number === currentStage);
-    if (stage?.intro && !userData.getStageIntrosSeen().includes(currentStage)) {
+    // A stage reveal's "Return home" links to /home?intro=skip so the person
+    // lands on the dashboard itself, not straight into the next stage's intro.
+    // Transient (this visit only) — the intro still shows on a later forward
+    // entry, since this never records it as seen.
+    const skipIntro =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("intro") === "skip";
+    if (
+      stage?.intro &&
+      !skipIntro &&
+      !userData.getStageIntrosSeen().includes(currentStage)
+    ) {
       setIntroStage(currentStage);
     }
     // The Stage 1 opening capture comes right after that intro and before module

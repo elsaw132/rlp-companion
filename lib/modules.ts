@@ -124,6 +124,9 @@ export type MirrorCardsInteraction = {
   starMax: number;
   // Heading for the recap card and the coach summary (e.g. "Your strengths").
   summaryLabel: string;
+  // Optional footnote shown at the top of the exercise — a short note with a
+  // single outbound link (3.1 uses it to credit the VIA framework).
+  footnote?: { text: string; linkLabel: string; linkUrl: string };
 };
 
 // 3.2 "Your values" — a triage surface built on the fixed value set, so the
@@ -1310,8 +1313,9 @@ WATCH FOR
             {
               type: "role-picker",
               instruction:
-                "Pick the active things you'd most like to be part of your week — as many or as few as feel right.",
+                "Pick the active things you'd most like to be part of your week — as many or as few as feel right. These don't have to be things you've done before — it's about how you'd like to keep moving and feel confident in your body through retirement.",
               starrable: false,
+              summaryLabel: "Your selected activities",
               groups: [
                 {
                   name: "On foot",
@@ -1763,7 +1767,7 @@ WATCH FOR
           stepHeadings: [
             null,
             null,
-            "Now, just noticing how things feel lately — there's no score here.",
+            "Let's check in on how things have felt lately. There's no score here — just noticing.",
             null,
             null,
             null,
@@ -2054,6 +2058,11 @@ WATCH FOR
             "Which feel most like your signature — the ones most you? Pick up to five.",
           starMax: 5,
           summaryLabel: "Your strengths",
+          footnote: {
+            text: "These draw on the VIA character strengths, a research-backed framework for the qualities people use most naturally. Learn more at",
+            linkLabel: "viacharacter.org",
+            linkUrl: "https://www.viacharacter.org",
+          },
         },
         sessionInstructions: `PURPOSE
 You already know this person from the Imagine and Explore stages — open like a coach who remembers them. They have just worked through the VIA character strengths: kept the ones that fit, added any they'd leaned on that hadn't come up, and starred a signature few. They did NOT say where any of these might show up in retirement — that work is this conversation's, not theirs to arrive with. Help each signature strength find a real home in the retirement they're designing. This is recognition, not assessment.
@@ -2107,7 +2116,7 @@ Name their signature strengths in their words, as things they already have and n
         interaction: {
           type: "value-triage",
           instruction:
-            "These come from a recognised set of values. Here are the ones I think I can see mattering to you, drawn from what you've told me. Sort each into a tray — there's no right answer, and \"not sure\" is a fine place to leave one.",
+            "These come from a recognised set of values. Here are the ones I think I can see mattering to you, drawn from what you've told me. Decide whether each one rings true for you, doesn't, or you're not sure — there's no right answer, and \"not sure\" is a fine place to leave one.",
           paletteLabel: "Look through the rest",
           paletteIntro:
             "Here's the rest of the set. Is there anything here that matters to you that hasn't come up yet? Tap any that fit to add them.",
@@ -2468,25 +2477,25 @@ Mirror back, in their words: the window or timing they're picturing (however wid
       },
       {
         id: "4.2",
-        title: "The seasons of retirement",
+        title: "The chapters of retirement",
         description:
-          "Retirement isn't one long chapter — it unfolds in seasons. A map of how your priorities might shift over the years, and what you'd want to keep throughout.",
+          "Retirement isn't one long stretch — it unfolds in chapters. A map of how your priorities might shift over the years, and what you'd want to keep throughout.",
         durationMin: 15,
         primer: [
           {
             type: "text",
-            value: `[Placeholder — SMW to replace.] Retirement is often spoken about as though it were one long, unchanging stage of life. In reality it tends to unfold through a series of seasons. Early years may bring greater freedom, energy and opportunity. Later years bring different priorities, relationships and ways of spending time. Many people carry an unspoken pressure that retirement must be fully designed before it begins. The truer, gentler picture: you are not planning a single fixed future, you are planning for a life that will keep evolving.`,
+            value: `[Placeholder — SMW to replace.] Retirement is often spoken about as though it were one long, unchanging stage of life. In reality it tends to unfold through a series of chapters. Early years may bring greater freedom, energy and opportunity. Later years bring different priorities, relationships and ways of spending time. Many people carry an unspoken pressure that retirement must be fully designed before it begins. The truer, gentler picture: you are not planning a single fixed future, you are planning for a life that will keep evolving.`,
           },
           {
             type: "text",
-            value: `[Placeholder — SMW to replace.] In Stage 1 you pictured a single day. Now widen the lens to decades. Below is a board with three broad seasons — early, middle and later years — and a lane that runs across all of them for the things you'd want to hold onto throughout. You'll find some cards drawn from what you've already told us: hopes, activities, people, sources of purpose. Place each one where it feels most alive, in more than one season if it belongs there, or in the enduring lane if it runs through everything. Add your own where something's missing.`,
+            value: `[Placeholder — SMW to replace.] In Stage 1 you pictured a single day. Now widen the lens to decades. Below is a board with three broad chapters — early, middle and later years — and a lane that runs across all of them for the things you'd want to hold onto throughout. You'll find some cards drawn from what you've already told us: hopes, activities, people, sources of purpose. Place each one where it feels most alive, in more than one chapter if it belongs there, or in the enduring lane if it runs through everything. Add your own where something's missing.`,
           },
         ],
-        coachOpening: `Here's the board you've laid out — your retirement sketched as seasons rather than one long stretch. Let's start at the beginning: in those early years, while you've got the most energy and freedom, what matters most to you to do?`,
+        coachOpening: `Here's the board you've laid out — your retirement sketched as chapters rather than one long stretch. Let's start at the beginning: in those early years, while you've got the most energy and freedom, what matters most to you to do?`,
         interaction: {
           type: "seasons-board",
           boardInstruction:
-            "Place each card in the season where it feels most alive. Something can sit in more than one season, or in the enduring lane if it runs across all of them. Add your own where a card is missing.",
+            "Place each card in the chapter where it feels most alive. Something can sit in more than one chapter, or in the enduring lane if it runs across all of them. Add your own where a card is missing.",
           seasons: [
             {
               id: "early",
@@ -2507,31 +2516,31 @@ Mirror back, in their words: the window or timing they're picturing (however wid
           enduringLane: {
             id: "enduring",
             label: "Throughout",
-            hint: "Runs across every season",
+            hint: "Runs across every chapter",
           },
           addOwnLabel: "Add your own",
           addOwnPlaceholder: "Something else that matters…",
-          summaryLabel: "Your seasons board",
+          summaryLabel: "Your chapters board",
         },
         sessionInstructions: `PURPOSE
-You already know this person from the earlier stages — open like a coach who remembers them. They have just laid out a "seasons board": cards drawn from their earlier answers (hopes, activities, people, sources of purpose) sorted into early, middle and later years, or an enduring lane for what runs throughout. Your job is to widen their lens — from the single day they pictured in Stage 1 to a life that keeps evolving — and help them see how priorities may shift across the seasons while certain threads endure. The outcome is a broad sense of the shape of their retirement, not a fixed roadmap.
+You already know this person from the earlier stages — open like a coach who remembers them. They have just laid out a "chapters board": cards drawn from their earlier answers (hopes, activities, people, sources of purpose) sorted into early, middle and later years, or an enduring lane for what runs throughout. Your job is to widen their lens — from the single day they pictured in Stage 1 to a life that keeps evolving — and help them see how priorities may shift across the chapters while certain threads endure. The outcome is a broad sense of the shape of their retirement, not a fixed roadmap.
 
 MOST IMPORTANT
 The deeper purpose is how meaning, connection and fulfilment evolve over time — not simply how hobbies change. Two things to capture before closing: their priorities for early retirement (what they most want while energy and freedom are greatest), and the enduring threads (the values and relationships they want to hold throughout). Work the board they built — start with the early years, move through to later years, then name what runs across all of them.
 
 HOW TO RUN IT
-- Open by widening the lens explicitly: they imagined a Tuesday in Stage 1; now you're looking at decades. Reflect the relevant prior-stage material as you introduce the seasons.
+- Open by widening the lens explicitly: they imagined a Tuesday in Stage 1; now you're looking at decades. Reflect the relevant prior-stage material as you introduce the chapters.
 - Early years: while energy and flexibility are greatest, what do they most want to do? Are there experiences or ambitions they would not want to postpone?
 - Middle years: what feels important about that stretch?
 - Later years: approach with continuity and adaptation, never decline. Which relationships do they hope grow more important over time? What sources of purpose or enjoyment feel sustainable across stages?
 - Enduring lane: what would they want to remain constant, regardless of age or circumstance?
-- Help them distinguish aspirations that belong to a particular season from those that are enduring priorities.
+- Help them distinguish aspirations that belong to a particular chapter from those that are enduring priorities.
 - Aim to reach your close within roughly five to seven exchanges.
 
 HOLD BACK WHERE
 - Do NOT frame later retirement as decline, loss or limitation — broaden the perspective without creating anxiety about ageing.
-- Do NOT treat the seasons as a rigid prediction. They are a planning lens; retirement unfolds differently for everyone, and the board can change.
-- Do NOT over-focus on activities and hobbies. Keep returning to meaning, connection and what gives a season its purpose.
+- Do NOT treat the chapters as a rigid prediction. They are a planning lens; retirement unfolds differently for everyone, and the board can change.
+- Do NOT over-focus on activities and hobbies. Keep returning to meaning, connection and what gives a chapter its purpose.
 - The person should leave with a sense of direction, not a locked-in roadmap. Encourage flexibility.
 
 CLOSING

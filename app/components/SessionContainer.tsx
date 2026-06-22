@@ -2209,9 +2209,26 @@ function stripMarkdown(text: string): string {
 }
 
 function CoachBubble({ text }: { text: string }) {
+  // Vita breaks longer replies into paragraphs with a blank line between them.
+  // The bubble collapses whitespace, so render each paragraph as its own block
+  // (splitting on any run of newlines) to keep the spacing she intended. Short
+  // replies are a single paragraph and look exactly as before.
+  const paragraphs = stripMarkdown(text)
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   return (
     <div style={styles.coachRow}>
-      <div style={styles.coachBubble}>{stripMarkdown(text)}</div>
+      <div style={styles.coachBubble}>
+        {(paragraphs.length ? paragraphs : [""]).map((p, i) => (
+          <p
+            key={i}
+            style={i === 0 ? styles.coachParagraph : styles.coachParagraphNext}
+          >
+            {p}
+          </p>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2534,6 +2551,16 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     maxWidth: "85%",
     textAlign: "left",
+  },
+  // One paragraph of a coach message. The first has no outer margin, so a
+  // single-paragraph bubble looks exactly as before; later paragraphs carry a
+  // top margin that becomes the blank line Vita intended in a longer reply.
+  coachParagraph: {
+    margin: 0,
+  },
+  coachParagraphNext: {
+    margin: 0,
+    marginTop: "0.75em",
   },
   typingBubble: {
     display: "inline-flex",

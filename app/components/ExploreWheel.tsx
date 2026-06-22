@@ -112,6 +112,8 @@ export default function ExploreWheel({ areas }: { areas: RevealArea[] }) {
         source you can reveal below.
       </h3>
 
+      <p className="exw-hint">Tap each area to see more.</p>
+
       <div className="exw-wheel">
         <svg
           viewBox="0 0 300 300"
@@ -233,6 +235,7 @@ function DetailCard({ area }: { area: RevealArea }) {
 const css = `
 .exw .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .exw{margin:0 auto;max-width:440px}
+.exw-hint{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:600;color:var(--text-muted);text-align:center;margin:0}
 
 .exw-wheel{position:relative;width:300px;height:300px;margin:6px auto 2px}
 .exw-wheel svg{display:block}

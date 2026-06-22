@@ -689,6 +689,9 @@ export default function RlpPlanDocument({
       {/* §3 — values */}
       <section className="rlp-section">
         <SectionHead index={3} eyebrow="Your compass" title="What matters most to you" />
+        {values.coreValues.length > 0 && (
+          <p className="rlp-tap-hint">Tap each value to read what it means to you.</p>
+        )}
         <ValuesCompass
           values={values.coreValues}
           buckets={{ nonNegotiable: values.nonNegotiables, flexible: values.flexible }}
@@ -1002,6 +1005,7 @@ const css = `
 .rlp-star{color:var(--accent);margin-right:7px;font-size:13px}
 
 /* §3 compass */
+.rlp-tap-hint{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:600;color:var(--text-muted);margin:14px 0 0}
 .rlp-compass-wrap{display:grid;grid-template-columns:minmax(0,300px) 1fr;gap:28px;align-items:center}
 .rlp-compass{width:100%;max-width:300px;height:auto;aspect-ratio:1/1}
 .rlp-compass-ring{fill:var(--warm-surface);stroke:var(--warm-line);stroke-width:1.5}
