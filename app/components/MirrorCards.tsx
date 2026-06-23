@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { MirrorCardsInteraction, MirrorCardsResult } from "@/lib/modules";
 import { VIA_CLUSTERS, type Stage3Seed } from "@/lib/stage3Seed";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // 3.1 "Your strengths" — a mirror surface built on the fixed VIA character
 // strengths, so the whole module is recognition against a known list. Three
@@ -186,7 +186,9 @@ export default function MirrorCards({
       )}
 
       {/* Movement 1 — the ones that fit */}
-      <div style={styles.cardList}>
+      <div style={styles.helperGroup}>
+        <HelperLine>Tap Keep or Set aside on each one.</HelperLine>
+        <div style={styles.cardList}>
         {cards.map((card, i) => (
           <div
             key={`${card.label}-${i}`}
@@ -238,6 +240,7 @@ export default function MirrorCards({
             </div>
           </div>
         ))}
+        </div>
       </div>
 
       {/* Movement 2 — the rest of the list */}
@@ -367,6 +370,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     textDecoration: "underline",
     textUnderlineOffset: "2px",
+  },
+  // Keep the helper line close above the first card (tighter than the wrap's
+  // 24px gap) so it reads as a cue for the cards, not a separate block.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
   },
   cardList: {
     display: "flex",

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ValueTriageInteraction, ValueTriageResult } from "@/lib/modules";
 import { VALUE_CLUSTERS, type Stage3Seed } from "@/lib/stage3Seed";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // 3.2 "Your values" — a triage surface built on the fixed value set, so the
 // module is recognition against a known set (the same way 3.1 uses VIA). Seeded
@@ -143,7 +143,11 @@ export default function ValueTriage({
       <style>{triageCss}</style>
       <p style={styles.instruction}>{interaction.instruction}</p>
 
-      <div style={styles.cardList}>
+      <div style={styles.helperGroup}>
+        <HelperLine>
+          Tap where each value belongs — that&apos;s me, not sure, or not really.
+        </HelperLine>
+        <div style={styles.cardList}>
         {cards.map((card, i) => (
           <div key={`${card.label}-${i}`} style={styles.card}>
             <div style={styles.cardMain}>
@@ -172,6 +176,7 @@ export default function ValueTriage({
             </div>
           </div>
         ))}
+        </div>
       </div>
 
       <div style={styles.paletteBlock}>
@@ -328,6 +333,9 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-muted)",
     margin: 0,
   },
+  // Keep the helper line close above the first card (tighter than the wrap's
+  // 24px gap) so it reads as a cue for the cards, not a separate block.
+  helperGroup: { display: "flex", flexDirection: "column", gap: "14px" },
   cardList: { display: "flex", flexDirection: "column", gap: "12px" },
   card: {
     display: "flex",
