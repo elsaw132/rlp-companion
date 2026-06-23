@@ -876,6 +876,104 @@ export type Stage = {
   modules: Module[];
 };
 
+// ---- Senses module (2.6): age-gated hearing-check recommendation -----------
+// The "book a hearing check" recommendation is only meant for people aged 50 or
+// over. We capture no birthdate — the only age signal is the onboarding
+// retirement-horizon band — so we treat anyone within ~10 years of retirement
+// (almost certainly 50+, since retirement isn't reachable much before the
+// mid-50s), or unsure how far off it is, as in scope. People more than 10 years
+// out are likely still in their forties, so the recommendation is withheld from
+// them; and with no horizon recorded at all we also withhold it rather than push
+// it on someone who may be well under 50.
+export function hearingCheckRecommended(
+  horizon: string | null | undefined
+): boolean {
+  return (
+    horizon === "Less than 2 years" ||
+    horizon === "2–5 years" ||
+    horizon === "5–10 years" ||
+    horizon === "Not sure"
+  );
+}
+
+// The senses module's private guidance to Vita. The base is shown to everyone;
+// one of the two hearing blocks below is appended at request time depending on
+// whether the hearing-check recommendation is in scope for this person.
+const SENSES_BASE_INSTRUCTIONS = `PURPOSE
+You already know this person from the Imagine stage — open like a coach who remembers them, not a fresh chatbot. They have just marked when they last had an eye test and a hearing check (shown under WHAT THEY BUILT). This is a short, practical module about two senses only: sight and hearing. Help them see where they stand on a couple of simple, low-effort habits. This is the last Explore module — close the whole stage warmly.
+
+TONE — IMPORTANT
+Keep it warm, plain and practical. Inform, don't urge. Offer any check as a worthwhile option someone might choose, never as something they "really should" do, and never with urgency or alarm. One light mention is plenty. If they're not interested, accept it cleanly and move on — no persuasion.
+
+HOW TO RUN IT
+- The eye test: if theirs is recent, acknowledge it warmly — they're already on it. If it was a while ago or they can't remember, you can note lightly that a routine eye test is an easy thing to book whenever it suits them. No pressure.
+- Keep it short — a few turns, one question at a time.
+- Right after you close, a small step will appear where they can set a rhythm for keeping these checks up, so you do NOT need to pin down exact dates or frequencies yourself. Just leave the door open warmly in your wrap-up.
+
+MUST NOT
+- No catastrophising about loss. No dramatic framing. No "while you still can".
+- No medical advice, diagnosis, or condition education beyond a simple, practical booking mention.
+- If they mention an existing eye or hearing condition, handle it with real care — don't assume the general case, and don't imply they've done anything wrong.
+
+CLOSING
+Acknowledge warmly that this is the last Explore module and they've now finished the whole stage — grounded and real, not a fanfare. A brief, specific nod to the Imagine picture is welcome if it fits. Then bridge into the next stage, Understand, where you'll help them see what matters most across everything they've pictured.
+
+WATCH FOR
+- If fear of decline surfaces, stay calm and practical — bring it back to the simple, everyday habit they can act on whenever they choose.
+- Welcome revisions — that's them building the picture.`;
+
+// Appended when the hearing-check recommendation is in scope (likely 50+).
+const SENSES_HEARING_REC_BLOCK = `THE HEARING CHECK — OFFER GENTLY, ONLY IF IT FITS
+This person is at an age where an occasional hearing check is a sensible norm, so it's fine to mention it. If their hearing check is recent, just acknowledge it warmly. If it was a while ago, they've never had one, or they can't remember, you may note — once, lightly, as a worthwhile option rather than advice — that many people have a quick hearing check every few years from around 50, and it's easy to arrange. Offer it neutrally and let it rest. Do not press, do not ask them to commit to a date or when they could "realistically" book one, and never imply they've left it too long. If they're not interested, move on warmly.`;
+
+// Appended instead when it is out of scope (likely under 50, or age unknown):
+// Vita acknowledges the answer but never suggests booking a hearing check.
+const SENSES_NO_HEARING_REC_BLOCK = `THE HEARING CHECK — DO NOT RAISE IT
+This person is not yet at the age where a routine hearing check is the norm, so do NOT suggest booking one, and do not treat a "longer ago", "never", or "can't remember" answer about hearing as something to act on. If they raise it themselves, you can say plainly that a routine hearing check is something that becomes worthwhile from around 50. Otherwise, acknowledge their answer lightly and keep your focus on the eye test.`;
+
+// The closing plan step. The default covers sight and hearing (for people the
+// hearing recommendation is in scope for); the eye-only variant drops hearing
+// for everyone else.
+const SENSES_COMMITMENT: ClosingCommitment = {
+  prompt: "Would you like to add regular eye and hearing checks to your plan?",
+  frequencyLabel: "A rhythm that suits you",
+  frequencyOptions: ["Every year", "Every 2 years"],
+  actionLabel: "A first step, if one comes to mind (optional)",
+  actionPlaceholder: "e.g. book an eye test this month",
+  confirmLabel: "Add to my plan",
+  skipLabel: "Maybe later",
+};
+
+const SENSES_COMMITMENT_EYE_ONLY: ClosingCommitment = {
+  prompt: "Would you like to add regular eye tests to your plan?",
+  frequencyLabel: "A rhythm that suits you",
+  frequencyOptions: ["Every year", "Every 2 years"],
+  actionLabel: "A first step, if one comes to mind (optional)",
+  actionPlaceholder: "e.g. book an eye test this month",
+  confirmLabel: "Add to my plan",
+  skipLabel: "Maybe later",
+};
+
+// Request-time builders: the senses module's guidance and closing step, tailored
+// to whether the hearing-check recommendation is in scope for this person's
+// retirement horizon. Called from the session page, which has the horizon.
+export function sensesSessionInstructions(
+  horizon: string | null | undefined
+): string {
+  const hearingBlock = hearingCheckRecommended(horizon)
+    ? SENSES_HEARING_REC_BLOCK
+    : SENSES_NO_HEARING_REC_BLOCK;
+  return `${SENSES_BASE_INSTRUCTIONS}\n\n${hearingBlock}`;
+}
+
+export function sensesClosingCommitment(
+  horizon: string | null | undefined
+): ClosingCommitment {
+  return hearingCheckRecommended(horizon)
+    ? SENSES_COMMITMENT
+    : SENSES_COMMITMENT_EYE_ONLY;
+}
+
 // The full programme has five stages; only Stage 1 (Imagine) content exists so
 // far. Stages 2–5 are listed here (name + subtitle) so the dashboard can render
 // the full sidebar nav and the five-stage arc from one source; their modules
@@ -1928,18 +2026,26 @@ WATCH FOR
       },
       {
         id: "2.6",
-        title: "Your senses",
+        title: "Your sight and hearing",
         description:
-          "Vision and hearing shape how you experience everything else — and they're surprisingly easy to look after with a couple of small, regular habits.",
+          "Just two senses — sight and hearing. They shape how you take in everything around you, and they're easy to look after with a couple of small, regular habits.",
         durationMin: 15,
         primer: [
           {
             type: "text",
-            value: `[Placeholder — SMW to replace.] This module is about two senses that quietly shape your whole experience of retirement: vision and hearing. The good news first — most changes here are common, gradual and correctable. Needing reading glasses in your forties is near-universal; cataracts are very common and very treatable; even the more serious conditions are highly manageable when they're caught early. None of this is about decline. The single most striking finding is about hearing: the Lancet Commission identifies untreated hearing loss as the largest modifiable risk factor for dementia — partly through less mental stimulation, partly through people slowly withdrawing from company. And the real cost isn't dramatic loss. It's the quiet gap: hearing aid uptake is under a third of those who'd benefit, and people wait around ten years on average between first noticing a change and getting it checked.`,
+            value: `[Placeholder — SMW to replace.] A quick word on what this covers. It's about two of your senses — your sight and your hearing. Not taste, smell or touch. These two shape how you take in almost everything around you, which is why they're worth a few minutes.`,
           },
           {
             type: "text",
-            value: `[Placeholder — SMW to replace.] What makes this worth ten minutes is how simple the upkeep is. Routine eye tests (every couple of years, yearly from 60). A hearing check from around 50. Early correction when it's needed — modern hearing aids are nothing like the ones you might picture. And everyday protection from loud noise and strong sun. Small, regular maintenance that compounds quietly over years. So this isn't a module about preparing for things to go wrong — it's the simplest, highest-return habit in retirement health. Let's just check where you are with the basics.`,
+            value: `[Placeholder — SMW to replace.] The good news comes first. Most changes to sight and hearing are common, gradual, and straightforward to put right. Reading glasses in your forties are near-universal. Cataracts are very common and very treatable. Even the more serious conditions are very manageable when they're caught early. None of this is about decline.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] The simplest habit is just keeping an eye on the basics. A routine eye test every couple of years — yearly once you're past 60 — picks up most things early. Hearing tends to change slowly, so an occasional check becomes a sensible norm from around 50, roughly every three years.`,
+          },
+          {
+            type: "text",
+            value: `[Placeholder — SMW to replace.] So this isn't about preparing for things to go wrong. It's some of the easiest, highest-return upkeep there is. Let's just see where you are with the basics.`,
           },
           {
             type: "links",
@@ -1955,7 +2061,7 @@ WATCH FOR
             ],
           },
         ],
-        coachOpening: `Thanks for marking those two down — quick to answer, but they matter more than almost anything else in this area. Let's take a look at where you've landed.`,
+        coachOpening: `Thanks for marking those two down — quick to answer, and a useful place to round off Explore. Let's take a look at where you've landed.`,
         interaction: {
           type: "screening-check",
           instruction: "Two quick ones — just tap the closest answer for each.",
@@ -1968,44 +2074,23 @@ WATCH FOR
             {
               id: "hearing",
               prompt: "When did you last have a hearing check?",
-              options: ["Within the last 2 years", "Longer ago", "Can't remember"],
+              options: [
+                "Within the last 2 years",
+                "Longer ago",
+                "Never",
+                "Can't remember",
+              ],
             },
           ],
         },
-        closingCommitment: {
-          prompt:
-            "Would you like to make regular eye and hearing checks part of your plan?",
-          frequencyLabel: "A sensible rhythm",
-          frequencyOptions: ["Every year", "Every 2 years"],
-          actionLabel: "A first step, if one comes to mind (optional)",
-          actionPlaceholder: "e.g. book an eye test this month",
-          confirmLabel: "Add to my plan",
-          skipLabel: "Maybe later",
-        },
+        // Both the closing plan step and the conversation guidance are tailored to
+        // the person's age at request time (see sensesClosingCommitment /
+        // sensesSessionInstructions). These statics are the safe defaults if the
+        // builders are ever bypassed: the closing step covers sight + hearing, and
+        // the instructions are the neutral base with no hearing nudge.
+        closingCommitment: SENSES_COMMITMENT,
         closeInOneStep: true,
-        sessionInstructions: `PURPOSE
-You already know this person from the Imagine stage — open like a coach who remembers them, not a fresh chatbot. They have just marked when they last had an eye test and a hearing check (shown under WHAT THEY BUILT). This is a short, practical module: help them see where they stand on two simple, high-return habits. This is the last Explore module — close the whole stage warmly.
-
-TONE — IMPORTANT
-This is the one module where you may be mildly directive. The evidence here is the strongest in the programme and the actions are simple and binary, so a gentle, concrete nudge is more useful than an open-ended conversation. Stay warm and practical — never urgent, never alarming. If they push back or aren't interested, accept it cleanly and move on. No persuasion.
-
-HOW TO RUN IT
-- If both checks are recent: acknowledge it warmly — they're already on it, which is the single best thing they can do in this area.
-- If either is overdue, or they can't remember: name it directly but kindly — worth booking in. Single out the hearing check especially: the evidence on what early correction does for long-term brain health is strong. Ask when booking it would feel realistic for them.
-- Keep it short — a few turns, one question at a time.
-- Right after you close, a small step will appear where they can set a rhythm for keeping these checks up — so you do NOT need to pin down exact dates or frequencies yourself. Just open the door to it warmly in your wrap-up.
-
-MUST NOT
-- No catastrophising about loss. No dramatic framing. No "while you still can".
-- No medical advice, diagnosis, or condition education beyond the simple, practical booking nudge.
-- If they mention an existing eye or hearing condition, handle it with real care — don't assume the general case, and don't imply they've done anything wrong.
-
-CLOSING
-Acknowledge warmly that this is the last Explore module and they've now completed the whole stage — genuine and grounded, not a fanfare. A brief, specific nod to the Imagine picture is welcome if it fits. Then bridge into the next stage, Understand, where you'll help them see what matters most across everything they've pictured.
-
-WATCH FOR
-- If fear of decline surfaces, stay calm and practical — bring it back to the simple, high-return habit they can act on now.
-- Welcome revisions — that's them building the picture.`,
+        sessionInstructions: SENSES_BASE_INSTRUCTIONS,
       },
     ],
   },

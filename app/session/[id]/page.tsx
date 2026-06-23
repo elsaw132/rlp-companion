@@ -3,7 +3,13 @@ import { auth } from "@clerk/nextjs/server";
 import SessionContainer from "../../components/SessionContainer";
 import { ResetModuleLink } from "../../components/ResetControls";
 import { ModulesBackLink } from "../../components/ModulesBackLink";
-import { getModule, getNextModule, getModulesBefore } from "@/lib/modules";
+import {
+  getModule,
+  getNextModule,
+  getModulesBefore,
+  sensesSessionInstructions,
+  sensesClosingCommitment,
+} from "@/lib/modules";
 import { getUserData } from "@/lib/db";
 
 export default async function SessionPage({
@@ -52,6 +58,31 @@ export default async function SessionPage({
       if (!unlocked) redirect("/home");
     }
   }
+
+  // The senses module (2.6) age-gates its hearing-check recommendation on the
+  // person's retirement horizon — the only age signal we capture at onboarding.
+  // Read it here so the conversation guidance and the closing plan step can be
+  // tailored before they reach the client. Any miss (no data, a DB hiccup) falls
+  // back to withholding the hearing nudge rather than showing it to everyone.
+  const isSenses = mod.id === "2.6";
+  let horizon: string | null = null;
+  if (isSenses && userId) {
+    try {
+      const onboarding = await getUserData(userId, "onboarding");
+      if (onboarding && typeof onboarding === "object") {
+        const h = (onboarding as { horizon?: unknown }).horizon;
+        if (typeof h === "string") horizon = h;
+      }
+    } catch {
+      horizon = null;
+    }
+  }
+  const sessionInstructions = isSenses
+    ? sensesSessionInstructions(horizon)
+    : mod.sessionInstructions;
+  const closingCommitment = isSenses
+    ? sensesClosingCommitment(horizon)
+    : mod.closingCommitment;
 
   // The next module in this stage, if there is one — offered as a secondary
   // action on completion, alongside returning to the hub. Null on the last
@@ -106,9 +137,9 @@ export default async function SessionPage({
         durationMin={mod.durationMin}
         primer={mod.primer}
         coachOpening={mod.coachOpening}
-        sessionInstructions={mod.sessionInstructions}
+        sessionInstructions={sessionInstructions}
         interaction={mod.interaction}
-        closingCommitment={mod.closingCommitment}
+        closingCommitment={closingCommitment}
         closeInOneStep={mod.closeInOneStep ?? false}
       />
     </main>
