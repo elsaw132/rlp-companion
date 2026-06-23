@@ -104,3 +104,46 @@ export async function deleteAllUserData(userId: string): Promise<void> {
   await ensureTable();
   await sql()`DELETE FROM user_data WHERE user_id = ${userId}`;
 }
+
+// --- Feedback -------------------------------------------------------------
+// Tester feedback submitted from the in-app feedback panel. Separate table
+// (not user_data) because it's append-only and not keyed per user/key: one row
+// per submission, with the page the tester was on so we know where it came
+// from. reply_email is optional — only set when the tester asks for a reply.
+let feedbackTableReady: Promise<void> | null = null;
+
+function ensureFeedbackTable(): Promise<void> {
+  if (!feedbackTableReady) {
+    feedbackTableReady = sql()`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        user_id text NOT NULL,
+        message text NOT NULL,
+        reply_email text,
+        page text,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `
+      .then(() => undefined)
+      .catch((err) => {
+        feedbackTableReady = null;
+        throw err;
+      });
+  }
+  return feedbackTableReady;
+}
+
+// Record one feedback submission. user_id always comes from the authenticated
+// Clerk session at the call site, never from client input.
+export async function insertFeedback(input: {
+  userId: string;
+  message: string;
+  replyEmail: string | null;
+  page: string | null;
+}): Promise<void> {
+  await ensureFeedbackTable();
+  await sql()`
+    INSERT INTO feedback (user_id, message, reply_email, page)
+    VALUES (${input.userId}, ${input.message}, ${input.replyEmail}, ${input.page})
+  `;
+}

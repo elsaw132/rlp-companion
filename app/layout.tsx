@@ -2,6 +2,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import "./globals.css";
 import { UserDataProvider } from "@/lib/userData";
+import FeedbackButton from "./components/FeedbackButton";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -23,31 +24,8 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
           <UserDataProvider>{children}</UserDataProvider>
-          {/* Global feedback button — fixed bottom-right on every screen. */}
-          <a
-            href="https://tally.so"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              position: "fixed",
-              right: "22px",
-              bottom: "22px",
-              background: "var(--ink)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "var(--r-pill)",
-              padding: "11px 18px",
-              fontSize: "13px",
-              fontWeight: 600,
-              boxShadow: "var(--shadow-md)",
-              display: "flex",
-              alignItems: "center",
-              gap: "7px",
-              zIndex: 20,
-            }}
-          >
-            💬 Feedback
-          </a>
+          {/* Global in-app feedback panel — fixed bottom-right on every screen. */}
+          <FeedbackButton />
         </ClerkProvider>
       </body>
     </html>
