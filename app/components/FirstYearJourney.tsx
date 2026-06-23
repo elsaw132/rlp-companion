@@ -29,6 +29,7 @@ import {
   type FirstYearKind,
 } from "@/lib/firstYearSeed";
 import { useUserData } from "@/lib/userData";
+import { HelperLine } from "./InteractionShell";
 
 // One item on the timeline. `season` is one of the four phase ids or ALL_YEAR;
 // `top` is a headline moment; `fixed` is the ongoing-work footprint; `own` marks
@@ -577,18 +578,23 @@ export default function FirstYearJourney({
     <section style={styles.wrap}>
       <style>{journeyCss}</style>
 
-      <YearTimeline
-        items={items}
-        seasons={seasons}
-        allYearLabel={allYearLabel}
-        workLaneLabel={workLaneLabel}
-        noWorkLabel={noWorkLabel}
-        topLabel={topLabel}
-        interactive
-        onMove={moveItem}
-        onToggleTop={toggleTop}
-        onRemove={removeItem}
-      />
+      <div style={styles.helperGroup}>
+        <HelperLine>
+          Drag a piece to another phase, or tap a moment to star it.
+        </HelperLine>
+        <YearTimeline
+          items={items}
+          seasons={seasons}
+          allYearLabel={allYearLabel}
+          workLaneLabel={workLaneLabel}
+          noWorkLabel={noWorkLabel}
+          topLabel={topLabel}
+          interactive
+          onMove={moveItem}
+          onToggleTop={toggleTop}
+          onRemove={removeItem}
+        />
+      </div>
 
       {/* The story Vita writes from the arc */}
       <div style={styles.narrativeCard}>
@@ -788,6 +794,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: "var(--ink)",
     margin: 0,
+  },
+  // Keep the helper line close above the timeline (tighter than the wrap's 20px
+  // gap) so it reads as a cue for the element, not a separate block.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
   },
   // ---- timeline ----
   timeline: {

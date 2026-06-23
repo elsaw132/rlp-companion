@@ -6,7 +6,7 @@ import type {
   SeasonsBoardResult,
 } from "@/lib/modules";
 import type { SeasonCard } from "@/lib/userModel";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // One card on the board: the label, the category it was drawn from (absent for
 // cards the person added), whether they added it, and the season labels it
@@ -146,7 +146,11 @@ export default function SeasonsBoard({
       <p style={styles.instruction}>{boardInstruction}</p>
 
       {/* The cards to place */}
-      <div style={styles.cardList}>
+      <div style={styles.helperGroup}>
+        <HelperLine>
+          Tap a card&apos;s seasons to place it — a card can sit in more than one.
+        </HelperLine>
+        <div style={styles.cardList}>
         {items.map((item, index) => (
           <div key={`${item.label}-${index}`} style={styles.card}>
             <div style={styles.cardHead}>
@@ -204,6 +208,7 @@ export default function SeasonsBoard({
             </div>
           </div>
         ))}
+        </div>
       </div>
 
       {/* Add your own */}
@@ -319,6 +324,13 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  // Keep the helper line close above the cards (tighter than the wrap's 28px
+  // gap) so it reads as a cue for the element, not a separate block.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
   },
   cardList: {
     display: "flex",

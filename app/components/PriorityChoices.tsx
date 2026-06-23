@@ -6,7 +6,7 @@ import type {
   PriorityChoicesResult,
 } from "@/lib/modules";
 import type { Stage3Seed } from "@/lib/stage3Seed";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // 3.3 "What matters most" — quick-fire either/or trade-offs drawn from this
 // person's own picture, then an adjustable ranking of the values those choices
@@ -134,7 +134,9 @@ export default function PriorityChoices({
       <style>{choicesCss}</style>
       <p style={styles.instruction}>{interaction.instruction}</p>
 
-      <div style={styles.pairList}>
+      <div style={styles.helperGroup}>
+        <HelperLine>Tap whichever pulls harder.</HelperLine>
+        <div style={styles.pairList}>
         {pairs.map((pair, i) => (
           <div key={`${pair.left}-${i}`} style={styles.pair}>
             <div style={styles.optionRow}>
@@ -191,11 +193,15 @@ export default function PriorityChoices({
             </div>
           </div>
         ))}
+        </div>
       </div>
 
       {ranked.length > 0 && (
         <div style={styles.rankBlock}>
           <p style={styles.subLabel}>{interaction.rankLabel}</p>
+          <HelperLine>
+            Tap the arrows to put them in order, most important first.
+          </HelperLine>
           <ol style={styles.rankList}>
             {ranked.map((value, i) => (
               <li key={value} style={styles.rankItem}>
@@ -290,6 +296,13 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  // Keep the helper line close above the first pair (tighter than the wrap's
+  // 24px gap) so it reads as a cue for the element, not a separate block.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
   },
   pairList: { display: "flex", flexDirection: "column", gap: "14px" },
   pair: {

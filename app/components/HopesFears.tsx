@@ -8,7 +8,7 @@ import {
   PARTNER_FEARS,
   type Stage3Seed,
 } from "@/lib/stage3Seed";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // 3.5 "Hopes and fears" — the quieter half of the picture. A short read-only
 // hopes line opens it as a warm on-ramp; then the person reacts to candidate fear
@@ -203,6 +203,9 @@ export default function HopesFears({
 
       <p style={styles.instruction}>{interaction.instruction}</p>
 
+      <div style={styles.helperGroup}>
+        <HelperLine>Tap how each one sits with you.</HelperLine>
+        <div style={styles.horizonList}>
       {horizons.map((horizon) => {
         const cardsHere = cards
           .map((c, i) => ({ c, i }))
@@ -323,6 +326,8 @@ export default function HopesFears({
           </div>
         );
       })}
+        </div>
+      </div>
 
       <FinishControls
         mode={mode}
@@ -425,6 +430,19 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  // Keep the helper line close above the first cards (tighter than the wrap's
+  // 24px gap) so it reads as a cue for the element, not a separate block.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  },
+  // The horizon blocks keep the wrap's original 24px rhythm between them.
+  horizonList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "24px",
   },
   horizonBlock: { display: "flex", flexDirection: "column", gap: "12px" },
   horizonName: {

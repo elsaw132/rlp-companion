@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { RolePickerInteraction, RolePickerResult } from "@/lib/modules";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 const MAX_STARRED = 3;
 
@@ -112,11 +112,21 @@ export default function RolePicker({
         ? `Pick ${minPicks === 1 ? "one" : minPicks}.`
         : `Choose ${minPicks} to ${maxPicks}.`
       : null;
+  // The button hint now carries only the count gate; how to act on the chips
+  // (tap, add your own, star) lives in the helper line above the element.
   const finishHint = !countOk
     ? rangeHint ?? "Pick at least one to carry forward."
-    : starrable
-      ? "Star up to three that feel most alive."
-      : undefined;
+    : undefined;
+
+  // The per-exercise cue, assembled from the picker's flags so it always matches
+  // what's actually on screen (count rule, the add-your-own field, starring).
+  const tapClause = selectRange
+    ? "Tap the ones you'd like"
+    : "Tap each one you'd like — as many or few as you want";
+  let helperText = allowCustom
+    ? `${tapClause}, then type your own and press Add.`
+    : `${tapClause}.`;
+  if (starrable) helperText += " Then star up to three that feel most alive.";
 
   return (
     <section
@@ -130,7 +140,9 @@ export default function RolePicker({
 
       <p style={styles.instruction}>{instruction}</p>
 
-      <div style={styles.groups}>
+      <div style={styles.helperGroup}>
+        <HelperLine>{helperText}</HelperLine>
+        <div style={styles.groups}>
         {groups.map((group) => {
           const options = [...group.options, ...(extras[group.name] ?? [])];
           return (
@@ -212,6 +224,7 @@ export default function RolePicker({
             </div>
           );
         })}
+        </div>
       </div>
 
       {!embedded && (
@@ -244,6 +257,13 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  // Keep the helper line close above the first chips (tighter than the wrap's
+  // 28px gap) so it reads as a cue for the element, not a separate block.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
   },
   groups: {
     display: "flex",

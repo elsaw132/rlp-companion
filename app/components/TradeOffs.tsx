@@ -16,7 +16,7 @@ import {
   type TradeOffsSeed,
 } from "@/lib/tradeOffsSeed";
 import { useUserData } from "@/lib/userData";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 type Bucket = "non-negotiable" | "flexible" | "unsorted";
 
@@ -325,6 +325,9 @@ export default function TradeOffs({
       {/* 1 — the trade-off scenarios */}
       <div style={styles.block}>
         <p style={styles.sectionLabel}>{scenariosLabel}</p>
+        <HelperLine>
+          Drag the slider to where you&apos;d lean, and add what you&apos;d protect.
+        </HelperLine>
         <div style={styles.scenarioList}>
           {scenarios.map((s) => (
             <ScenarioCard
@@ -347,6 +350,7 @@ export default function TradeOffs({
         <div style={styles.block}>
           <p style={styles.sectionLabel}>{valuesLabel}</p>
           <p style={styles.subInstruction}>{valuesInstruction}</p>
+          <HelperLine>Sort each value into non-negotiable or flexible.</HelperLine>
           <div style={styles.valueList}>
             {values.map((v) => (
               <div key={v.id} style={styles.valueRow}>

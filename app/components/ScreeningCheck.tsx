@@ -5,7 +5,7 @@ import type {
   ScreeningCheckInteraction,
   ScreeningCheckResult,
 } from "@/lib/modules";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // The coach-facing summary, e.g.
 // "When did you last have an eye test? Within the last 2 years. When did you
@@ -64,6 +64,8 @@ export default function ScreeningCheck({
       <style>{screeningCss}</style>
 
       <p style={styles.instruction}>{instruction}</p>
+
+      <HelperLine>Tap one answer for each question.</HelperLine>
 
       <div style={styles.questions}>
         {questions.map((q) => (

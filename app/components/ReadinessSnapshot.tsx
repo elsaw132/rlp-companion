@@ -5,7 +5,7 @@ import type {
   ReadinessSnapshotInteraction,
   ReadinessSnapshotResult,
 } from "@/lib/modules";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 const MIDPOINT = 50;
 
@@ -173,6 +173,7 @@ export default function ReadinessSnapshot({
       {/* Transition spectrum */}
       <div style={styles.block}>
         <p style={styles.instruction}>{transitionInstruction}</p>
+        <HelperLine>Drag the slider to where it feels right.</HelperLine>
         <div style={styles.labelRow}>
           <span style={styles.endLabel}>{transition.left}</span>
           <span style={{ ...styles.endLabel, ...styles.endLabelRight }}>
@@ -311,6 +312,7 @@ export default function ReadinessSnapshot({
       {/* Readiness profile */}
       <div style={styles.block}>
         <p style={styles.instruction}>{factorsInstruction}</p>
+        <HelperLine>Tap the level that fits for each.</HelperLine>
         <div style={styles.factors}>
           {factors.map((factor) => {
             const chosen = levelByFactor[factor.id];

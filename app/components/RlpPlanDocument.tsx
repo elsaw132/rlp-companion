@@ -21,6 +21,7 @@ import type {
 import { seasonLabel43 } from "@/lib/rlpPlan";
 import type { ConnectionsGraph } from "@/lib/planIntro";
 import type { BalancedAreaId } from "@/lib/modules";
+import { HelperLine } from "./InteractionShell";
 
 // ---- area theme: the five balanced areas mapped onto the existing palette ----
 const AREA_THEME: Record<BalancedAreaId, { base: string; sel: string; fg: string }> = {
@@ -584,7 +585,7 @@ function ConnectionsWeb({ graph }: { graph: ConnectionsGraph }) {
         ) : (
           <p className="rlp-web-hint">
             The threads between your goals, the people who matter, and what you
-            value. Select anything to see what it connects to.
+            value.
           </p>
         )}
       </div>
@@ -690,7 +691,7 @@ export default function RlpPlanDocument({
       <section className="rlp-section">
         <SectionHead index={3} eyebrow="Your compass" title="What matters most to you" />
         {values.coreValues.length > 0 && (
-          <p className="rlp-tap-hint">Tap each value to read what it means to you.</p>
+          <HelperLine>Tap each value to read what it means to you.</HelperLine>
         )}
         <ValuesCompass
           values={values.coreValues}
@@ -761,6 +762,7 @@ export default function RlpPlanDocument({
       {connections && (
         <section className="rlp-section">
           <SectionHead index={0} eyebrow="The web of it" title="See how it all connects" />
+          <HelperLine>Tap any point to see what it connects to.</HelperLine>
           <ConnectionsWeb graph={connections} />
         </section>
       )}
@@ -1005,7 +1007,6 @@ const css = `
 .rlp-star{color:var(--accent);margin-right:7px;font-size:13px}
 
 /* §3 compass */
-.rlp-tap-hint{font-family:var(--font-sans);font-size:var(--fs-label);font-weight:600;color:var(--text-muted);margin:14px 0 0}
 .rlp-compass-wrap{display:grid;grid-template-columns:minmax(0,300px) 1fr;gap:28px;align-items:center}
 .rlp-compass{width:100%;max-width:300px;height:auto;aspect-ratio:1/1}
 .rlp-compass-ring{fill:var(--warm-surface);stroke:var(--warm-line);stroke-width:1.5}

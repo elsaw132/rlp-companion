@@ -14,7 +14,7 @@ import {
   type GoalVariant,
 } from "@/lib/balancedGoalsSeed";
 import { useUserData } from "@/lib/userData";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 type Track = "do" | "be";
 
@@ -426,6 +426,8 @@ export default function BalancedGoals({
         <>
           <p style={styles.instruction}>{curationInstruction}</p>
 
+          <div style={styles.helperGroup}>
+          <HelperLine>Tap to keep, reword, or set aside each goal.</HelperLine>
           <div style={styles.areaSections}>
             {areas.map((area) => (
               <div key={area.id} style={styles.areaSection}>
@@ -467,6 +469,7 @@ export default function BalancedGoals({
                 </button>
               </div>
             ))}
+          </div>
           </div>
 
           <div style={styles.stepControls}>
@@ -846,6 +849,8 @@ function FocusStep({
       <p style={styles.instruction}>{instruction}</p>
       <p style={styles.absencePrompt}>{absencePrompt}</p>
 
+      <div style={styles.helperGroup}>
+      <HelperLine>Tap the few you&apos;d most want to keep.</HelperLine>
       <div style={styles.areaSections}>
         {areas.map((area) => {
           const list = goalsInArea(area.id).filter((g) => g.label.trim());
@@ -896,6 +901,7 @@ function FocusStep({
             </div>
           );
         })}
+      </div>
       </div>
 
       {focusOrder.length > maxFocus && (
@@ -1307,6 +1313,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: "var(--ink)",
     margin: "-4px 0 0",
+  },
+  // Keep the helper line close above the goal cards / pick chips (tighter than
+  // the wrap's 20px gap) so it reads as a cue for the element, not a separate block.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
   },
   areaSections: {
     display: "flex",

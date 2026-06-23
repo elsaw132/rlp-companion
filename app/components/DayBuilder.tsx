@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { DayBuilderInteraction, DayBuilderResult } from "@/lib/modules";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // Emoji stand-ins for activity images. Unknown activities (including the
 // person's own additions) fall back to a neutral dot.
@@ -143,7 +143,6 @@ export default function DayBuilder({
       <div style={styles.intro}>
         <p style={styles.introTitle}>Build your Tuesday</p>
         <p style={styles.introBody}>
-          Tap whatever you&apos;d like in your day and choose when it happens.
           There are no right answers — pick what feels like a good, ordinary day.
         </p>
       </div>
@@ -183,6 +182,10 @@ export default function DayBuilder({
       </div>
 
       {/* Activity palette */}
+      <div style={styles.palette}>
+      <HelperLine>
+        Tap an activity to add it, then choose when in the day it happens.
+      </HelperLine>
       <div style={styles.categories}>
         {categories.map((category) => (
           <div key={category.name} style={styles.category}>
@@ -234,6 +237,7 @@ export default function DayBuilder({
             </div>
           </div>
         ))}
+      </div>
       </div>
 
       <FinishControls
@@ -447,6 +451,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   // Palette
+  palette: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  },
   categories: {
     display: "flex",
     flexDirection: "column",

@@ -19,7 +19,7 @@ import {
   type WeekShapeSeed,
 } from "@/lib/weekShapeSeed";
 import { useUserData } from "@/lib/userData";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // One activity on the curation surface — a real, recurring thing in the week, with
 // a rough frequency, whether it's a regular anchor, whether it gives them energy,
@@ -380,6 +380,7 @@ export default function WeekShape({
       {/* 1 — the overall structure–freedom feel */}
       <div style={styles.block}>
         <p style={styles.sectionLabel}>{structureLabel}</p>
+        <HelperLine>Drag the slider to where it feels right.</HelperLine>
         <div style={styles.sliderWrap}>
           <div style={styles.poleRow}>
             <span style={styles.poleLabel}>{structurePoleLeft}</span>
@@ -408,6 +409,10 @@ export default function WeekShape({
       <div style={styles.block}>
         <p style={styles.sectionLabel}>{activitiesLabel}</p>
         <p style={styles.subInstruction}>{activitiesInstruction}</p>
+        <HelperLine>
+          Tap to set how often each one happens, and mark the anchors and the ones
+          that give you energy.
+        </HelperLine>
         <div style={styles.blockList}>
           {activities.map((a) => (
             <ActivityCard

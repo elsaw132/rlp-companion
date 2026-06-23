@@ -14,7 +14,7 @@ import {
   type GoalPath,
 } from "@/lib/goalPathsSeed";
 import { useUserData } from "@/lib/userData";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 type Track = "do" | "be";
 
@@ -344,7 +344,9 @@ export default function GoalPaths({
 
       <p style={styles.instruction}>{curationInstruction}</p>
 
-      <div style={styles.pathList}>
+      <div style={styles.helperGroup}>
+        <HelperLine>Tap a step to mark it done, or add your own.</HelperLine>
+        <div style={styles.pathList}>
         {paths.map((path) => (
           <PathCard
             key={path.id}
@@ -369,6 +371,7 @@ export default function GoalPaths({
             onLean={(v) => patchPath(path.id, { lean: v })}
           />
         ))}
+        </div>
       </div>
 
       <p style={styles.boundaryHint}>{boundaryHint}</p>
@@ -773,6 +776,13 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  // Keep the helper line close above the path cards (tighter than the wrap's
+  // 20px gap) so it reads as a cue for the element, not a separate block.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
   },
   pathList: {
     display: "flex",

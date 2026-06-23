@@ -16,6 +16,31 @@ export type EditableProps<R> = {
   onCancel?: () => void;
 };
 
+// The one per-exercise instruction line, used everywhere an interaction needs a
+// plain cue for how to act on it (slider, selection, drag, clickable visual).
+// One short line in the UI font, muted, a notch smaller than reading text — a
+// helper, not content — placed directly above the interactive element. Keep the
+// wording plain, present-tense, and about the physical action the person takes.
+// `align="center"` is used where the element it sits over is centred (the
+// radial reveals); it defaults to left for the stacked interactions.
+export function HelperLine({
+  children,
+  align = "left",
+}: {
+  children: React.ReactNode;
+  align?: "left" | "center";
+}) {
+  return <p style={{ ...helperLineStyle, textAlign: align }}>{children}</p>;
+}
+
+const helperLineStyle: React.CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--fs-sm)",
+  lineHeight: 1.5,
+  color: "var(--text-muted)",
+  margin: 0,
+};
+
 type FinishControlsProps = {
   mode: InteractionMode;
   disabled: boolean;

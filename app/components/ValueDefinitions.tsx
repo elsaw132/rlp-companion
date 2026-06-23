@@ -6,7 +6,7 @@ import type {
   ValueDefinitionsResult,
 } from "@/lib/modules";
 import type { Stage3Seed } from "@/lib/stage3Seed";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // 3.4 "Living your values" — one card per priority value. The description is
 // carried over read-only from 3.2. Each card runs a single two-beat flow: a
@@ -164,7 +164,9 @@ export default function ValueDefinitions({
       <style>{defCss}</style>
       <p style={styles.instruction}>{interaction.instruction}</p>
 
-      <div style={styles.cardList}>
+      <div style={styles.helperGroup}>
+        <HelperLine>Tap to keep each one as it is, or swap it.</HelperLine>
+        <div style={styles.cardList}>
         {values.map((v, i) => (
           <div key={`${v.value}-${i}`} style={styles.card}>
             <p style={styles.valueName}>{v.value}</p>
@@ -276,6 +278,7 @@ export default function ValueDefinitions({
             </div>
           </div>
         ))}
+        </div>
       </div>
 
       <FinishControls
@@ -346,6 +349,13 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  // Keep the helper line close above the first card (tighter than the wrap's
+  // 24px gap) so it reads as a cue for the element, not a separate block.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
   },
   cardList: { display: "flex", flexDirection: "column", gap: "16px" },
   card: {

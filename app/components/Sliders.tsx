@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { SlidersInteraction, SlidersResult } from "@/lib/modules";
-import { FinishControls, type EditableProps } from "./InteractionShell";
+import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 const MIDPOINT = 50;
 
@@ -104,7 +104,13 @@ export default function Sliders({
 
       <p style={styles.instruction}>{instruction}</p>
 
-      <div style={styles.spectrums}>
+      <div style={styles.helperGroup}>
+        <HelperLine>
+          {spectrums.length > 1
+            ? "Drag each slider to where it feels right."
+            : "Drag the slider to where it feels right."}
+        </HelperLine>
+        <div style={styles.spectrums}>
         {spectrums.map((spectrum, i) => (
           <div key={`${spectrum.left}-${spectrum.right}`} style={styles.spectrum}>
             {!(anchors && anchors.length > 0) && (
@@ -137,6 +143,7 @@ export default function Sliders({
             )}
           </div>
         ))}
+        </div>
       </div>
 
       {seasonal && (
@@ -171,7 +178,6 @@ export default function Sliders({
           disabled={false}
           onFinish={() => onFinish(buildResultObject())}
           onCancel={onCancel}
-          hint="Slide each one to where it feels right."
         />
       )}
     </section>
@@ -193,6 +199,13 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  // The helper line sits close above the slider track (the wrap's own 28px gap
+  // is too far for a per-element cue), so group them with a tighter gap.
+  helperGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
   },
   spectrums: {
     display: "flex",
