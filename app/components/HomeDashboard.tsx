@@ -567,9 +567,9 @@ export default function HomeDashboard() {
                 <div>
                   <h4>This stage is on its way</h4>
                   <p>
-                    The modules for {viewedStageData.name} are still being
-                    prepared. You can revisit anything you&apos;ve already done in
-                    the meantime.
+                    The modules for {viewedStageData.name}{" "}
+                    are still being prepared. You can revisit anything you&apos;ve
+                    already done in the meantime.
                   </p>
                 </div>
               </div>
