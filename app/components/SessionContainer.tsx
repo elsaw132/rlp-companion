@@ -118,6 +118,10 @@ import type {
 import { getModulesBefore } from "@/lib/modules";
 import { stripStructuredLeak } from "@/lib/coachText";
 import { useUserData } from "@/lib/userData";
+import {
+  principlesAfterConversation,
+  type ConversationalDeltas,
+} from "@/lib/contextFacts";
 import type { Dreams } from "@/lib/dreams";
 import {
   isSeededType,
@@ -846,6 +850,62 @@ export default function SessionContainer({
     void generateAndStoreStage3Values(finalMessages);
   }
 
+  // ---- Canonical context profile (phase 1: write-only) --------------------
+  // Reconcile this module's widget-pick facts to match a build. The server diffs
+  // against what's on record, so this serves both first capture and a re-edit (a
+  // pick that disappears is rejected, not left behind). Background + best-effort;
+  // 1.money is reconciled from its dreams record instead (see below).
+  function reconcileBuildFacts(result: BuildResult | null) {
+    if (!user || !result || sessionId === "1.money") return;
+    void fetch("/api/context-facts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reconcile", moduleId: sessionId, build: result }),
+    }).catch(() => {});
+  }
+
+  // Reconcile 1.money's facts from its structured dreams record — the source that
+  // carries the achievable / pipe-dream split (so a pipe-dream is never read as
+  // plan-actionable).
+  function reconcileDreamsFacts(dreams: Dreams) {
+    if (!user) return;
+    void fetch("/api/context-facts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reconcileDreams", dreams }),
+    }).catch(() => {});
+  }
+
+  // Apply the conversational deltas the takeaway call extracted: additions land
+  // immediately; removals are applied only where the person confirmed the change
+  // in chat (the server gates this). For 4.5, also fold any new principles back
+  // into interaction:4.5 — the key the RLP reads — so they pull through at once.
+  function applyConversationalDeltas(deltas: ConversationalDeltas) {
+    if (!user) return;
+    void fetch("/api/context-facts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "conversational",
+        moduleId: sessionId,
+        deltas,
+      }),
+    }).catch(() => {});
+
+    if (sessionId === "4.5") {
+      const current = userData.getBuild("4.5");
+      if (current && current.type === "trade-offs") {
+        const next = principlesAfterConversation(current.principles ?? [], deltas);
+        if (
+          next.length !== (current.principles ?? []).length ||
+          next.some((p, i) => p !== current.principles?.[i])
+        ) {
+          void userData.saveBuild("4.5", { ...current, principles: next });
+        }
+      }
+    }
+  }
+
   // After a module completes, generate a short takeaway of what emerged and
   // store it for later modules to draw on. Runs in the background, so it never
   // blocks the done state. If generation fails, fall back to the interaction
@@ -871,6 +931,15 @@ export default function SessionContainer({
       });
     };
 
+    // The facts already on record for this module, so the delta pass can target a
+    // correction precisely (the "drop the 11am coffee" case) and not re-propose
+    // something already captured.
+    const knownFacts = user
+      ? userData
+          .getActiveFacts({ provenanceModule: sessionId })
+          .map((f) => ({ label: f.data.label, category: f.category }))
+      : [];
+
     try {
       const res = await fetch("/api/takeaway", {
         method: "POST",
@@ -879,6 +948,7 @@ export default function SessionContainer({
           messages: fullMessages,
           moduleTitle: sessionTitle,
           interactionSummary,
+          knownFacts,
         }),
       });
 
@@ -887,8 +957,11 @@ export default function SessionContainer({
       const data = (await res.json()) as {
         takeaway: string;
         takeawayDirect?: string;
+        facts?: ConversationalDeltas;
       };
       store(data.takeaway || interactionSummary, data.takeawayDirect);
+      // Fold any conversational fact changes into the canonical profile.
+      if (data.facts) applyConversationalDeltas(data.facts);
     } catch {
       store(interactionSummary);
     }
@@ -912,15 +985,20 @@ export default function SessionContainer({
       top3: Dreams["top3"],
       achievable: Dreams["achievable"],
       pipeDreams: Dreams["pipeDreams"]
-    ) =>
-      userData.saveDreams({
+    ) => {
+      const dreams: Dreams = {
         moduleId: sessionId,
         allDreams,
         top3,
         achievable,
         pipeDreams,
         savedAt: new Date().toISOString(),
-      });
+      };
+      void userData.saveDreams(dreams);
+      // Reconcile the money module's facts from this record — the source that
+      // keeps a pipe-dream walled off from anything plan-actionable.
+      reconcileDreamsFacts(dreams);
+    };
 
     try {
       const res = await fetch("/api/dreams", {
@@ -1138,6 +1216,7 @@ export default function SessionContainer({
   function handleLetterComplete(result: LetterResult, vitaMessage: string) {
     setBuildResult(result);
     void userData.saveBuild(sessionId, result);
+    reconcileBuildFacts(result);
     setLetterAck(vitaMessage);
     if (user) {
       void userData.markModuleComplete(sessionId);
@@ -1159,6 +1238,7 @@ export default function SessionContainer({
   ) {
     setBuildResult(result);
     void userData.saveBuild(sessionId, result);
+    reconcileBuildFacts(result);
     setFirstYearAck(vitaMessage);
     if (user) {
       void userData.markModuleComplete(sessionId);
@@ -1175,6 +1255,7 @@ export default function SessionContainer({
   function handleBuildFinish(result: BuildResult) {
     setBuildResult(result);
     void userData.saveBuild(sessionId, result);
+    reconcileBuildFacts(result);
     startConversation();
   }
 
@@ -1199,6 +1280,9 @@ export default function SessionContainer({
       !buildResult || JSON.stringify(buildResult) !== JSON.stringify(result);
     setBuildResult(result);
     void userData.saveBuild(sessionId, result);
+    // Diff the new build against the facts on record: new picks added, vanished
+    // picks rejected (the re-edit removal case).
+    if (changed) reconcileBuildFacts(result);
     if (changed && messages.length > 0) setEditAckPending(true);
     setPhase("conversation");
   }
@@ -1802,7 +1886,7 @@ function CloseChoice({
 }) {
   return (
     <div style={styles.completeBlock}>
-      <p style={styles.closeChoicePrompt}>Happy to wrap up here, or keep going?</p>
+      <p style={styles.closeChoicePrompt}>Are you ready to wrap this module up here, or do you want to keep talking with Vita?</p>
       <div style={styles.completeActions}>
         <button
           type="button"
@@ -1810,7 +1894,7 @@ function CloseChoice({
           style={styles.homeCompleteButton}
           onClick={onWrapUp}
         >
-          Wrap up here →
+          Finish this module
         </button>
         <button
           type="button"
@@ -2648,7 +2732,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     background: "var(--bg)",
     color: "var(--brand-primary)",
-    border: "1.5px solid var(--border-strong)",
+    border: "1.5px solid var(--brand-primary)",
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-body)",
     fontWeight: 600,

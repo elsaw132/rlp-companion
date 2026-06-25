@@ -5,6 +5,8 @@ type IncomingMessage = {
   text: string;
 };
 
+type KnownFact = { label: string; category: string };
+
 type TakeawayRequest = {
   // The module's full conversation, in order.
   messages: IncomingMessage[];
@@ -12,9 +14,22 @@ type TakeawayRequest = {
   moduleTitle: string;
   // A readable summary of whatever they built in the interaction step, if any.
   interactionSummary?: string;
+  // The facts already on record for this module, so the delta pass can target a
+  // correction precisely and avoid re-proposing something already captured.
+  knownFacts?: KnownFact[];
 };
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// The category names the delta pass may use for a new conversational fact. Kept
+// terse; the model picks the closest fit and we validate on the way in.
+const FACT_CATEGORIES = [
+  "day_picture_item", "role", "week_shape_pref", "letter_thread", "one_off_dream",
+  "aspiration", "recurring_activity", "energy_pattern", "relationship",
+  "social_balance_pref", "commitment", "strength", "value", "value_priority",
+  "hope", "fear", "meaning_thread", "readiness", "chapter", "goal", "goal_path",
+  "principle", "week_plan", "first_year_plan", "concern", "onboarding_fact",
+].join(", ");
 
 const SYSTEM_PROMPT = `You are summarising one module of a guided retirement life-planning programme. The transcript below is a conversation between a coach (Vita) and a person. The summary is used in two ways: it is carried into later modules so the coach can draw on the whole picture, and a version of it is read back to the person on their home screen. It also seeds the person's Retirement Life Plan.
 
@@ -24,11 +39,15 @@ Produce the summary in two grammatical persons. The content and tone must be ide
 - "thirdPerson": written in the third person ("they"/"their").
 - "secondPerson": written in the second person, addressing the person directly ("you"/"your").
 
+You ALSO extract structured fact changes that emerged ONLY in the conversation (not already in their saved selections), as a "facts" object:
+- "additions": new facts the person stated in conversation that aren't already on record. Each: {"category": one of [${FACT_CATEGORIES}], "label": the fact in their words (short), and optionally "domain" (for recurring_activity: Restore/Move/Think/Connect/Contribute), "description"}. Use one_off_dream for money-no-object/pipe dreams; aspiration for things they could realistically work toward; recurring_activity for regular activities — never mix these up. Only include something clearly new and concrete. Empty array if nothing new.
+- "removals": corrections where the person changed their mind about, dropped, or replaced something already on record (you're told what's on record). Each: {"label": the on-record fact to drop (match its wording), optionally "category", and "userConfirmedInChat": true ONLY if the person themselves clearly asked to drop or change it in this conversation (false if you merely inferred it). Empty array if nothing was corrected.
+
 Respond with ONLY a JSON object of exactly this shape, and nothing else:
-{"thirdPerson": "...", "secondPerson": "..."}
+{"thirdPerson": "...", "secondPerson": "...", "facts": {"additions": [], "removals": []}}
 
 Example:
-{"thirdPerson": "They pictured a family-centred day built around a morning run, time with grandkids, and an evening with their partner. What matters most is being a steady, everyday presence for family, at an unhurried pace.", "secondPerson": "You pictured a family-centred day built around a morning run, time with grandkids, and an evening with your partner. What matters most is being a steady, everyday presence for family, at an unhurried pace."}`;
+{"thirdPerson": "They pictured a family-centred day built around a morning run, time with grandkids, and an evening with their partner. What matters most is being a steady, everyday presence for family, at an unhurried pace.", "secondPerson": "You pictured a family-centred day built around a morning run, time with grandkids, and an evening with your partner. What matters most is being a steady, everyday presence for family, at an unhurried pace.", "facts": {"additions": [{"category": "recurring_activity", "domain": "Move", "label": "a solo coffee and walk at 11am"}], "removals": [{"label": "morning run", "userConfirmedInChat": true}]}}`;
 
 // Pull the first {...} object out of the model's reply, in case it wraps the
 // JSON in prose or a code fence.
@@ -75,7 +94,14 @@ export async function POST(request: Request) {
       ? `What they built in this module:\n${body.interactionSummary.trim()}\n\n`
       : "";
 
-  const userContent = `Module: ${body.moduleTitle}\n\n${built}Conversation transcript:\n${transcript}`;
+  const known =
+    body.knownFacts && body.knownFacts.length
+      ? `Already on record for this module (use these for "removals"):\n${body.knownFacts
+          .map((f) => `- [${f.category}] ${f.label}`)
+          .join("\n")}\n\n`
+      : "";
+
+  const userContent = `Module: ${body.moduleTitle}\n\n${built}${known}Conversation transcript:\n${transcript}`;
 
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
@@ -92,13 +118,26 @@ export async function POST(request: Request) {
 
   let takeaway = "";
   let takeawayDirect = "";
+  // Conversational deltas. Default to empty so a parse miss degrades to
+  // summary-only and never breaks module close (the robustness §4c asks for).
+  let facts: { additions: unknown[]; removals: unknown[] } = {
+    additions: [],
+    removals: [],
+  };
   try {
     const parsed = JSON.parse(extractJsonObject(rawText)) as {
       thirdPerson?: string;
       secondPerson?: string;
+      facts?: { additions?: unknown[]; removals?: unknown[] };
     };
     takeaway = (parsed.thirdPerson ?? "").trim();
     takeawayDirect = (parsed.secondPerson ?? "").trim();
+    if (parsed.facts && typeof parsed.facts === "object") {
+      facts = {
+        additions: Array.isArray(parsed.facts.additions) ? parsed.facts.additions : [],
+        removals: Array.isArray(parsed.facts.removals) ? parsed.facts.removals : [],
+      };
+    }
   } catch {
     // Model returned the fields but not as parseable JSON (a stray quote, smart
     // quotes, trailing prose). Lift the two fields out by regex before giving up,
@@ -122,5 +161,5 @@ export async function POST(request: Request) {
   if (!takeaway) takeaway = rawText;
   if (!takeawayDirect) takeawayDirect = toSecondPerson(takeaway);
 
-  return Response.json({ takeaway, takeawayDirect });
+  return Response.json({ takeaway, takeawayDirect, facts });
 }
