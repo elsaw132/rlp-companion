@@ -784,6 +784,11 @@ export function factsFromOnboarding(o: OnboardingAnswers): DraftFact[] {
       draft("onboarding_fact", { label: o.motivation as string, field: "motivation" }, "onboarding")
     );
   }
+  if (clean(o.dob)) {
+    // The DOB is the raw fact; age is computed from it at read time (the
+    // resolver's {age} filter), so it never goes stale.
+    out.push(draft("onboarding_fact", { label: o.dob as string, field: "dob" }, "onboarding"));
+  }
   return tidy(out);
 }
 

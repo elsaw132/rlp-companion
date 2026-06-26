@@ -8,17 +8,17 @@ import type {
   WeekShapeInteraction,
   WeekShapeResult,
 } from "@/lib/modules";
-import { getModulesBefore } from "@/lib/modules";
 import {
   fallbackWeekShape,
   fetchWeekShapeDraft,
   transitionShape,
   weekShapeGoalInputs,
-  weekTranscripts,
   FREQUENCIES,
   type WeekShapeSeed,
 } from "@/lib/weekShapeSeed";
 import { useUserData } from "@/lib/userData";
+import { resolveSeedItems } from "@/lib/contextResolver";
+import { recurringSeedFromFacts } from "@/lib/resolverInputs";
 import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // One activity on the curation surface — a real, recurring thing in the week, with
@@ -219,8 +219,9 @@ export default function WeekShape({
   const userData = useUserData();
 
   // The inputs the draft is built from, read once. Goals add grounding; the
-  // transition decides whether ongoing work belongs; the transcripts carry the
-  // person's own words, where the real, specific recurring activities live.
+  // transition decides whether ongoing work belongs; the recurring activities —
+  // the person's real, specific recurring things — now come from structured
+  // recurring_activity facts (the canonical profile), not a transcript scrape.
   const draftInputsRef = useRef({
     goals: weekShapeGoalInputs(
       (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
@@ -228,9 +229,8 @@ export default function WeekShape({
     transition: transitionShape(
       (userData.getBuild("4.1") as ReadinessSnapshotResult | null) ?? null
     ),
-    transcripts: weekTranscripts(
-      getModulesBefore(sessionId),
-      userData.getConversation
+    recurring: recurringSeedFromFacts(
+      resolveSeedItems(sessionId, userData.getActiveFacts(), "recurring_activity")
     ),
   });
   const draftInputs = draftInputsRef.current;
@@ -285,7 +285,7 @@ export default function WeekShape({
           hasPartner,
           goals: draftInputs.goals,
           transition: draftInputs.transition,
-          transcripts: draftInputs.transcripts,
+          recurring: draftInputs.recurring,
         }));
       if (cancelled) return;
       const seed =
@@ -296,7 +296,7 @@ export default function WeekShape({
           hasPartner,
           goals: draftInputs.goals,
           transition: draftInputs.transition,
-          transcripts: draftInputs.transcripts,
+          recurring: draftInputs.recurring,
         });
       if (draft && !cached) void userData.saveWeekShapeSeed(sessionId, draft);
       setStructure(earlierStructure ?? seed.structure);

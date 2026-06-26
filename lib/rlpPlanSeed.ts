@@ -12,6 +12,8 @@ import type { ModelSource } from "@/lib/userModel";
 import type { Stage3ValuesSummary } from "@/lib/stage3Seed";
 import type { Dreams } from "@/lib/dreams";
 import type { Takeaway } from "@/lib/takeaways";
+import type { StoredFact } from "@/lib/contextFacts";
+import { synthesizeActiveFacts } from "@/lib/resolverInputs";
 
 export const SEED_MEMBER_NAME = "Margaret";
 
@@ -376,3 +378,12 @@ export const SEED_SOURCE: ModelSource = {
     motivation: "A milestone birthday on the horizon",
   }),
 };
+
+// Phase 2: the assembler reads values from the canonical profile, so the seed
+// member needs one too. Synthesized from the same structured builds above (the
+// phase-1 backfill mapping), memoised. Assigned after the literal to avoid the
+// self-reference. This is what makes the demo RLP show verbatim value
+// descriptions and the 3.4 threat/protector through the new read path.
+let seedFactsCache: StoredFact[] | null = null;
+SEED_SOURCE.getActiveFacts = () =>
+  (seedFactsCache ??= synthesizeActiveFacts(SEED_SOURCE));

@@ -56,6 +56,10 @@ export type OnboardingAnswers = {
   partner?: string;
   horizon?: string;
   motivation?: string | null;
+  // Date of birth, ISO YYYY-MM-DD. Optional: existing users and anyone who skips
+  // it have none, and every age-dependent path degrades gracefully without it.
+  // Used to compute real age at read time (the 2.6 hearing-check gate).
+  dob?: string;
 };
 
 export type ConversationMessage = {
@@ -626,6 +630,7 @@ export function useUserData() {
       partner: "",
       horizon: "",
       motivation: null,
+      dob: "",
       ...getOnboarding(),
       ...partial,
     };

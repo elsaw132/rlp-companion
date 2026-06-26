@@ -28,6 +28,7 @@ import type {
 import type { Takeaway } from "@/lib/takeaways";
 import type { Dreams } from "@/lib/dreams";
 import type { Stage3ValuesSummary } from "@/lib/stage3Seed";
+import type { StoredFact } from "@/lib/contextFacts";
 
 // ---- The read surface ----
 // The useUserData() hook satisfies this directly, so callers pass it straight
@@ -42,6 +43,10 @@ export type ModelSource = {
     horizon?: string;
     motivation?: string | null;
   };
+  // The canonical profile's active facts (phase 2). Optional so older callers and
+  // fixtures still satisfy the surface; when present, the RLP reads values
+  // (verbatim description + 3.4 threat/protector) from here instead of re-deriving.
+  getActiveFacts?: () => StoredFact[];
 };
 
 // ---- The curated synthesis ----
@@ -52,6 +57,10 @@ export type ValueEntry = {
   meaning?: string;
   // From the Stage 3 values close: whether they were certain or still forming.
   confidence?: "certain" | "still forming";
+  // From 3.4 (Living your values): what threatens this value, and what protects
+  // it. Carried into the plan via the canonical profile (phase 2).
+  threat?: string;
+  protectors?: string[];
 };
 
 export type Aspiration = {
@@ -343,43 +352,17 @@ export function buildUserModel(source: ModelSource): UserModel {
 // into seasons, so we keep a manageable handful rather than every item.
 // Deterministic and free — the same philosophy as the user model.
 
+// Short tokens to sort onto the 4.2 seasons board. Phase 2 builds these from the
+// canonical profile (seasonCardsFromFacts in lib/resolverInputs) — dream-walled
+// and correction-aware — so the old model-derived builder is retired; the type
+// stays as the shared shape the board component consumes.
 export type SeasonCard = { label: string; category: string };
 
-// Cards are short tokens to sort onto a board. Aspirations often carry the
-// person's own commentary after a dash or colon (e.g. "Ballymaloe cookery school
-// — something as intensive as this is probably out of reach"); keep just the
-// thing itself so cards stay short and near-duplicates collapse on dedupe.
-function conciseCardLabel(text: string): string {
-  const head = text.split(/\s+(?:--|—|–)\s+|:\s+/)[0].trim();
-  return head || text.trim();
-}
-
-export function seasonCardsFromModel(model: UserModel): SeasonCard[] {
-  const cards: SeasonCard[] = [];
-  const seen = new Set<string>();
-  const add = (label: string, category: string) => {
-    const text = conciseCardLabel(label);
-    const key = text.toLowerCase();
-    if (!text || seen.has(key)) return;
-    seen.add(key);
-    cards.push({ label: text, category });
-  };
-
-  for (const a of model.aspirations) add(a.text, "Aspiration");
-  for (const e of model.energySources) add(e, "Activity");
-  for (const r of model.relationships) add(r, "People");
-
-  // Keep the board readable — a dozen cards is plenty to sort into seasons.
-  return cards.slice(0, 12);
-}
-
-// ---- Balanced-retirement springboards (Module 4.3) ----
-// Module 4.3 works through a fixed scaffold — the five areas of a balanced
-// retirement: Restore, Move, Think, Connect, Contribute. Under each, we surface
-// what the person has already said that lands there, in their own words, as
-// springboards for shaping a real goal. An item can land in more than one area;
-// these are prompts, not a filing system, so multiple membership is fine and
-// nothing has to be "correctly" sorted. Deterministic and free — no seed call.
+// ---- Balanced-retirement areas (Module 4.3) ----
+// The five areas of a balanced retirement. Phase 2 builds the per-area
+// springboards from recurring_activity facts grouped by domain
+// (springboardsFromFacts in lib/resolverInputs); the model-derived builder is
+// retired, but the area/seed types stay as the shared shapes.
 
 export type BalancedArea =
   | "restore"
@@ -396,65 +379,10 @@ export const BALANCED_AREAS: BalancedArea[] = [
   "contribute",
 ];
 
-// A prompt the person already placed in this area back in Stage 2, carried
-// across in their own selection. `areas` is usually one entry; an item picked in
-// two Stage 2 modules (e.g. "Caring for someone" under both Purpose and Energy)
-// carries both, so it appears under each.
+// A springboard the person already placed in an area. `areas` is usually one
+// entry; an activity that lands in two areas carries both.
 export type Springboard = { label: string; areas: BalancedArea[] };
 export type BalancedSeed = { springboards: Springboard[] };
-
-// 4.3 inherits its per-area springboards straight from the Stage 2 (Explore)
-// area modules, where the person already mapped their life and interests across
-// the balanced-retirement areas. We do NOT re-classify anything here: each
-// balanced area is fed by one Stage 2 module, and we carry that module's picks
-// across as-is, in the person's own words. An empty area means it was empty at
-// Stage 2 — never a classifier miss.
-type Stage2Source = {
-  moduleId: string;
-  // Stage 2 picks we want sometimes sit inside a composite; this is the index of
-  // the role-picker step that holds them, or null when the module is itself a
-  // role-picker.
-  compositeStep: number | null;
-};
-
-const BALANCED_SOURCES: Record<BalancedArea, Stage2Source> = {
-  restore: { moduleId: "2.5", compositeStep: 0 }, // energy & wellbeing: what lifts them
-  move: { moduleId: "2.1", compositeStep: 0 }, // staying active
-  think: { moduleId: "2.2", compositeStep: null }, // keeping the mind alive
-  connect: { moduleId: "2.3", compositeStep: 0 }, // the people in their life
-  contribute: { moduleId: "2.4", compositeStep: null }, // purpose & contribution
-};
-
-function pickedFrom(source: ModelSource, src: Stage2Source): string[] {
-  const b = source.getBuild(src.moduleId);
-  if (!b) return [];
-  const picker =
-    src.compositeStep === null
-      ? b
-      : b.type === "composite"
-        ? (b.results[src.compositeStep] ?? null)
-        : null;
-  return picker && picker.type === "role-picker" ? picker.picked : [];
-}
-
-export function balancedSpringboardsFromModel(source: ModelSource): BalancedSeed {
-  // Merge by label so an item placed in two Stage 2 areas carries both.
-  const byLabel = new Map<string, Springboard>();
-  for (const area of BALANCED_AREAS) {
-    for (const raw of pickedFrom(source, BALANCED_SOURCES[area])) {
-      const label = raw.trim();
-      if (!label) continue;
-      const key = label.toLowerCase();
-      const existing = byLabel.get(key);
-      if (existing) {
-        if (!existing.areas.includes(area)) existing.areas.push(area);
-      } else {
-        byLabel.set(key, { label, areas: [area] });
-      }
-    }
-  }
-  return { springboards: [...byLabel.values()] };
-}
 
 // Whether there's enough in the model to be worth reflecting back at all.
 export function hasUserModel(model: UserModel): boolean {
@@ -466,75 +394,8 @@ export function hasUserModel(model: UserModel): boolean {
   );
 }
 
-// ---- The text rendering ----
-// One labelled block for Vita's {priorReflections} slot and the Stage 4 seed
-// calls. Empty fields are omitted so the block never carries hollow headings.
-
-function dayLine(day: { parts: DayPart[] }): string {
-  return day.parts
-    .map((p) => `${p.part}: ${p.activities.join(", ")}`)
-    .join("; ");
-}
-
-export function renderUserModel(model: UserModel): string {
-  const lines: string[] = [];
-
-  if (model.coreValues.length > 0) {
-    const vals = model.coreValues
-      .map((v) => (v.meaning ? `${v.value} (${v.meaning})` : v.value))
-      .join("; ");
-    lines.push(
-      `- Core values, most important first: ${vals}.`
-    );
-  }
-  if (model.valueTensions.length > 0) {
-    lines.push(
-      `- Tensions they've weighed between priorities: ${model.valueTensions.join("; ")}.`
-    );
-  }
-  if (model.dayPicture) {
-    lines.push(`- The day they pictured in Stage 1: ${dayLine(model.dayPicture)}.`);
-  } else if (model.dayPictureNote) {
-    lines.push(`- The day they pictured in Stage 1: ${model.dayPictureNote}`);
-  }
-  if (model.roles.all.length > 0) {
-    const alive = model.roles.mostAlive.length
-      ? ` (most alive: ${model.roles.mostAlive.join(", ")})`
-      : "";
-    lines.push(`- Roles and identity they want to carry forward: ${model.roles.all.join(", ")}${alive}.`);
-  }
-  if (model.strengths.all.length > 0) {
-    const sig = model.strengths.signature.length
-      ? ` (signature: ${model.strengths.signature.join(", ")})`
-      : "";
-    lines.push(`- Their character strengths: ${model.strengths.all.join(", ")}${sig}.`);
-  }
-  if (model.aspirations.length > 0) {
-    const asp = model.aspirations
-      .map((a) => (a.reason ? `${a.text} — ${a.reason}` : a.text))
-      .join("; ");
-    lines.push(`- Recurring aspirations, dreams and interests: ${asp}.`);
-  }
-  if (model.energySources.length > 0) {
-    lines.push(`- Sources of energy and engagement: ${model.energySources.join(", ")}.`);
-  }
-  if (model.relationships.length > 0) {
-    lines.push(`- Relationships that feature most: ${model.relationships.join(", ")}.`);
-  }
-  if (model.liveConcerns.length > 0) {
-    lines.push(`- Worries heavy enough to plan around: ${model.liveConcerns.join("; ")}.`);
-  }
-  if (model.hopes) {
-    lines.push(`- What they've been reaching for: ${model.hopes}`);
-  }
-  if (model.constraints.length > 0) {
-    lines.push(`- Circumstances they've mentioned: ${model.constraints.join(" ")}`);
-  }
-
-  if (lines.length === 0) return "";
-
-  return [
-    "Here is the picture of this person built up across the earlier stages. It is your memory of them — open by reflecting the relevant parts back before asking anything, so it never feels like a fresh interview. Draw only on what's genuinely relevant to this module:",
-    ...lines,
-  ].join("\n");
-}
+// NB: the text rendering (renderUserModel) is retired in phase 2 — Vita's
+// {priorReflections} and the Stage-4 seed calls now read the resolver's views
+// (lib/contextResolver.ts), which are manifest-scoped, status=active and lean.
+// buildUserModel survives for the RLP's non-value fields (roles, strengths,
+// day, energy, relationships, hopes, concerns), which are not yet fact-sourced.

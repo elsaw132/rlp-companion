@@ -36,6 +36,7 @@ import {
   type UserModel,
   type ValueEntry,
 } from "@/lib/userModel";
+import { coreValuesFromFacts } from "@/lib/resolverInputs";
 import type { ConnectionsGraph } from "@/lib/planIntro";
 
 // ---- The assembled plan ----
@@ -630,8 +631,13 @@ export function buildRlpPlan(
   const areas = buildBalance(goalsResult);
   const prioritised = prioritisedAreas(areas);
 
+  // Values come from the canonical profile when it's available: the user's
+  // verbatim descriptions plus the 3.4 threat/protectors (which the old user
+  // model had no read path for). Falls back to the model's derivation otherwise.
+  const factCoreValues = coreValuesFromFacts(source.getActiveFacts?.() ?? []);
+
   const values: PlanValues = {
-    coreValues: model.coreValues,
+    coreValues: factCoreValues.length ? factCoreValues : model.coreValues,
     nonNegotiables: (tradeOffs?.values ?? [])
       .filter((v) => v.bucket === "non-negotiable")
       .map((v) => v.value),

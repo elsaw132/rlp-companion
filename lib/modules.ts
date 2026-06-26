@@ -886,8 +886,14 @@ export type Stage = {
 // them; and with no horizon recorded at all we also withhold it rather than push
 // it on someone who may be well under 50.
 export function hearingCheckRecommended(
-  horizon: string | null | undefined
+  horizon: string | null | undefined,
+  age?: number | null
 ): boolean {
+  // Prefer a real age when we have one (from the onboarding date of birth): the
+  // recommendation is for people 50 or over. With no DOB we fall back to the
+  // coarse retirement-horizon signal exactly as before, so existing users and
+  // anyone who skipped DOB keep today's behaviour.
+  if (typeof age === "number") return age >= 50;
   return (
     horizon === "Less than 2 years" ||
     horizon === "2–5 years" ||
@@ -958,18 +964,20 @@ const SENSES_COMMITMENT_EYE_ONLY: ClosingCommitment = {
 // to whether the hearing-check recommendation is in scope for this person's
 // retirement horizon. Called from the session page, which has the horizon.
 export function sensesSessionInstructions(
-  horizon: string | null | undefined
+  horizon: string | null | undefined,
+  age?: number | null
 ): string {
-  const hearingBlock = hearingCheckRecommended(horizon)
+  const hearingBlock = hearingCheckRecommended(horizon, age)
     ? SENSES_HEARING_REC_BLOCK
     : SENSES_NO_HEARING_REC_BLOCK;
   return `${SENSES_BASE_INSTRUCTIONS}\n\n${hearingBlock}`;
 }
 
 export function sensesClosingCommitment(
-  horizon: string | null | undefined
+  horizon: string | null | undefined,
+  age?: number | null
 ): ClosingCommitment {
-  return hearingCheckRecommended(horizon)
+  return hearingCheckRecommended(horizon, age)
     ? SENSES_COMMITMENT
     : SENSES_COMMITMENT_EYE_ONLY;
 }

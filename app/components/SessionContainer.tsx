@@ -98,7 +98,6 @@ import {
   fetchWeekShapeDraft,
   weekShapeGoalInputs,
   transitionShape,
-  weekTranscripts,
 } from "@/lib/weekShapeSeed";
 import { FinishControls, type InteractionMode } from "./InteractionShell";
 import type {
@@ -115,12 +114,12 @@ import type {
   ClosingCommitment,
   ScreeningCommitment as ScreeningCommitmentResult,
 } from "@/lib/modules";
-import { getModulesBefore } from "@/lib/modules";
 import { stripStructuredLeak } from "@/lib/coachText";
 import { useUserData } from "@/lib/userData";
 import {
   principlesAfterConversation,
   type ConversationalDeltas,
+  type PendingRemoval,
 } from "@/lib/contextFacts";
 import type { Dreams } from "@/lib/dreams";
 import {
@@ -129,18 +128,20 @@ import {
   type Stage3Value,
 } from "@/lib/stage3Seed";
 import {
-  buildCarryForward,
-  buildStage3Context,
-  hasCarryForward,
-} from "@/lib/carryForward";
-import {
-  buildUserModel,
-  renderUserModel,
-  seasonCardsFromModel,
-  balancedSpringboardsFromModel,
   type SeasonCard,
   type BalancedSeed,
 } from "@/lib/userModel";
+import {
+  resolveVitaText,
+  resolveSeedText,
+  resolveSeedItems,
+} from "@/lib/contextResolver";
+import {
+  springboardsFromFacts,
+  springboardAreasFromFacts,
+  seasonCardsFromFacts,
+  recurringSeedFromFacts,
+} from "@/lib/resolverInputs";
 
 // Vita appends a close signal to her final message so we know the module is
 // finished. It's stripped before display and before storage, so it never shows
@@ -469,32 +470,14 @@ export default function SessionContainer({
     .map((b) => b.value)
     .join("\n\n");
 
-  // What fills Vita's {priorReflections} slot. Stage 2 modules with a
-  // carry-forward contract get a curated, module-specific callback drawn from
-  // Stage 1; everything else gets the generic earlier-modules recap. The carry
-  // block falls back to the recap if Stage 1 captured nothing relevant.
-  function priorReflectionsBlock(includeStartingThoughts = false): string {
-    if (stageNumber === 2 && hasCarryForward(sessionId)) {
-      const carry = buildCarryForward(sessionId, userData);
-      if (carry) return carry;
-    }
-    const reflections = userData.buildPriorReflections(
-      sessionId,
-      includeStartingThoughts
-    );
-    // Stage 3 (Understand) infers strengths and values, so it also wants the raw
-    // structured picks from Stages 1–2 alongside the prose recap.
-    if (stageNumber === 3) {
-      const picks = buildStage3Context(userData);
-      if (picks) return `${reflections}\n\n${picks}`;
-    }
-    // Stage 4 (Plan) opens every module by reflecting the whole person back, so
-    // it leads with the curated user model assembled from Stages 1–3.
-    if (stageNumber === 4) {
-      const model = renderUserModel(buildUserModel(userData));
-      if (model) return `${model}\n\n${reflections}`;
-    }
-    return reflections;
+  // What fills Vita's {priorReflections} slot — now the resolver's Vita view: the
+  // module's manifest-scoped slice of the canonical profile, status=active only,
+  // rendered as a few compact lines. This replaces the old per-stage assembly
+  // (buildCarryForward / buildStage3Context / renderUserModel + the uncapped
+  // takeaway prose): corrections now drop here, and the block is leaner than the
+  // stack it replaces.
+  function priorReflectionsBlock(): string {
+    return resolveVitaText(sessionId, userData.getActiveFacts());
   }
 
   // The letter module replaces the build → conversation flow with a single
@@ -542,6 +525,11 @@ export default function SessionContainer({
   // re-reveals the composer. Vita signing off again returns to the finished
   // state (this flips back to false).
   const [reopened, setReopened] = useState(false);
+  // Conversational corrections the takeaway pass flagged but couldn't confirm in
+  // chat — surfaced at the close for a quick yes/no, so an un-applied rejection
+  // never leaves a stale fact active (it would now resurface, since consumers read
+  // the profile). Empty unless something needs confirming.
+  const [pendingFactRemovals, setPendingFactRemovals] = useState<PendingRemoval[]>([]);
   // When Vita signals a close, we don't finish the module straight away — we
   // offer the person a choice (keep talking, or wrap up here). True while that
   // choice is on screen, between Vita's sign-off and the person deciding.
@@ -632,16 +620,17 @@ export default function SessionContainer({
     if (interaction?.type !== "balanced-goals") return;
     if (goalsPrefetchedRef.current || userData.getGoalSeed(sessionId)) return;
     goalsPrefetchedRef.current = true;
-    const balanced = balancedSpringboardsFromModel(userData);
-    const springboards = interaction.areas.map((a) => ({
-      area: a.id,
-      labels: balanced.springboards
-        .filter((s) => s.areas.includes(a.id))
-        .map((s) => s.label),
-    }));
+    // Springboards now come from the resolver's recurring_activity facts, grouped
+    // by their balanced-area domain — fact-sourced, so a removed activity is gone.
+    const facts = userData.getActiveFacts();
+    const areaSeed = springboardAreasFromFacts(
+      resolveSeedItems(sessionId, facts, "recurring_activity")
+    );
+    const allowed = new Set(interaction.areas.map((a) => a.id));
+    const springboards = areaSeed.filter((s) => allowed.has(s.area));
     void (async () => {
       const draft = await fetchBalancedGoalsDraft({
-        userModel: renderUserModel(buildUserModel(userData)),
+        userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
         springboards,
@@ -666,7 +655,7 @@ export default function SessionContainer({
     pathsPrefetchedRef.current = true;
     void (async () => {
       const draft = await fetchGoalPathsDraft({
-        userModel: renderUserModel(buildUserModel(userData)),
+        userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
         goals,
@@ -697,7 +686,7 @@ export default function SessionContainer({
     tradeOffsPrefetchedRef.current = true;
     void (async () => {
       const draft = await fetchTradeOffsDraft({
-        userModel: renderUserModel(buildUserModel(userData)),
+        userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
         goals,
@@ -721,7 +710,7 @@ export default function SessionContainer({
     weekShapePrefetchedRef.current = true;
     void (async () => {
       const draft = await fetchWeekShapeDraft({
-        userModel: renderUserModel(buildUserModel(userData)),
+        userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
         goals: weekShapeGoalInputs(
@@ -730,9 +719,10 @@ export default function SessionContainer({
         transition: transitionShape(
           (userData.getBuild("4.1") as ReadinessSnapshotResult | null) ?? null
         ),
-        transcripts: weekTranscripts(
-          getModulesBefore(sessionId),
-          userData.getConversation
+        // The real, recurring activities now come from structured
+        // recurring_activity facts — not a scrape of prior transcripts.
+        recurring: recurringSeedFromFacts(
+          resolveSeedItems(sessionId, userData.getActiveFacts(), "recurring_activity")
         ),
       });
       if (draft) void userData.saveWeekShapeSeed(sessionId, draft);
@@ -756,7 +746,7 @@ export default function SessionContainer({
         (userData.getBuild("4.2") as SeasonsBoardResult | null) ?? null
       );
       const draft = await fetchFirstYearDraft({
-        userModel: renderUserModel(buildUserModel(userData)),
+        userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
         goals: firstYearGoalInputs(
@@ -882,15 +872,31 @@ export default function SessionContainer({
   // into interaction:4.5 — the key the RLP reads — so they pull through at once.
   function applyConversationalDeltas(deltas: ConversationalDeltas) {
     if (!user) return;
-    void fetch("/api/context-facts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "conversational",
-        moduleId: sessionId,
-        deltas,
-      }),
-    }).catch(() => {});
+    void (async () => {
+      try {
+        const res = await fetch("/api/context-facts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "conversational",
+            moduleId: sessionId,
+            deltas,
+          }),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { pending?: PendingRemoval[] };
+        // Surface any removals the model couldn't confirm in chat, for a quick
+        // yes/no at the close.
+        if (Array.isArray(data.pending) && data.pending.length) {
+          setPendingFactRemovals((prev) => {
+            const seen = new Set(prev.map((p) => p.identity));
+            return [...prev, ...data.pending!.filter((p) => !seen.has(p.identity))];
+          });
+        }
+      } catch {
+        // best-effort
+      }
+    })();
 
     if (sessionId === "4.5") {
       const current = userData.getBuild("4.5");
@@ -904,6 +910,26 @@ export default function SessionContainer({
         }
       }
     }
+  }
+
+  // Resolve a surfaced pending removal: apply it (re-send the correction with its
+  // identity confirmed, so the server rejects the fact) or discard it (the fact
+  // stays active). Either way it leaves the confirmation list.
+  function resolvePendingRemoval(removal: PendingRemoval, apply: boolean) {
+    setPendingFactRemovals((prev) =>
+      prev.filter((p) => p.identity !== removal.identity)
+    );
+    if (!apply || !user) return;
+    void fetch("/api/context-facts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "conversational",
+        moduleId: sessionId,
+        deltas: { additions: [], removals: [{ label: removal.label }] },
+        confirmedRemovalKeys: [removal.identity],
+      }),
+    }).catch(() => {});
   }
 
   // After a module completes, generate a short takeaway of what emerged and
@@ -1172,8 +1198,11 @@ export default function SessionContainer({
         body: JSON.stringify({
           seedType: interaction.type,
           onboardingContext: userData.buildOnboardingContext(),
-          priorReflections: userData.buildPriorReflections(sessionId),
-          carryForward: buildStage3Context(userData),
+          // The structured picks the seed grounds itself in now come from the
+          // resolver's seed view (manifest-scoped, status=active) — replacing the
+          // buildStage3Context registry and the uncapped takeaway prose.
+          priorReflections: "",
+          carryForward: resolveSeedText(sessionId, userData.getActiveFacts()),
           priorBuilds,
           hasPartner: userData.hasPartner(),
         }),
@@ -1422,26 +1451,29 @@ export default function SessionContainer({
       : undefined;
 
   // The Stage 4 modules are pre-populated from the person's earlier answers,
-  // deterministic and free, no seed call. 4.2's seasons board takes a flat set
-  // of cards built from the user model; 4.3's balanced-goals springboards are
-  // inherited straight from the Stage 2 area picks, read from userData directly.
+  // deterministic and free, no seed call. Both now read the resolver's seed view
+  // (manifest-scoped, status=active) rather than the lossy user-model re-derivation:
+  // 4.2's seasons board takes a flat set of cards; 4.3's springboards come from the
+  // recurring_activity facts grouped by balanced area.
   const seededCards =
     interaction?.type === "seasons-board"
-      ? seasonCardsFromModel(buildUserModel(userData))
+      ? seasonCardsFromFacts(resolveSeedItems(sessionId, userData.getActiveFacts()))
       : [];
   const balancedSeed: BalancedSeed | null =
     interaction?.type === "balanced-goals"
-      ? balancedSpringboardsFromModel(userData)
+      ? springboardsFromFacts(
+          resolveSeedItems(sessionId, userData.getActiveFacts(), "recurring_activity")
+        )
       : null;
-  // The rich picture built up across the earlier stages — the input the 4.3 and
-  // 4.4 routes draft from. Only assembled for those modules.
+  // The rich picture built up across the earlier stages — the input the Stage 4
+  // surfaces draft from. Now the resolver's seed view for this module.
   const planUserModelText =
     interaction?.type === "balanced-goals" ||
     interaction?.type === "goal-paths" ||
     interaction?.type === "trade-offs" ||
     interaction?.type === "week-shape" ||
     interaction?.type === "first-year"
-      ? renderUserModel(buildUserModel(userData))
+      ? resolveSeedText(sessionId, userData.getActiveFacts())
       : "";
 
   return (
@@ -1615,6 +1647,13 @@ export default function SessionContainer({
             {sending && <TypingBubble />}
           </div>
 
+          {completed && pendingFactRemovals.length > 0 && (
+            <PendingRemovals
+              removals={pendingFactRemovals}
+              onResolve={resolvePendingRemoval}
+            />
+          )}
+
           {completed && !reopened ? (
             closingCommitment && !commitmentDone ? (
               <ScreeningCommitment
@@ -1685,7 +1724,7 @@ export default function SessionContainer({
         !completed && (
           <LetterFlow
             interaction={interaction}
-            priorReflections={priorReflectionsBlock(true)}
+            priorReflections={resolveSeedText(sessionId, userData.getActiveFacts())}
             initial={buildResult?.type === "letter" ? buildResult : undefined}
             onComplete={handleLetterComplete}
           />
@@ -1773,6 +1812,48 @@ export default function SessionContainer({
         </section>
       )}
     </div>
+  );
+}
+
+// A quick yes/no for corrections Vita picked up in conversation but couldn't be
+// sure about — so the person confirms a drop before it's applied (mirroring the
+// edit-acknowledgement pattern). Each removal is its own line: keep, or drop.
+function PendingRemovals({
+  removals,
+  onResolve,
+}: {
+  removals: PendingRemoval[];
+  onResolve: (removal: PendingRemoval, apply: boolean) => void;
+}) {
+  return (
+    <section style={styles.pendingWrap}>
+      <p style={styles.pendingIntro}>
+        One thing to check — it sounded like this might have changed:
+      </p>
+      {removals.map((r) => (
+        <div key={r.identity} style={styles.pendingRow}>
+          <span style={styles.pendingLabel}>
+            Drop &ldquo;{r.label}&rdquo;?
+          </span>
+          <div style={styles.pendingActions}>
+            <button
+              type="button"
+              style={styles.pendingDrop}
+              onClick={() => onResolve(r, true)}
+            >
+              Yes, drop it
+            </button>
+            <button
+              type="button"
+              style={styles.pendingKeep}
+              onClick={() => onResolve(r, false)}
+            >
+              No, keep it
+            </button>
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -2584,6 +2665,59 @@ const styles: Record<string, React.CSSProperties> = {
     paddingTop: "36px",
     marginTop: "8px",
     borderTop: "1px solid var(--border)",
+  },
+  pendingWrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    background: "var(--warm-surface)",
+    border: "1px solid var(--warm-line)",
+    borderRadius: "var(--r-md)",
+    padding: "16px 18px",
+  },
+  pendingIntro: {
+    margin: 0,
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    color: "var(--text)",
+  },
+  pendingRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+  },
+  pendingLabel: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-body)",
+    fontWeight: 600,
+    color: "var(--ink)",
+  },
+  pendingActions: { display: "flex", gap: "8px" },
+  pendingDrop: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    color: "var(--brand-on-primary)",
+    background: "var(--brand-primary)",
+    border: "none",
+    borderRadius: "var(--r-sm)",
+    padding: "8px 14px",
+    minHeight: "40px",
+    cursor: "pointer",
+  },
+  pendingKeep: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    color: "var(--ink)",
+    background: "transparent",
+    border: "1px solid var(--border-strong)",
+    borderRadius: "var(--r-sm)",
+    padding: "8px 14px",
+    minHeight: "40px",
+    cursor: "pointer",
   },
   vitaLockup: {
     display: "flex",

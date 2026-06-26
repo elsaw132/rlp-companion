@@ -33,6 +33,7 @@ export default function OnboardingPage() {
   const [name, setName] = useState("");
   const [nameInit, setNameInit] = useState(false);
   const [partner, setPartner] = useState("");
+  const [dob, setDob] = useState("");
   const [horizon, setHorizon] = useState("");
   const [motivation, setMotivation] = useState("");
 
@@ -113,6 +114,18 @@ export default function OnboardingPage() {
           )}
 
           {step === 4 && (
+            <DateStep
+              dob={dob}
+              setDob={setDob}
+              onContinue={() => {
+                if (dob.trim()) data.saveOnboarding({ dob: dob.trim() });
+                setStep(5);
+              }}
+              onSkip={() => setStep(5)}
+            />
+          )}
+
+          {step === 5 && (
             <CardStep
               heading="Roughly how far from retirement are you?"
               options={HORIZON_OPTIONS}
@@ -120,13 +133,13 @@ export default function OnboardingPage() {
               onSelect={setHorizon}
               onContinue={() => {
                 data.saveOnboarding({ horizon });
-                setStep(5);
+                setStep(6);
               }}
               buttonLabel="Continue"
             />
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <CardStep
               heading="What's prompted you to start thinking about retirement?"
               options={MOTIVATION_OPTIONS}
@@ -257,6 +270,54 @@ function NameStep({
   );
 }
 
+function DateStep({
+  dob,
+  setDob,
+  onContinue,
+  onSkip,
+}: {
+  dob: string;
+  setDob: (v: string) => void;
+  onContinue: () => void;
+  onSkip: () => void;
+}) {
+  // The latest date a 16-year-old could have been born — a light floor so the
+  // picker can't take an implausibly recent date.
+  const maxDob = (() => {
+    const d = new Date();
+    return `${d.getFullYear() - 16}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate()
+    ).padStart(2, "0")}`;
+  })();
+  return (
+    <>
+      <h1 className="step-heading">What&apos;s your date of birth?</h1>
+      <p className="paragraph">
+        This helps Vita tailor a few practical, age-related suggestions — like
+        when a routine health check becomes worth a mention. It&apos;s private,
+        kept only on your own plan, and never shared. You can skip it.
+      </p>
+      <div className="name-field">
+        <input
+          id="date-of-birth"
+          type="date"
+          className="name-input"
+          value={dob}
+          max={maxDob}
+          onChange={(e) => setDob(e.target.value)}
+          autoComplete="bday"
+        />
+      </div>
+      <button type="button" className="btn btn-navy" onClick={onContinue}>
+        Continue
+      </button>
+      <button type="button" onClick={onSkip} className="skip">
+        Skip
+      </button>
+    </>
+  );
+}
+
 function CardStep({
   heading,
   options,
@@ -328,13 +389,13 @@ const css = `
 
 .rlp-onb .welcome{width:100%;background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-lg);box-shadow:var(--shadow-md);overflow:hidden}
 .rlp-onb .scene{height:140px;background:linear-gradient(var(--ill-sky-pale),var(--ill-sky) 42%,var(--ill-hill) 64%,var(--ill-hill-deep));position:relative}
-.rlp-onb .scene .sun-ill{position:absolute;right:40px;top:32px;width:50px;height:50px;border-radius:50%;background:radial-gradient(circle,#FFF3CF,var(--sun));box-shadow:0 0 34px rgba(251,210,78,.6)}
+.rlp-onb .scene .sun-ill{position:absolute;right:40px;top:32px;width:50px;height:50px;border-radius:50%;background:radial-gradient(circle,#FBEAC0,var(--ill-sun));box-shadow:0 0 36px rgba(233,185,73,.55)}
 .rlp-onb .scene .cloud{position:absolute;width:70px;height:20px;background:rgba(255,255,255,.7);border-radius:20px;top:78px;right:66px}
 .rlp-onb .scene .cloud.two{width:48px;top:106px;right:154px;opacity:.6}
 .rlp-onb .welcome .body{padding:30px 32px 32px}
 
 .rlp-onb .vita{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.rlp-onb .vita .sun{width:38px;height:38px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:18px;color:var(--ink)}
+.rlp-onb .vita .sun{width:38px;height:38px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:18px;color:var(--brand-primary)}
 .rlp-onb .vita .name{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--ink)}
 
 .rlp-onb .hero-heading{font-family:var(--font-serif);font-size:var(--fs-display);font-weight:600;color:var(--ink);line-height:1.2;margin:0 0 18px}

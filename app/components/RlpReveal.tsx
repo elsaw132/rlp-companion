@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useUserData } from "@/lib/userData";
 import { buildUserModel, type ModelSource } from "@/lib/userModel";
+import { coreValuesFromFacts } from "@/lib/resolverInputs";
 import { buildRlpPlan, type RlpPlan } from "@/lib/rlpPlan";
 import { SEED_SOURCE, SEED_MEMBER_NAME } from "@/lib/rlpPlanSeed";
 import { todayISODate } from "@/lib/planDate";
@@ -46,6 +47,9 @@ export default function RlpReveal() {
     getDreams: userData.getDreams,
     getStage3Values: userData.getStage3Values,
     getOnboarding: userData.getOnboarding,
+    // Phase 2: the plan reads values (verbatim description + 3.4 threat/protector)
+    // from the canonical profile.
+    getActiveFacts: userData.getActiveFacts,
   };
 
   const today = todayISODate();
@@ -69,10 +73,16 @@ export default function RlpReveal() {
   // ---- generated-once pieces: Vita's opening, and the scene imagery ----
   async function generateIntro() {
     const model = buildUserModel(source);
+    // Prefer the canonical profile's verbatim value descriptions for the intro
+    // prose too, so it matches the plan document (falls back to the model).
+    const factValues = coreValuesFromFacts(source.getActiveFacts?.() ?? []);
+    const introValues = (factValues.length ? factValues : model.coreValues).map(
+      (v) => ({ value: v.value, meaning: v.meaning })
+    );
     const req: PlanIntroRequest = {
       name: plan.meta.name,
       withPartner: model.onboarding.withPartner,
-      coreValues: model.coreValues.map((v) => ({ value: v.value, meaning: v.meaning })),
+      coreValues: introValues,
       roles: model.roles.all,
       mostAliveRoles: model.roles.mostAlive,
       energySources: model.energySources,

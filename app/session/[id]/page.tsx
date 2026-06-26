@@ -11,6 +11,7 @@ import {
   sensesClosingCommitment,
 } from "@/lib/modules";
 import { getUserData } from "@/lib/db";
+import { ageFromDob } from "@/lib/planDate";
 
 export default async function SessionPage({
   params,
@@ -66,22 +67,27 @@ export default async function SessionPage({
   // back to withholding the hearing nudge rather than showing it to everyone.
   const isSenses = mod.id === "2.6";
   let horizon: string | null = null;
+  let age: number | null = null;
   if (isSenses && userId) {
     try {
       const onboarding = await getUserData(userId, "onboarding");
       if (onboarding && typeof onboarding === "object") {
         const h = (onboarding as { horizon?: unknown }).horizon;
         if (typeof h === "string") horizon = h;
+        // Prefer the real age computed from the onboarding date of birth; the
+        // horizon stays as the graceful fallback when no DOB was given.
+        const d = (onboarding as { dob?: unknown }).dob;
+        if (typeof d === "string") age = ageFromDob(d);
       }
     } catch {
       horizon = null;
     }
   }
   const sessionInstructions = isSenses
-    ? sensesSessionInstructions(horizon)
+    ? sensesSessionInstructions(horizon, age)
     : mod.sessionInstructions;
   const closingCommitment = isSenses
-    ? sensesClosingCommitment(horizon)
+    ? sensesClosingCommitment(horizon, age)
     : mod.closingCommitment;
 
   // The next module in this stage, if there is one — offered as a secondary

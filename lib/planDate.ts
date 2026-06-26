@@ -16,3 +16,34 @@ export function todayISODate(): string {
 export function isTodayLocal(iso: string): boolean {
   return iso === todayISODate();
 }
+
+// Whole years between a date of birth (ISO YYYY-MM-DD) and today, or null if the
+// input isn't a usable past date. Computed at read time so the age never goes
+// stale. Used by the senses (2.6) hearing-check gate and the resolver's {age}
+// filter — both prefer this real age over the coarse retirement-horizon signal,
+// and fall back to the horizon when no DOB was given.
+export function ageFromDob(dob: string | null | undefined): number | null {
+  if (!dob || typeof dob !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob.trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const birth = new Date(year, month - 1, day);
+  // Reject malformed dates (e.g. 2024-02-31 rolling over) and future dates.
+  if (
+    birth.getFullYear() !== year ||
+    birth.getMonth() !== month - 1 ||
+    birth.getDate() !== day
+  ) {
+    return null;
+  }
+  const now = new Date();
+  if (birth.getTime() > now.getTime()) return null;
+  let age = now.getFullYear() - year;
+  const hadBirthday =
+    now.getMonth() > month - 1 ||
+    (now.getMonth() === month - 1 && now.getDate() >= day);
+  if (!hadBirthday) age -= 1;
+  return age >= 0 && age < 130 ? age : null;
+}
