@@ -45,6 +45,8 @@ export type SeedView = {
   items: ResolvedFact[];
   // Age computed from the DOB fact, when the manifest asked for {age} (2.6).
   age: number | null;
+  // One compact line per category (same rendering as the text block, unjoined).
+  lines: string[];
   // A compact text block for routes that accept a single context string (drop-in
   // for the old renderUserModel(...) argument).
   text: string;
@@ -202,7 +204,7 @@ export function resolveViews(moduleId: string, activeFacts: StoredFact[]): Resol
   const manifest = getManifest(moduleId);
   if (!manifest) {
     return {
-      seed: { items: [], age: null, text: "" },
+      seed: { items: [], age: null, lines: [], text: "" },
       vita: { items: [], lines: [], text: "" },
     };
   }
@@ -228,6 +230,7 @@ export function resolveViews(moduleId: string, activeFacts: StoredFact[]): Resol
     seed: {
       items: seedItems,
       age,
+      lines: seedLines,
       text: seedLines.length ? [SEED_PREAMBLE, ...seedLines].join("\n") : "",
     },
     vita: {
