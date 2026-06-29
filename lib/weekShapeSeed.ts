@@ -65,6 +65,10 @@ export type TransitionShape = {
   period?: string;
 };
 
+// One real recurring activity, from the structured recurring_activity facts —
+// the source of truth for the week, replacing the old transcript scrape.
+export type RecurringActivityInput = { label: string; domain: string | null };
+
 // The picture the draft is built from. Assembled by the caller.
 export type WeekShapeDraftInput = {
   userModel: string;
@@ -72,9 +76,9 @@ export type WeekShapeDraftInput = {
   hasPartner: boolean;
   goals: WeekShapeGoal[];
   transition: TransitionShape | null;
-  // The person's own words from earlier conversations with Vita — where the real,
-  // specific activities live (the actual badminton, the swim, the family dinner).
-  transcripts: string;
+  // The person's real, recurring activities — drawn from structured
+  // recurring_activity facts (the canonical profile), not a transcript scrape.
+  recurring: RecurringActivityInput[];
 };
 
 // ---- Pull the inputs out of the earlier modules' saved results ----
@@ -129,50 +133,6 @@ export function transitionShape(
     ...(t.shape ? { shape: t.shape } : {}),
     ...(t.period ? { period: t.period } : {}),
   };
-}
-
-// ---- Gather the real activities from earlier conversations ----
-// The user model is a curated synthesis; the specific recurring activities (the
-// actual badminton, the weekly swim) live in the person's own words across the
-// earlier conversations. Pull those transcripts so the draft works from what they
-// genuinely said, not from generic templates. Capped so the call stays light.
-const PER_MODULE_CHARS = 1500;
-const TOTAL_CHARS = 9000;
-const PER_MESSAGE_CHARS = 320;
-
-export function weekTranscripts(
-  modules: { id: string; title: string }[],
-  getConversation: (
-    id: string
-  ) => { role: string; text: string }[] | null
-): string {
-  const sections: string[] = [];
-  let total = 0;
-  for (const m of modules) {
-    if (total >= TOTAL_CHARS) break;
-    const messages = getConversation(m.id);
-    if (!messages || messages.length === 0) continue;
-    const lines: string[] = [];
-    let used = 0;
-    for (const msg of messages) {
-      const text = typeof msg.text === "string" ? msg.text.trim() : "";
-      if (!text) continue;
-      const who = msg.role === "user" ? "Them" : "Vita";
-      const clipped =
-        text.length > PER_MESSAGE_CHARS
-          ? `${text.slice(0, PER_MESSAGE_CHARS)}…`
-          : text;
-      const line = `${who}: ${clipped}`;
-      if (used + line.length > PER_MODULE_CHARS) break;
-      lines.push(line);
-      used += line.length;
-    }
-    if (lines.length === 0) continue;
-    const section = `— ${m.title} —\n${lines.join("\n")}`;
-    sections.push(section);
-    total += section.length;
-  }
-  return sections.join("\n\n");
 }
 
 // Call the drafting route. Returns the drafted seed, or null on any failure so

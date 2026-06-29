@@ -24,6 +24,11 @@ import {
   type BuildResult,
   type ScreeningCommitment,
 } from "@/lib/modules";
+import {
+  CONTEXT_FACTS_SNAPSHOT_KEY,
+  type StoredFact,
+  type FactCategory,
+} from "@/lib/contextFacts";
 import { getActiveStageNumber } from "@/lib/progress";
 import type { Takeaway } from "@/lib/takeaways";
 import type { Dreams } from "@/lib/dreams";
@@ -51,6 +56,10 @@ export type OnboardingAnswers = {
   partner?: string;
   horizon?: string;
   motivation?: string | null;
+  // Date of birth, ISO YYYY-MM-DD. Optional: existing users and anyone who skips
+  // it have none, and every age-dependent path degrades gracefully without it.
+  // Used to compute real age at read time (the 2.6 hearing-check gate).
+  dob?: string;
 };
 
 export type ConversationMessage = {
@@ -621,6 +630,7 @@ export function useUserData() {
       partner: "",
       horizon: "",
       motivation: null,
+      dob: "",
       ...getOnboarding(),
       ...partial,
     };
@@ -927,6 +937,25 @@ export function useUserData() {
 
   const clearCommitment = (id: string) => removeKey(KEYS.commitment(id));
 
+  // ---- Canonical context profile (read-only view) ----
+  // The bulk snapshot fetch attaches the user's active facts under a synthetic
+  // key. This getter is a read-only view over them — phase 1 writes and
+  // validates the store; the live read paths are migrated in phase 2. Filterable
+  // by category and/or the module a fact came from.
+  const getActiveFacts = (filter?: {
+    category?: FactCategory;
+    provenanceModule?: string;
+  }): StoredFact[] => {
+    const v = snapshot[CONTEXT_FACTS_SNAPSHOT_KEY];
+    const facts = Array.isArray(v) ? (v as StoredFact[]) : [];
+    if (!filter) return facts;
+    return facts.filter(
+      (f) =>
+        (!filter.category || f.category === filter.category) &&
+        (!filter.provenanceModule || f.provenanceModule === filter.provenanceModule)
+    );
+  };
+
   // ---- Resets ----
   const resetAll = () => removeAll();
 
@@ -1020,6 +1049,7 @@ export function useUserData() {
     getCommitment,
     saveCommitment,
     clearCommitment,
+    getActiveFacts,
     resetAll,
     resetModule,
   };

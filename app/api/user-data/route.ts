@@ -5,6 +5,10 @@ import {
   deleteUserData,
   deleteAllUserData,
 } from "@/lib/db";
+import {
+  ensureBackfill,
+  CONTEXT_FACTS_SNAPSHOT_KEY,
+} from "@/lib/contextBackfill";
 
 // The user's data access layer. The browser never sends a user id — it's
 // always derived here from the authenticated Clerk session, so a request can
@@ -17,6 +21,18 @@ export async function GET() {
   if (!userId) return new Response("Unauthorized", { status: 401 });
 
   const data = await getAllUserData(userId);
+
+  // Lazily provision the canonical context profile (idempotent; short-circuits
+  // once a user is backfilled) and attach the active facts under a synthetic,
+  // read-only snapshot key so phase-2 client consumers can read them
+  // synchronously. Best-effort: a failure here never blocks the data load.
+  try {
+    const { facts } = await ensureBackfill(userId, data);
+    data[CONTEXT_FACTS_SNAPSHOT_KEY] = facts;
+  } catch {
+    // Leave the snapshot without facts; the app works, capture continues.
+  }
+
   return Response.json(data);
 }
 

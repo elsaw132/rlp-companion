@@ -208,6 +208,10 @@ export function createPlanPdfDocument(plan: RlpPlan, images: Record<string, stri
             <View key={i} style={{ marginBottom: 8 }} wrap={false}>
               <Text style={s.goalLabel}>{v.value}</Text>
               {v.meaning ? <Text style={s.goalWhy}>&ldquo;{v.meaning}&rdquo;</Text> : null}
+              {v.threat ? <Text style={s.goalWhy}>What puts it at risk: {v.threat}</Text> : null}
+              {v.protectors && v.protectors.length ? (
+                <Text style={s.goalWhy}>What protects it: {v.protectors.join(", ")}</Text>
+              ) : null}
             </View>
           ))}
           {values.nonNegotiables.length ? (

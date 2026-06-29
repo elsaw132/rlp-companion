@@ -219,7 +219,13 @@ function ValuesCompass({
   values,
   buckets,
 }: {
-  values: { value: string; meaning?: string; confidence?: string }[];
+  values: {
+    value: string;
+    meaning?: string;
+    confidence?: string;
+    threat?: string;
+    protectors?: string[];
+  }[];
   buckets: { nonNegotiable: string[]; flexible: string[] };
 }) {
   const [sel, setSel] = useState(0);
@@ -292,6 +298,14 @@ function ValuesCompass({
           )}
         </div>
         {active.meaning && <p className="rlp-compass-meaning">&ldquo;{active.meaning}&rdquo;</p>}
+        {active.threat && (
+          <p className="rlp-compass-note">What puts it at risk: {active.threat}</p>
+        )}
+        {active.protectors && active.protectors.length > 0 && (
+          <p className="rlp-compass-note">
+            What protects it: {active.protectors.join(", ")}
+          </p>
+        )}
         {active.confidence === "still forming" && (
           <p className="rlp-compass-note">Still forming &mdash; settling as you go.</p>
         )}

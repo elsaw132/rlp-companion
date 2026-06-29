@@ -28,7 +28,7 @@ function systemPrompt(): string {
 WHAT MAKES THIS WORK — THEIR REAL ACTIVITIES, AT A GRAIN THEY CAN ANSWER
 This far out from retirement, no one can honestly say "tennis on Tuesday at 3pm". The honest grain is rougher: how often a thing happens, whether it's a fixed anchor or stays loose. So you capture rhythm, NOT a timetable. Two rules above all:
 
-1. USE THEIR ACTUAL, SPECIFIC ACTIVITIES. Build the week from the real recurring things they have actually named — their regular badminton, the Tuesday swim, the choir, Sunday lunch with the family, the dog walk, the book group, the volunteering shift. Read these out of everything below, ESPECIALLY their own words in the earlier conversations. Name each thing specifically and in full, in their terms ("Badminton at the club", not "something active"; "Sunday dinner with the kids", not "time with family"). NEVER use generic template activities like "morning walk", "something social", "a project or interest", "time to relax". A week of generic placeholders has failed. Nothing recurring they mentioned should be missing.
+1. USE THEIR ACTUAL, SPECIFIC ACTIVITIES. Build the week from the real recurring things they have actually named — listed below under THEIR REAL RECURRING ACTIVITIES (their regular badminton, the Tuesday swim, the choir, Sunday lunch with the family, the dog walk, the book group, the volunteering shift). Name each thing specifically and in full, in their terms ("Badminton at the club", not "something active"; "Sunday dinner with the kids", not "time with family"). NEVER use generic template activities like "morning walk", "something social", "a project or interest", "time to relax". A week of generic placeholders has failed. Nothing on that list should be missing.
 
 2. NEVER INVENT. Only include activities they actually told you about. If they named few specifics, return few — better six real, recognisable activities than twelve padded with invented filler. Do not make up hobbies, clubs or commitments.
 
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         hasPartner: false,
         goals: [],
         transition: null,
-        transcripts: "",
+        recurring: [],
       }),
     });
   }
@@ -79,7 +79,12 @@ export async function POST(request: Request) {
     hasPartner: body.hasPartner === true,
     goals: Array.isArray(body.goals) ? body.goals : [],
     transition: body.transition ?? null,
-    transcripts: typeof body.transcripts === "string" ? body.transcripts : "",
+    recurring: Array.isArray(body.recurring)
+      ? body.recurring.filter(
+          (r): r is { label: string; domain: string | null } =>
+            !!r && typeof r.label === "string" && r.label.trim() !== ""
+        )
+      : [],
   };
 
   const goalBlock = input.goals.length
@@ -112,14 +117,18 @@ export async function POST(request: Request) {
       : "a clean break from work — no ongoing work activity"
     : "(no transition signal — assume no ongoing work activity)";
 
+  const recurringBlock = input.recurring.length
+    ? input.recurring
+        .map((r) => `- ${r.label}${r.domain ? ` (${r.domain})` : ""}`)
+        .join("\n")
+    : "(none recorded yet)";
+
   const context = [
     input.onboarding &&
       input.onboarding.trim() &&
       `ABOUT THEM:\n${input.onboarding.trim()}`,
     input.userModel && input.userModel.trim(),
-    input.transcripts &&
-      input.transcripts.trim() &&
-      `THEIR OWN WORDS FROM EARLIER CONVERSATIONS (the richest source for the real, specific recurring activities — read the actual hobbies, clubs and commitments out of these):\n${input.transcripts.trim()}`,
+    `THEIR REAL RECURRING ACTIVITIES (the source for the week — the actual hobbies, clubs and commitments they named across the programme; build the week from these and don't drop any):\n${recurringBlock}`,
     `THE GOALS THEY NAMED ACROSS THE BALANCED AREAS (extra grounding; each tagged with its area):\n${goalBlock}`,
     `THEIR WORK TRANSITION (only to decide whether ongoing work belongs in the week):\n${transitionBlock}`,
   ]

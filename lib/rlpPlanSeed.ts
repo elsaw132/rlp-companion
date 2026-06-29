@@ -12,12 +12,35 @@ import type { ModelSource } from "@/lib/userModel";
 import type { Stage3ValuesSummary } from "@/lib/stage3Seed";
 import type { Dreams } from "@/lib/dreams";
 import type { Takeaway } from "@/lib/takeaways";
+import type { StoredFact } from "@/lib/contextFacts";
+import { synthesizeActiveFacts } from "@/lib/resolverInputs";
 
 export const SEED_MEMBER_NAME = "Margaret";
 
 // ---- Prior-stage builds the user model reads (Stage 1–3) ----
 
 const builds: Record<string, BuildResult> = {
+  // Stage 1 — the day they pictured (day-builder). Activities use the real
+  // day-builder labels, spread across the day, and span the movement / mind /
+  // people / helping / restful vocab so the {tag} filters downstream (2.1–2.5)
+  // have something to surface — and so 1.roles, 3.1 and 3.2 lean on it.
+  "1.day": {
+    type: "day-builder",
+    parts: ["Morning", "Afternoon", "Evening"],
+    assigned: {
+      Morning: ["Swim", "Slow breakfast", "Gardening"],
+      Afternoon: ["A walk somewhere new", "Read", "Help family practically"],
+      Evening: ["Time with your partner", "Grandkids", "See friends"],
+    },
+  },
+  // Stage 1 — a letter to their future self (provides the letter_thread that
+  // 1.5/2.1/2.6 lean on).
+  "1.letter": {
+    type: "letter",
+    recipientId: "future-self",
+    recipientLabel: "My future self, at 70",
+    body: "By now I hope the mornings still start with a swim and the garden is a happy mess. I hope Tom and I finally did the slow trip to Italy, and that I kept my hand in with the watercolours even when they were terrible. Most of all I hope I stayed close to the people I love, and useful to one or two who needed it.",
+  },
   // Stage 1 — roles / identity.
   "1.roles": {
     type: "role-picker",
@@ -48,6 +71,45 @@ const builds: Record<string, BuildResult> = {
     ],
     ranked: ["Family", "Health", "Making a difference", "Learning", "Independence"],
     summaryLabel: "Your priorities",
+  },
+  // Stage 3 — living your values (3.4): each value in the member's OWN words,
+  // with what threatens it and what protects it. Phase 2 carries these into the
+  // plan; the verbatim descriptions also supersede the 3.6 re-distillation.
+  "3.4": {
+    type: "value-definitions",
+    values: [
+      {
+        value: "Family",
+        description: "Being a steady, everyday presence for the people I love — not just showing up for the big occasions",
+        threat: "Letting a full diary quietly crowd them out",
+        protectors: ["Sunday lunch with the grandchildren", "A proper weekly call with my sister"],
+      },
+      {
+        value: "Health",
+        description: "Keeping a willing body so I can do the things I want, for as long as I can",
+        threat: "Putting it off until something forces my hand",
+        protectors: ["My morning swim", "A long walk most days"],
+      },
+      {
+        value: "Making a difference",
+        description: "Leaving things, and people, a little better than I found them",
+        threat: "Drifting into busy-ness that doesn't actually help anyone",
+        protectors: ["Mentoring one young person at a time", "Saying yes to the local cause that matters"],
+      },
+      {
+        value: "Learning",
+        description: "Always having something new on the go that stretches me",
+        threat: "Settling into the comfortable and familiar",
+        protectors: ["One proper project a season", "Booking the watercolour class before I talk myself out of it"],
+      },
+      {
+        value: "Independence",
+        description: "My time being mine to shape, on my own terms",
+        threat: "Quietly handing my weeks over to everyone else's plans",
+        protectors: ["Keeping a few mornings unplanned", "Choosing what I take on, not just accepting it"],
+      },
+    ],
+    summaryLabel: "Living your values",
   },
   // Stage 2 — staying active (energy sources).
   "2.1": {
@@ -374,5 +436,17 @@ export const SEED_SOURCE: ModelSource = {
     partner: "Me and my partner",
     horizon: "3 to 5 years",
     motivation: "A milestone birthday on the horizon",
+    // Date of birth (age ~62) — exercises the new DOB→age path: 2.6's hearing
+    // check is recommended on real age (50+), not the retirement horizon.
+    dob: "1963-09-12",
   }),
 };
+
+// Phase 2: the assembler reads values from the canonical profile, so the seed
+// member needs one too. Synthesized from the same structured builds above (the
+// phase-1 backfill mapping), memoised. Assigned after the literal to avoid the
+// self-reference. This is what makes the demo RLP show verbatim value
+// descriptions and the 3.4 threat/protector through the new read path.
+let seedFactsCache: StoredFact[] | null = null;
+SEED_SOURCE.getActiveFacts = () =>
+  (seedFactsCache ??= synthesizeActiveFacts(SEED_SOURCE));
