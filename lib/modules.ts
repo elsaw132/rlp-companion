@@ -1038,6 +1038,8 @@ export const STAGES: Stage[] = [
         coachOpening: `Here's the day you've put together. Let's talk it through — looking at the whole thing, which part are you most looking forward to?`,
         interaction: {
           type: "day-builder",
+          // Stored explicitly so the recap heading never depends on the default.
+          summaryLabel: "Your day",
           parts: ["Morning", "Afternoon", "Evening"],
           categories: [
             {
@@ -1169,6 +1171,8 @@ WATCH FOR
         coachOpening: `Oh, now THIS is a good list — so this is what you'd do if money were no object! How fun does that sound. If you could only afford three of these dreams, which three would you pick?`,
         interaction: {
           type: "spark-prompts",
+          // Stored explicitly so the recap heading never depends on the default.
+          summaryLabel: "What you'd do",
           instruction:
             "No budgets, no second-guessing. Fill in as many as spark something — leave the rest blank.",
           prompts: [
@@ -1238,6 +1242,8 @@ WATCH FOR
           type: "role-picker",
           instruction:
             "Pick the roles that feel most alive to you — then star the two or three that matter most right now.",
+          // Stored explicitly so the recap heading never depends on the default.
+          summaryLabel: "Your roles",
           groups: [
             {
               name: "Relationships",
@@ -1318,6 +1324,8 @@ WATCH FOR
           type: "sliders",
           instruction:
             "Set where your ideal week sits on each of these — there's no right answer, just what feels like you.",
+          // Stored explicitly so the recap heading never depends on the default.
+          summaryLabel: "Ideal week",
           spectrums: [
             { left: "Lots of routine", right: "Lots of spontaneity" },
             { left: "Mostly on my own", right: "Mostly with others" },
@@ -2100,6 +2108,8 @@ WATCH FOR
         coachOpening: `Thanks for marking those two down — quick to answer, and a useful place to round off Explore. Let's take a look at where you've landed.`,
         interaction: {
           type: "screening-check",
+          // Stored explicitly so the recap heading never depends on the default.
+          summaryLabel: "Where you are with the basics",
           instruction: "Two quick ones — just tap the closest answer for each.",
           questions: [
             {
