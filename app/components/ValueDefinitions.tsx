@@ -347,7 +347,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-body)",
     lineHeight: "var(--lh-body)",
-    color: "var(--text-muted)",
+    fontWeight: 500,
+    color: "var(--ink)",
     margin: 0,
   },
   // Keep the helper line close above the first card (tighter than the wrap's

@@ -243,7 +243,14 @@ export default function DayBuilder({
       <FinishControls
         mode={mode}
         disabled={total < 3}
-        onFinish={() => onFinish({ type: "day-builder", parts, assigned })}
+        onFinish={() =>
+          onFinish({
+            type: "day-builder",
+            parts,
+            assigned,
+            summaryLabel: interaction.summaryLabel,
+          })
+        }
         onCancel={onCancel}
         hint={
           total < 3
@@ -299,7 +306,7 @@ export default function DayBuilder({
 export function DayBuilderSummary({ result }: { result: DayBuilderResult }) {
   return (
     <>
-      <p style={summaryStyles.heading}>Your day</p>
+      <p style={summaryStyles.heading}>{result.summaryLabel ?? "Your day"}</p>
       <div style={summaryStyles.grid}>
         {filledParts(result).map((part) => (
           <div key={part} style={summaryStyles.column}>

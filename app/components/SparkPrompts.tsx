@@ -47,7 +47,11 @@ export default function SparkPrompts({
     const entries = prompts
       .filter((p) => (values[p.id] ?? "").trim())
       .map((p) => ({ id: p.id, label: p.label, text: values[p.id].trim() }));
-    onFinish({ type: "spark-prompts", entries });
+    onFinish({
+      type: "spark-prompts",
+      entries,
+      summaryLabel: interaction.summaryLabel,
+    });
   }
 
   return (
@@ -144,7 +148,9 @@ const styles: Record<string, React.CSSProperties> = {
 export function SparkPromptsSummary({ result }: { result: SparkPromptsResult }) {
   return (
     <>
-      <p style={summaryStyles.heading}>What you&rsquo;d do</p>
+      <p style={summaryStyles.heading}>
+        {result.summaryLabel ?? "What you’d do"}
+      </p>
       <div style={summaryStyles.list}>
         {result.entries.map((entry) => (
           <div key={entry.id} style={summaryStyles.item}>

@@ -317,10 +317,12 @@ export function buildUserModel(source: ModelSource): UserModel {
   const onboarding = source.getOnboarding();
   return {
     onboarding: {
+      // "Yes"/"No" are the current onboarding answers; "Me and my partner"/
+      // "Just me" are honoured for data saved before the question changed.
       withPartner:
-        onboarding.partner === "Me and my partner"
+        onboarding.partner === "Yes" || onboarding.partner === "Me and my partner"
           ? true
-          : onboarding.partner === "Just me"
+          : onboarding.partner === "No" || onboarding.partner === "Just me"
             ? false
             : null,
       horizon: onboarding.horizon?.trim() || null,

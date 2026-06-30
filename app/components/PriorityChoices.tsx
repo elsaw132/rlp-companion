@@ -268,14 +268,23 @@ export function PriorityChoicesSummary({
         </ol>
       )}
       {leanings.length > 0 && (
-        <div style={summaryStyles.leanings}>
-          {leanings.map((c, i) => (
-            <span key={`${c.chose}-${i}`} style={summaryStyles.chip}>
-              {c.chose}
-              {c.why ? ` — ${c.why}` : ""}
-            </span>
-          ))}
-        </div>
+        <>
+          <p style={summaryStyles.subLabel}>What pulled harder, and what it was over</p>
+          <div style={summaryStyles.leanings}>
+            {leanings.map((c, i) => {
+              const other = c.chose === c.left ? c.right : c.left;
+              return (
+                <span key={`${c.chose}-${i}`} style={summaryStyles.chip}>
+                  <span style={summaryStyles.chipChosen}>{c.chose}</span>
+                  <span style={summaryStyles.chipOver}>over {other}</span>
+                  {c.why ? (
+                    <span style={summaryStyles.chipWhy}>— {c.why}</span>
+                  ) : null}
+                </span>
+              );
+            })}
+          </div>
+        </>
       )}
     </>
   );
@@ -294,7 +303,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-body)",
     lineHeight: "var(--lh-body)",
-    color: "var(--text-muted)",
+    fontWeight: 500,
+    color: "var(--ink)",
     margin: 0,
   },
   // Keep the helper line close above the first pair (tighter than the wrap's
@@ -449,15 +459,42 @@ const summaryStyles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: "var(--brand-primary)",
   },
+  subLabel: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-label)",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    color: "var(--text-muted)",
+    margin: "2px 0 10px",
+  },
   leanings: { display: "flex", flexWrap: "wrap", gap: "8px" },
+  // Each leaning shows both sides of the trade-off — the chosen side emphasised,
+  // the other shown muted as "over X" — so the person can see what they were
+  // choosing between while talking it through with Vita.
   chip: {
+    display: "inline-flex",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: "6px",
     background: "var(--brand-primary-tint)",
     borderRadius: "var(--r-pill)",
     padding: "6px 14px",
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-sm)",
-    fontWeight: 600,
     color: "var(--ink)",
+  },
+  chipChosen: {
+    fontWeight: 700,
+    color: "var(--ink)",
+  },
+  chipOver: {
+    fontWeight: 500,
+    color: "var(--text-muted)",
+  },
+  chipWhy: {
+    fontWeight: 500,
+    color: "var(--text)",
   },
 };
 

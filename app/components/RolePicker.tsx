@@ -26,6 +26,9 @@ type RolePickerProps = {
   // finishing and validity.
   embedded?: boolean;
   onChange?: (result: RolePickerResult) => void;
+  // Whether to show the "tap each one" helper cue. The composite shows it once
+  // (on the first picker step), so later repeated pickers pass false.
+  showHelper?: boolean;
 } & EditableProps<RolePickerResult>;
 
 export default function RolePicker({
@@ -36,6 +39,7 @@ export default function RolePicker({
   onCancel,
   embedded = false,
   onChange,
+  showHelper = true,
 }: RolePickerProps) {
   const { instruction, groups, selectRange, summaryLabel } = interaction;
   // Starring is on by default (Stage 1); flat Stage 2 pickers turn it off.
@@ -102,6 +106,18 @@ export default function RolePicker({
     setDrafts((prev) => ({ ...prev, [group]: "" }));
   }
 
+  // Remove a custom activity entirely — for one added under the wrong heading.
+  // Drops it from this group's extras and from the current selection/starring.
+  // (Listed preset options can't be removed; tapping just deselects them.)
+  function removeExtra(group: string, role: string) {
+    setExtras((prev) => ({
+      ...prev,
+      [group]: (prev[group] ?? []).filter((r) => r !== role),
+    }));
+    setSelected((prev) => prev.filter((r) => r !== role));
+    setStarred((prev) => prev.filter((r) => r !== role));
+  }
+
   const starLimitReached = starred.length >= MAX_STARRED;
   const countOk =
     selected.length >= minPicks &&
@@ -141,10 +157,11 @@ export default function RolePicker({
       <p style={styles.instruction}>{instruction}</p>
 
       <div style={styles.helperGroup}>
-        <HelperLine>{helperText}</HelperLine>
+        {showHelper && <HelperLine>{helperText}</HelperLine>}
         <div style={styles.groups}>
         {groups.map((group) => {
-          const options = [...group.options, ...(extras[group.name] ?? [])];
+          const groupExtras = extras[group.name] ?? [];
+          const options = [...group.options, ...groupExtras];
           return (
             <div key={group.name} style={styles.group}>
               {group.name && <p style={styles.groupName}>{group.name}</p>}
@@ -152,6 +169,7 @@ export default function RolePicker({
                 {options.map((role) => {
                   const isSelected = selected.includes(role);
                   const isStarred = starred.includes(role);
+                  const isCustom = groupExtras.includes(role);
                   return (
                     <span
                       key={role}
@@ -184,6 +202,18 @@ export default function RolePicker({
                           onClick={() => toggleStar(role)}
                         >
                           {isStarred ? "★" : "☆"}
+                        </button>
+                      )}
+                      {isCustom && (
+                        <button
+                          type="button"
+                          className="remove-btn"
+                          style={styles.removeButton}
+                          aria-label={`Remove ${role}`}
+                          title="Remove"
+                          onClick={() => removeExtra(group.name, role)}
+                        >
+                          ×
                         </button>
                       )}
                     </span>
@@ -255,7 +285,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-body)",
     lineHeight: "var(--lh-body)",
-    color: "var(--text-muted)",
+    fontWeight: 500,
+    color: "var(--ink)",
     margin: 0,
   },
   // Keep the helper line close above the first chips (tighter than the wrap's
@@ -318,6 +349,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "16px",
     lineHeight: 1,
     color: "var(--accent-strong)",
+    cursor: "pointer",
+    alignSelf: "stretch",
+  },
+  // The delete affordance on a custom ("add your own") chip, so an activity put
+  // under the wrong heading can be removed outright. Only custom chips get it;
+  // listed options are removed by tapping to deselect.
+  removeButton: {
+    background: "none",
+    border: "none",
+    borderLeft: "1px solid var(--border-strong)",
+    padding: "10px 12px",
+    fontSize: "18px",
+    lineHeight: 1,
+    color: "var(--text-muted)",
     cursor: "pointer",
     alignSelf: "stretch",
   },
@@ -417,10 +462,12 @@ const summaryStyles: Record<string, React.CSSProperties> = {
 };
 
 const rolePickerCss = `
-  .role-chip:focus-visible, .star-btn:focus-visible, .custom-add:focus-visible {
+  .role-chip:focus-visible, .star-btn:focus-visible, .custom-add:focus-visible,
+  .remove-btn:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
   }
+  .remove-btn:hover { color: var(--accent-strong); }
   .custom-input:focus-visible {
     border-color: var(--brand-primary);
     box-shadow: var(--focus-ring);

@@ -258,17 +258,33 @@ function ValuesCompass({
       <svg viewBox="0 0 300 300" className="rlp-compass" role="img" aria-label="My values">
         <circle cx={cx} cy={cy} r={r} className="rlp-compass-ring" />
         {nodes.map((nd) => (
-          <line
+          <g
             key={`l${nd.i}`}
-            x1={cx}
-            y1={cy}
-            x2={nd.x}
-            y2={nd.y}
-            className={`rlp-compass-spoke${nd.i === sel ? " on" : ""}`}
-          />
+            onClick={() => setSel(nd.i)}
+            className="rlp-compass-spoke-hit"
+          >
+            <line
+              x1={cx}
+              y1={cy}
+              x2={nd.x}
+              y2={nd.y}
+              className={`rlp-compass-spoke${nd.i === sel ? " on" : ""}`}
+            />
+            {/* Invisible thick line widens the spoke's clickable area. */}
+            <line
+              x1={cx}
+              y1={cy}
+              x2={nd.x}
+              y2={nd.y}
+              stroke="transparent"
+              strokeWidth={16}
+            />
+          </g>
         ))}
         {nodes.map((nd) => (
           <g key={`n${nd.i}`} onClick={() => setSel(nd.i)} className="rlp-compass-node">
+            {/* Invisible larger circle widens the dot's clickable target. */}
+            <circle cx={nd.x} cy={nd.y} r={22} fill="transparent" stroke="none" />
             <circle cx={nd.x} cy={nd.y} r={nd.i === sel ? 9 : 6} className={nd.i === sel ? "on" : ""} />
             <text
               x={nd.x}
@@ -1026,6 +1042,7 @@ const css = `
 .rlp-compass-ring{fill:var(--warm-surface);stroke:var(--warm-line);stroke-width:1.5}
 .rlp-compass-spoke{stroke:var(--border);stroke-width:1}
 .rlp-compass-spoke.on{stroke:var(--brand-primary);stroke-width:1.5}
+.rlp-compass-spoke-hit{cursor:pointer}
 .rlp-compass-node{cursor:pointer}
 .rlp-compass-node circle{fill:var(--surface);stroke:var(--brand-primary);stroke-width:1.5}
 .rlp-compass-node circle.on{fill:var(--brand-primary)}

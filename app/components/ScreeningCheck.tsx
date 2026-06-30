@@ -56,6 +56,7 @@ export default function ScreeningCheck({
         prompt: q.prompt,
         choice: choices[q.id] ?? "",
       })),
+      summaryLabel: interaction.summaryLabel,
     };
   }
 
@@ -174,7 +175,9 @@ export function ScreeningCheckSummary({
 }) {
   return (
     <>
-      <p style={summaryStyles.heading}>Where you are with the basics</p>
+      <p style={summaryStyles.heading}>
+        {result.summaryLabel ?? "Where you are with the basics"}
+      </p>
       <div style={summaryStyles.rows}>
         {result.answers.map((a) => (
           <div key={a.id} style={summaryStyles.row}>

@@ -44,6 +44,9 @@ type SlidersProps = {
   // report the current settings upward on every change.
   embedded?: boolean;
   onChange?: (result: SlidersResult) => void;
+  // Whether to show the "drag the slider" helper cue. The composite shows it
+  // once (on the first slider step), so later repeated sliders pass false.
+  showHelper?: boolean;
 } & EditableProps<SlidersResult>;
 
 export default function Sliders({
@@ -54,6 +57,7 @@ export default function Sliders({
   onCancel,
   embedded = false,
   onChange,
+  showHelper = true,
 }: SlidersProps) {
   const { instruction, spectrums, seasonal, anchors, summaryLabel } =
     interaction;
@@ -105,11 +109,13 @@ export default function Sliders({
       <p style={styles.instruction}>{instruction}</p>
 
       <div style={styles.helperGroup}>
-        <HelperLine>
-          {spectrums.length > 1
-            ? "Drag each slider to where it feels right."
-            : "Drag the slider to where it feels right."}
-        </HelperLine>
+        {showHelper && (
+          <HelperLine>
+            {spectrums.length > 1
+              ? "Drag each slider to where it feels right."
+              : "Drag the slider to where it feels right."}
+          </HelperLine>
+        )}
         <div style={styles.spectrums}>
         {spectrums.map((spectrum, i) => (
           <div key={`${spectrum.left}-${spectrum.right}`} style={styles.spectrum}>
@@ -197,7 +203,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-body)",
     lineHeight: "var(--lh-body)",
-    color: "var(--text-muted)",
+    fontWeight: 500,
+    color: "var(--ink)",
     margin: 0,
   },
   // The helper line sits close above the slider track (the wrap's own 28px gap
@@ -292,7 +299,7 @@ const styles: Record<string, React.CSSProperties> = {
 export function SlidersSummary({ result }: { result: SlidersResult }) {
   return (
     <>
-      <p style={summaryStyles.heading}>Your week</p>
+      <p style={summaryStyles.heading}>{result.summaryLabel ?? "Ideal week"}</p>
       <div style={summaryStyles.spectrums}>
         {result.spectrums.map((s) => (
           <div key={`${s.left}-${s.right}`} style={summaryStyles.spectrum}>

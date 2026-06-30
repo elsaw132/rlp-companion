@@ -646,7 +646,12 @@ export function useUserData() {
     return setKey(KEYS.onboarding, merged);
   };
 
-  const hasPartner = (): boolean => getOnboarding().partner === "Me and my partner";
+  // "Yes" is the current onboarding answer; "Me and my partner" is kept for any
+  // data saved before the question was simplified to Yes/No.
+  const hasPartner = (): boolean => {
+    const p = getOnboarding().partner;
+    return p === "Yes" || p === "Me and my partner";
+  };
 
   // The register Vita should use, defaulting to "warm" (the pre-selected option)
   // for anyone who hasn't set one.
@@ -673,9 +678,11 @@ export function useUserData() {
     }
 
     const parts: string[] = [];
-    if (answers.partner === "Me and my partner") {
+    // "Yes"/"No" are the current answers; the older "Me and my partner"/"Just me"
+    // values are still honoured for anyone who answered before the change.
+    if (answers.partner === "Yes" || answers.partner === "Me and my partner") {
       parts.push("They're planning their retirement with a partner");
-    } else if (answers.partner === "Just me") {
+    } else if (answers.partner === "No" || answers.partner === "Just me") {
       parts.push("They're planning their retirement on their own");
     }
     if (answers.horizon === "Not sure") {
