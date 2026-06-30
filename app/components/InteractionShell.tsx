@@ -18,11 +18,14 @@ export type EditableProps<R> = {
 
 // The one per-exercise instruction line, used everywhere an interaction needs a
 // plain cue for how to act on it (slider, selection, drag, clickable visual).
-// One short line in the UI font, muted, a notch smaller than reading text — a
-// helper, not content — placed directly above the interactive element. Keep the
-// wording plain, present-tense, and about the physical action the person takes.
-// `align="center"` is used where the element it sits over is centred (the
-// radial reveals); it defaults to left for the stacked interactions.
+// It sits at the bottom of a three-level hierarchy: the question prompt is
+// primary (ink, reading size), the element/scale labels keep their bold, and
+// this helper is the smallest, lightest, most distinct — muted and italic so it
+// reads as a quiet cue, never mistaken for the question. Keep the wording plain,
+// present-tense, and about the physical action the person takes. `align="center"`
+// is used where the element it sits over is centred (the radial reveals); it
+// defaults to left for the stacked interactions. It's shown once per
+// exercise/group (the first instance), not before every repeated control.
 export function HelperLine({
   children,
   align = "left",
@@ -36,6 +39,7 @@ export function HelperLine({
 const helperLineStyle: React.CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: "var(--fs-sm)",
+  fontStyle: "italic",
   lineHeight: 1.5,
   color: "var(--text-muted)",
   margin: 0,

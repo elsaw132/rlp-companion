@@ -84,8 +84,11 @@ export default function LetterFlow({
 
   function applySuggestion(i: number, seed: string) {
     setBody((prev) => {
-      const needsSpace = prev.trim() && !prev.endsWith("\n") && !prev.endsWith(" ");
-      return prev + (needsSpace ? " " : "") + seed;
+      // Start each applied prompt on its own paragraph so the letter builds as
+      // distinct paragraphs, not one run-on block. (The surface itself takes
+      // line breaks freely; this just keeps seeded starts from smashing together.)
+      const sep = prev.trim() ? (prev.endsWith("\n") ? "" : "\n\n") : "";
+      return prev + sep + seed;
     });
     setUsedChips((prev) => new Set(prev).add(i));
   }

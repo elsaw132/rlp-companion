@@ -2,7 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import ProviderBand from "../components/ProviderBand";
 import { useUserData, type CoachTone } from "@/lib/userData";
 
@@ -14,7 +14,7 @@ const HORIZON_OPTIONS = [
   "Not sure",
 ];
 
-const PARTNER_OPTIONS = ["Just me", "Me and my partner"];
+const PARTNER_OPTIONS = ["Yes", "No"];
 
 const MOTIVATION_OPTIONS = [
   "A big birthday or milestone",
@@ -111,11 +111,26 @@ export default function OnboardingPage() {
 
           {step === 3 && (
             <CardStep
-              heading="When you picture your retirement, is it just you — or you and a partner?"
+              heading="Do you have a partner?"
               options={PARTNER_OPTIONS}
               selected={partner}
               onSelect={setPartner}
               large
+              note={
+                partner === "Yes" ? (
+                  <div className="partner-note">
+                    <p>
+                      It works best to go through this on your own first — it&rsquo;s
+                      your own picture of retirement that matters here.
+                    </p>
+                    <p>
+                      At the end you&rsquo;ll be able to share it with your partner,
+                      and there&rsquo;s a module to help you work through any
+                      differences in how you each imagine retirement.
+                    </p>
+                  </div>
+                ) : null
+              }
               onContinue={() => {
                 data.saveOnboarding({ partner });
                 setStep(4);
@@ -356,6 +371,7 @@ function CardStep({
   buttonLabel,
   large = false,
   onSkip,
+  note,
 }: {
   heading: string;
   serif?: boolean;
@@ -366,6 +382,9 @@ function CardStep({
   buttonLabel: string;
   large?: boolean;
   onSkip?: () => void;
+  // Optional note shown beneath the options once a relevant choice is made
+  // (e.g. the partner follow-up). Rendered only when provided.
+  note?: ReactNode;
 }) {
   return (
     <>
@@ -394,6 +413,7 @@ function CardStep({
           );
         })}
       </div>
+      {note}
       <button
         type="button"
         className="btn btn-navy"
@@ -448,6 +468,8 @@ const css = `
 .rlp-onb .card.large{min-height:84px;font-size:var(--fs-section);font-weight:600}
 .rlp-onb .card.is-selected{background:var(--brand-primary-tint);border-color:var(--brand-primary);color:var(--ink)}
 .rlp-onb .card.is-selected:hover{border-color:var(--brand-primary)}
+.rlp-onb .partner-note{width:100%;background:var(--info-surface);border:1px solid var(--info-line);border-radius:var(--r-md);padding:16px 18px;margin:0 0 28px;display:flex;flex-direction:column;gap:10px}
+.rlp-onb .partner-note p{margin:0;font-family:var(--font-sans);font-size:var(--fs-sm);line-height:var(--lh-body);color:var(--info-text)}
 .rlp-onb .card:focus-visible{box-shadow:var(--focus-ring)}
 
 .rlp-onb .btn{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;border:none;border-radius:var(--r-sm);padding:14px 28px;min-height:48px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;line-height:1}

@@ -602,7 +602,9 @@ export function ReadinessSnapshotSummary({
 
   return (
     <>
-      <p style={summaryStyles.heading}>Your readiness snapshot</p>
+      <p style={summaryStyles.heading}>
+        {result.summaryLabel ?? "Your readiness snapshot"}
+      </p>
 
       <div style={summaryStyles.section}>
         <p style={summaryStyles.line}>

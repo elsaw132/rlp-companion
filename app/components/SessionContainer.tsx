@@ -503,6 +503,8 @@ export default function SessionContainer({
   const [seed, setSeed] = useState<Stage3Seed | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  // The composer is an auto-growing textarea; this lets it size to its content.
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   // Flips true once we've read this module's saved state out of the snapshot, so
   // the persist effect can't overwrite a saved conversation with an empty one
   // before hydration.
@@ -1347,6 +1349,16 @@ export default function SessionContainer({
     setCommitmentDone(true);
   }
 
+  // Grow the composer to fit what's typed (up to a cap, then it scrolls), so a
+  // longer message is comfortable to write and read back. Resets to one line
+  // once the field is cleared after a send.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+  }, [input]);
+
   async function handleSend() {
     const text = input.trim();
     if (!text || sending) return;
@@ -1579,13 +1591,23 @@ export default function SessionContainer({
 
       {/* ZONE 2.4 — SEEDING (Stage 3: preparing the surface) */}
       {phase === "seeding" && (
-        <section style={styles.seedingStep}>
+        <section style={styles.seedingStep} role="status" aria-live="polite">
+          <div style={styles.vitaLockup}>
+            <span style={styles.sun} aria-hidden="true">
+              ☀️
+            </span>
+            <span style={styles.vitaName}>Vita</span>
+          </div>
           <span className="seeding-dots" aria-hidden="true">
             <span className="typing-dot" />
             <span className="typing-dot" />
             <span className="typing-dot" />
           </span>
           <p style={styles.seedingLine}>Setting this up from what you&apos;ve shared…</p>
+          <p style={styles.seedingSubLine}>
+            This can take up to a minute. Please keep this page open while Vita
+            gets it ready.
+          </p>
         </section>
       )}
 
@@ -1691,18 +1713,24 @@ export default function SessionContainer({
               )}
 
               <div style={styles.composer}>
-                <input
-                  type="text"
+                <textarea
+                  ref={composerRef}
                   className="composer-input"
                   style={styles.input}
                   placeholder="Type your message…"
+                  rows={1}
                   value={input}
                   onChange={(e) => {
                     setInput(e.target.value);
                     if (error) setError(null);
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSend();
+                    // Enter sends; Shift+Enter starts a new line, so a longer
+                    // thought can be written without firing it half-finished.
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
                   }}
                 />
                 <button
@@ -2277,10 +2305,14 @@ function EmbeddedInteraction({
   interaction,
   initial,
   onChange,
+  showHelper = true,
 }: {
   interaction: Interaction;
   initial?: BuildResult;
   onChange: (result: BuildResult) => void;
+  // The helper cue ("drag the slider", "tap each one") shows once per group —
+  // the composite passes false to repeated steps of the same type.
+  showHelper?: boolean;
 }) {
   switch (interaction.type) {
     case "role-picker":
@@ -2288,6 +2320,7 @@ function EmbeddedInteraction({
         <RolePicker
           interaction={interaction}
           embedded
+          showHelper={showHelper}
           onChange={onChange}
           onFinish={() => {}}
           initial={initial?.type === "role-picker" ? initial : undefined}
@@ -2298,6 +2331,7 @@ function EmbeddedInteraction({
         <Sliders
           interaction={interaction}
           embedded
+          showHelper={showHelper}
           onChange={onChange}
           onFinish={() => {}}
           initial={initial?.type === "sliders" ? initial : undefined}
@@ -2337,6 +2371,14 @@ function CompositeStep({
 
   const allValid = steps.every((s, i) => isStepValid(s, results[i]));
 
+  // The how-to-act helper cue shows once per interaction type: only the first
+  // step of each type renders it, so e.g. four sliders don't repeat "drag the
+  // slider" four times.
+  const firstOfType: Record<string, number> = {};
+  steps.forEach((s, i) => {
+    if (firstOfType[s.type] === undefined) firstOfType[s.type] = i;
+  });
+
   return (
     <section style={styles.compositeStep}>
       {steps.map((step, i) => (
@@ -2348,6 +2390,7 @@ function CompositeStep({
             interaction={step}
             initial={initial?.results[i]}
             onChange={(r) => setStepResult(i, r)}
+            showHelper={firstOfType[step.type] === i}
           />
         </div>
       ))}
@@ -2608,9 +2651,19 @@ const styles: Record<string, React.CSSProperties> = {
   seedingLine: {
     fontFamily: "var(--font-serif)",
     fontStyle: "italic",
-    fontSize: "var(--fs-body)",
+    fontSize: "var(--fs-title)",
+    color: "var(--ink)",
+    margin: 0,
+    textAlign: "center",
+  },
+  seedingSubLine: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
     color: "var(--text-muted)",
     margin: 0,
+    maxWidth: "34ch",
+    textAlign: "center",
+    lineHeight: "var(--lh-body)",
   },
   summaryCard: {
     background: "var(--bg)",
@@ -2891,7 +2944,7 @@ const styles: Record<string, React.CSSProperties> = {
   composer: {
     display: "flex",
     gap: "12px",
-    alignItems: "stretch",
+    alignItems: "flex-end",
     marginTop: "4px",
   },
   input: {
@@ -2901,10 +2954,15 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "var(--r-sm)",
     padding: "13px 16px",
     minHeight: "48px",
+    maxHeight: "180px",
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-body)",
+    lineHeight: "var(--lh-body)",
     color: "var(--text)",
     outline: "none",
+    resize: "none",
+    overflowY: "auto",
+    boxSizing: "border-box",
   },
   sendButton: {
     background: "var(--brand-primary)",

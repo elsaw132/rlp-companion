@@ -433,7 +433,7 @@ export const SEED_SOURCE: ModelSource = {
   getDreams: (id) => (id === "1.money" ? dreams : null),
   getStage3Values: () => stage3Values,
   getOnboarding: () => ({
-    partner: "Me and my partner",
+    partner: "Yes",
     horizon: "3 to 5 years",
     motivation: "A milestone birthday on the horizon",
     // Date of birth (age ~62) — exercises the new DOB→age path: 2.6's hearing

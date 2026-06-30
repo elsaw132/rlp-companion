@@ -10,6 +10,8 @@ export type DayBuilderInteraction = {
   type: "day-builder";
   parts: string[];
   categories: { name: string; activities: string[] }[];
+  // Heading for the read-only recap card. Defaults to "Your day".
+  summaryLabel?: string;
 };
 
 // A role picker: choose meaningful options from grouped (or flat) lists, and —
@@ -69,6 +71,8 @@ export type SparkPromptsInteraction = {
   type: "spark-prompts";
   instruction: string;
   prompts: { id: string; label: string; placeholder: string }[];
+  // Heading for the read-only recap card. Defaults to "What you'd do".
+  summaryLabel?: string;
 };
 
 // A screening check: a short set of discrete-option questions, each answered by
@@ -79,6 +83,8 @@ export type ScreeningCheckInteraction = {
   type: "screening-check";
   instruction: string;
   questions: { id: string; prompt: string; options: string[] }[];
+  // Heading for the read-only recap card. Defaults to "Where you are with the basics".
+  summaryLabel?: string;
 };
 
 // A composite interaction runs two or more sub-interactions together on one
@@ -486,6 +492,9 @@ export type DayBuilderResult = {
   parts: string[];
   // Part name (e.g. "Morning") → the activities they put there, in order.
   assigned: Record<string, string[]>;
+  // Heading for the recap card, carried from the interaction. Defaults to
+  // "Your day" when absent.
+  summaryLabel?: string;
 };
 
 export type RolePickerResult = {
@@ -528,6 +537,9 @@ export type LetterResult = {
 export type SparkPromptsResult = {
   type: "spark-prompts";
   entries: { id: string; label: string; text: string }[];
+  // Heading for the recap card, carried from the interaction. Defaults to
+  // "What you'd do" when absent.
+  summaryLabel?: string;
 };
 
 // What the person answered in a screening check. Each entry carries its own
@@ -536,6 +548,9 @@ export type SparkPromptsResult = {
 export type ScreeningCheckResult = {
   type: "screening-check";
   answers: { id: string; prompt: string; choice: string }[];
+  // Heading for the recap card, carried from the interaction. Defaults to
+  // "Where you are with the basics" when absent.
+  summaryLabel?: string;
 };
 
 // The results of a composite interaction, one per sub-step, in the same order
@@ -1415,6 +1430,10 @@ WATCH FOR
         coachOpening: `Here's what you'd like your active life to look like. Let's start with the one you're most drawn to — what is it about that one that appeals to you?`,
         interaction: {
           type: "composite",
+          // The slider sits below a long grid of activity chips and is easy to
+          // miss before Save — give it its own heading so it reads as a clear,
+          // separate section the person still has to set.
+          stepHeadings: [null, "Your activity level"],
           steps: [
             {
               type: "role-picker",
@@ -1665,6 +1684,9 @@ WATCH FOR
               instruction:
                 "Your people — pick the ones who are part of your world. Naming individuals is up to you, never required.",
               starrable: false,
+              // Not "roles" — give the recap its own heading so it doesn't fall
+              // back to the generic "Your roles". [SMW may refine wording.]
+              summaryLabel: "Your people",
               groups: [
                 {
                   name: "",
@@ -1887,6 +1909,9 @@ WATCH FOR
               type: "role-picker",
               instruction: "What tends to give you energy?",
               starrable: false,
+              // Distinct recap heading so this and the "drains you" picker don't
+              // both fall back to "Your roles". [SMW may refine wording.]
+              summaryLabel: "What gives you energy",
               groups: [
                 {
                   name: "",
@@ -1929,6 +1954,9 @@ WATCH FOR
               type: "role-picker",
               instruction: "And what tends to drain you?",
               starrable: false,
+              // Distinct recap heading (see the "gives you energy" picker above).
+              // [SMW may refine wording.]
+              summaryLabel: "What drains you",
               groups: [
                 {
                   name: "",
