@@ -4,7 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import ProviderBand from "../components/ProviderBand";
-import { useUserData } from "@/lib/userData";
+import { useUserData, type CoachTone } from "@/lib/userData";
 
 const HORIZON_OPTIONS = [
   "Less than 2 years",
@@ -23,6 +23,15 @@ const MOTIVATION_OPTIONS = [
   "Just curious for now",
 ];
 
+// Vita's register, chosen here and stored against the user. Each label maps to a
+// stable code value (CoachTone) the chat API turns into a tone directive. All
+// three are real choices; "Warm and friendly" is simply pre-selected.
+const TONE_OPTIONS: { label: string; value: CoachTone }[] = [
+  { label: "Warm and friendly", value: "warm" },
+  { label: "More professional", value: "professional" },
+  { label: "Lighter and playful", value: "playful" },
+];
+
 export default function OnboardingPage() {
   const { user, isLoaded } = useUser();
   const data = useUserData();
@@ -36,6 +45,8 @@ export default function OnboardingPage() {
   const [dob, setDob] = useState("");
   const [horizon, setHorizon] = useState("");
   const [motivation, setMotivation] = useState("");
+  // Pre-select "Warm and friendly" — it's the default, not the only proper choice.
+  const [tone, setTone] = useState<CoachTone>("warm");
 
   // Once the data layer has loaded (running the one-time migration if needed),
   // anyone who has already finished onboarding is sent straight to /home — they
@@ -147,15 +158,33 @@ export default function OnboardingPage() {
               onSelect={setMotivation}
               onContinue={async () => {
                 await data.saveOnboarding({ motivation });
+                setStep(7);
+              }}
+              buttonLabel="Continue"
+              onSkip={async () => {
+                await data.saveOnboarding({ motivation: null });
+                setStep(7);
+              }}
+            />
+          )}
+
+          {step === 7 && (
+            <CardStep
+              heading="How would you like Vita, our AI coach, to talk with you?"
+              options={TONE_OPTIONS.map((t) => t.label)}
+              selected={
+                TONE_OPTIONS.find((t) => t.value === tone)?.label ?? ""
+              }
+              onSelect={(label) => {
+                const match = TONE_OPTIONS.find((t) => t.label === label);
+                if (match) setTone(match.value);
+              }}
+              onContinue={async () => {
+                await data.saveOnboarding({ tone });
                 await data.markOnboardingComplete();
                 router.push("/home");
               }}
               buttonLabel="Finish"
-              onSkip={async () => {
-                await data.saveOnboarding({ motivation: null });
-                await data.markOnboardingComplete();
-                router.push("/home");
-              }}
             />
           )}
         </div>

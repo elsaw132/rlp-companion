@@ -1,39 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { COACH_BASE_PROMPT } from "@/lib/coachBasePrompt";
-
-type IncomingMessage = {
-  role: "coach" | "user";
-  text: string;
-};
-
-type ChatRequest = {
-  messages: IncomingMessage[];
-  coachOpening: string;
-  sessionInstructions: string;
-  onboardingContext: string;
-  priorReflections: string;
-  sessionContent: string;
-  // A readable summary of whatever the person built in this module's
-  // interaction step (e.g. the day builder). Empty/omitted when the module
-  // has no interaction.
-  interactionSummary?: string;
-  // The title of the next module in this stage, so Vita's closing sign-off can
-  // name it correctly. Null/omitted on the last module of a stage, where she
-  // should not name a specific next module.
-  nextModuleTitle?: string | null;
-  // When true, Vita closes in a single sign-off instead of the usual two-step
-  // "mirror back, then confirm" wrap-up. Set for short, practical modules (e.g.
-  // the senses screening) where the conversation was a couple of concrete
-  // answers and there's nothing inferred to validate — restating it is noise.
-  closeInOneStep?: boolean;
-  // True only for the one call that generates Vita's first message, where she
-  // opens by reacting to what they built rather than using a fixed line.
-  isOpening?: boolean;
-  // Set for the single turn right after the person re-opened the interaction
-  // and saved changed picks: a one-off instruction telling Vita to acknowledge
-  // the change once and carry on. Empty/omitted otherwise.
-  editAcknowledgement?: string;
-};
+import {
+  buildSystemPrompt,
+  toApiMessages,
+  COACH_MODEL,
+  COACH_MAX_TOKENS,
+  type ChatRequest,
+} from "@/lib/chatPrompt";
 
 // Give the serverless function more headroom than the default so a slow model
 // response doesn't get cut off mid-flight.
@@ -47,81 +19,15 @@ const anthropic = new Anthropic({
   maxRetries: 3,
 });
 
-function buildSystemPrompt(body: ChatRequest): string {
-  const filled = COACH_BASE_PROMPT.replace(
-    "{onboardingContext}",
-    body.onboardingContext
-  )
-    .replace("{priorReflections}", body.priorReflections)
-    .replace("{sessionContent}", body.sessionContent);
-
-  const sections = [
-    filled,
-    "",
-    "THIS MODULE'S INSTRUCTIONS",
-    body.sessionInstructions,
-  ];
-
-  if (body.interactionSummary && body.interactionSummary.trim()) {
-    sections.push("", "WHAT THEY BUILT IN THIS MODULE:", body.interactionSummary);
-  }
-
-  if (body.isOpening) {
-    sections.push(
-      "",
-      "This is the very start of the conversation, and you are speaking first. Open with a short, warm first message and ask one question — no greeting, no preamble, no welcome. If this module had a build step, react to something specific in what they made (under WHAT THEY BUILT above). Otherwise, open by gently drawing on the picture they've built in earlier modules where it's relevant — following this module's own brief and tone. Engage directly; don't recap everything back to them."
-    );
-    return sections.join("\n");
-  }
-
-  const nextModuleGuidance =
-    body.nextModuleTitle && body.nextModuleTitle.trim()
-      ? `The next module is "${body.nextModuleTitle.trim()}" — if you point ahead, name only this one and nothing else.`
-      : "This is the last module of the stage, so do not name a specific next module — close gently without pointing to a particular one.";
-
-  const closingInstruction = body.closeInOneStep
-    ? `CLOSING THIS MODULE — ONE STEP. This was a short, practical conversation, so there is nothing to mirror back or confirm — do NOT add a wrap-up that restates their answers and asks whether it's a fair summary. That would just be noise here. Once they've given their answer (or made clear they're done), close in a single message: a brief, warm sign-off that asks nothing at all and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question.`
-    : `CLOSING THIS MODULE — TWO STEPS. When you're ready to close, first offer your wrap-up: name what matters in their words and check it feels right to them. This message asks a question (does this land? anything to add?), so it must NOT contain the marker. Then, only after they respond, send a brief final sign-off that points to the next module, asks nothing at all, and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question. Only ever include the marker in that one final sign-off.`;
-
-  sections.push("", closingInstruction);
-
-  sections.push(
-    "",
-    "THE MARKER IS A LITERAL TOKEN. When you close, write the marker exactly as these eight characters — two open brackets, MODULE_COMPLETE, two close brackets: [[MODULE_COMPLETE]]. Never reword it, translate it, wrap it in tildes, asterisks or other punctuation, and never write any variant such as ~~COMPLETION_MARKER~~ or \"completion marker\". It is invisible plumbing the person never sees, so it must match exactly or it will leak into your message."
-  );
-
-  sections.push(
-    "",
-    "You have already opened this conversation by saying, word for word:",
-    `"${body.coachOpening}"`
-  );
-
-  if (body.editAcknowledgement && body.editAcknowledgement.trim()) {
-    sections.push("", body.editAcknowledgement);
-  }
-
-  return sections.join("\n");
-}
-
 export async function POST(request: Request) {
   const body = (await request.json()) as ChatRequest;
 
-  // The Messages API requires the list to start with a user turn. Vita's
-  // opening already lives in the system prompt, so drop everything up to the
-  // user's first real reply, then map our bubble roles onto API roles.
-  const firstUserIndex = body.messages.findIndex((m) => m.role === "user");
-  const exchanges =
-    firstUserIndex === -1 ? [] : body.messages.slice(firstUserIndex);
-
-  const apiMessages = exchanges.map((m) => ({
-    role: m.role === "user" ? ("user" as const) : ("assistant" as const),
-    content: m.text,
-  }));
+  const apiMessages = toApiMessages(body.messages);
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 500,
+      model: COACH_MODEL,
+      max_tokens: COACH_MAX_TOKENS,
       // The system prompt is large and identical across every turn of one
       // conversation, so we mark it cacheable. Anthropic reuses the cached
       // copy on later turns instead of re-reading the whole prompt — cheaper
