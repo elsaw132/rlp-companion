@@ -792,6 +792,7 @@ export default function SessionContainer({
           priorReflections: priorReflectionsBlock(),
           sessionContent: sessionContent ?? primerText,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
+          toneChoice: userData.getCoachTone(),
         }),
       });
 
@@ -1383,6 +1384,7 @@ export default function SessionContainer({
           nextModuleTitle,
           closeInOneStep,
           editAcknowledgement,
+          toneChoice: userData.getCoachTone(),
         }),
       });
 

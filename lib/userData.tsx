@@ -52,6 +52,11 @@ import { stripStructuredLeak } from "@/lib/coachText";
 
 // ---- Shapes shared across the app ----
 
+// The register the person picks for Vita at onboarding. Stored as a stable code
+// value (not the display label) and mapped to a tone directive in the chat API.
+// Shifts surface tone only — never the structural coaching rules.
+export type CoachTone = "warm" | "professional" | "playful";
+
 export type OnboardingAnswers = {
   partner?: string;
   horizon?: string;
@@ -60,6 +65,10 @@ export type OnboardingAnswers = {
   // it have none, and every age-dependent path degrades gracefully without it.
   // Used to compute real age at read time (the 2.6 hearing-check gate).
   dob?: string;
+  // How they'd like Vita to talk with them. Absent for existing users and
+  // anyone before the tone step — read through getCoachTone(), which defaults
+  // to "warm".
+  tone?: CoachTone;
 };
 
 export type ConversationMessage = {
@@ -639,10 +648,29 @@ export function useUserData() {
 
   const hasPartner = (): boolean => getOnboarding().partner === "Me and my partner";
 
+  // The register Vita should use, defaulting to "warm" (the pre-selected option)
+  // for anyone who hasn't set one.
+  const getCoachTone = (): CoachTone => {
+    const t = getOnboarding().tone;
+    return t === "professional" || t === "playful" ? t : "warm";
+  };
+
   // The short sentence Vita reads, built from the onboarding answers.
   const buildOnboardingContext = (): string => {
     const answers = getOnboarding();
-    if (!snapshot[KEYS.onboarding]) return "Nothing recorded yet.";
+
+    // The name Vita should address them by. Stated explicitly, and first, so she
+    // anchors on their real preferred name and never picks up a name from
+    // elsewhere (e.g. the recipient of a letter they wrote). Included even before
+    // the rest of onboarding is recorded.
+    const preferred = getPreferredName();
+    const nameSentence = preferred
+      ? `Their preferred name — the only name you should ever call them — is ${preferred}.`
+      : "";
+
+    if (!snapshot[KEYS.onboarding]) {
+      return nameSentence || "Nothing recorded yet.";
+    }
 
     const parts: string[] = [];
     if (answers.partner === "Me and my partner") {
@@ -660,7 +688,8 @@ export function useUserData() {
     if (answers.motivation) {
       sentence += `${sentence ? " " : ""}What prompted them to start: ${answers.motivation.toLowerCase()}.`;
     }
-    return sentence.trim() || "Nothing recorded yet.";
+    const combined = [nameSentence, sentence.trim()].filter(Boolean).join(" ");
+    return combined || "Nothing recorded yet.";
   };
 
   // ---- Stage 1 reveal (threads + archetype) ----
@@ -1002,6 +1031,7 @@ export function useUserData() {
     getOnboarding,
     saveOnboarding,
     hasPartner,
+    getCoachTone,
     buildOnboardingContext,
     getStage1Reveal,
     hasStage1Reveal,
