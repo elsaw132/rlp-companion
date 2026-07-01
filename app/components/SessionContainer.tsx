@@ -130,7 +130,10 @@ import {
 import {
   type SeasonCard,
   type BalancedSeed,
+  type ModelSource,
 } from "@/lib/userModel";
+import { buildRlpPlan } from "@/lib/rlpPlan";
+import { ensurePlanGenerated } from "@/lib/planPrewarm";
 import {
   resolveVitaText,
   resolveSeedText,
@@ -182,6 +185,38 @@ function capWords(text: string, max: number): string {
     clipped = `${clipped.replace(/[,;:\s]+$/, "")}…`;
   }
   return clipped;
+}
+
+// POST to /api/chat and read the streamed reply. onDelta is called with the full
+// text accumulated so far after each chunk, so callers can render Vita's words as
+// they arrive. Resolves with the final full text. Throws if the request fails to
+// start OR the stream breaks mid-flight — the same all-or-nothing contract the
+// non-streaming version had, so callers keep their existing fallback (opening →
+// fixed line; send → error notice and a clean retry).
+async function streamChatReply(
+  requestBody: unknown,
+  onDelta: (fullText: string) => void
+): Promise<string> {
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+  if (!res.ok || !res.body) throw new Error(`Chat request failed: ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let full = "";
+  // A stream error (the server errored the controller) rejects read(), which
+  // propagates out of this function as a throw — caller handles the fallback.
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    full += decoder.decode(value, { stream: true });
+    onDelta(full);
+  }
+  full += decoder.decode();
+  return full;
 }
 
 // A hidden user turn that only exists to make Vita speak first when generating
@@ -603,10 +638,17 @@ export default function SessionContainer({
     }
   }
 
+  // True while a reply is streaming in token-by-token. The persist effect below
+  // skips those partial frames so we don't POST a half-written coach message to
+  // the database on every chunk — the final, complete message is saved once the
+  // stream settles (streamingRef flips back to false before the last setMessages).
+  const streamingRef = useRef(false);
+
   // Persist the conversation after every change, but only once we've hydrated
-  // any existing conversation (otherwise we'd overwrite it with []).
+  // any existing conversation (otherwise we'd overwrite it with []), and never
+  // mid-stream (that would save partial replies and spam the database).
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || streamingRef.current) return;
     void userData.saveConversation(sessionId, messages);
     // userData is a fresh object each render; the hydrated guard and sessionId
     // are what actually gate this.
@@ -768,6 +810,72 @@ export default function SessionContainer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interaction, sessionId]);
 
+  // Pre-warm the Retirement Life Plan the moment 4.7 (the last Stage 4 module) is
+  // done. The plan's prose and scene images are otherwise generated only when
+  // /plan first opens, so the first reveal fills in over a minute or more (the
+  // images are the tail — up to five, one at a time). Generating them here, in
+  // the background and into the very same planIntro / planImages caches the
+  // reveal reads, means the member's first /plan open is an instant, complete
+  // cache hit. ensurePlanGenerated is cache-first and dedup-guarded, so nothing
+  // regenerates and a member who races to /plan before this finishes never
+  // doubles the work. Runs on fresh completion and on a revisit (a no-op once the
+  // caches are warm).
+  const planPrewarmedRef = useRef(false);
+  useEffect(() => {
+    if (!isFirstYear || !completed || !buildResult || !user) return;
+    if (planPrewarmedRef.current) return;
+    const source: ModelSource = {
+      getBuild: userData.getBuild,
+      getTakeaway: userData.getTakeaway,
+      getDreams: userData.getDreams,
+      getStage3Values: userData.getStage3Values,
+      getOnboarding: userData.getOnboarding,
+      getActiveFacts: userData.getActiveFacts,
+    };
+    const plan = buildRlpPlan(source, {
+      name: userData.getDisplayName(user),
+      dateCreated: todayISODate(),
+    });
+    // Nothing to warm yet if there's no real Stage 4 material — let the reveal's
+    // dev-seed path handle the empty case.
+    if (!plan.hasPlan) return;
+    planPrewarmedRef.current = true;
+    void ensurePlanGenerated(plan, source, {
+      getPlanIntro: userData.getPlanIntro,
+      savePlanIntro: userData.savePlanIntro,
+      getPlanImages: userData.getPlanImages,
+      savePlanImage: userData.savePlanImage,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFirstYear, completed, buildResult, user]);
+
+  // Pre-fetch the Stage 3 seed while the person is still reading the intro — the
+  // same "prefetch during reading" trick the Stage 4 surfaces use. The
+  // value-definitions seed (3.4) is the slowest at ~40s and previously only
+  // started *after* the reading, so the person read and then waited at a blank
+  // screen. Kicking it off on mount overlaps the generation with the reading time
+  // they already spend, so it's usually ready by the time they finish. runSeeding
+  // reuses this in-flight request rather than starting a second one. Gated on the
+  // data layer being loaded so the seed grounds itself in real context, not an
+  // empty snapshot. Applies to every seeded Stage 3 surface; 3.4 is the worst case.
+  const seedPrefetchedRef = useRef(false);
+  const seedInFlightRef = useRef<Promise<Stage3Seed | null> | null>(null);
+  useEffect(() => {
+    if (!user || userData.loading) return;
+    if (!interaction || !isSeededType(interaction.type)) return;
+    if (seedPrefetchedRef.current || seed || userData.getSeed(sessionId)) return;
+    seedPrefetchedRef.current = true;
+    const p = fetchSeedDraft();
+    seedInFlightRef.current = p;
+    void p.then((draft) => {
+      if (draft) {
+        setSeed(draft);
+        void userData.saveSeed(sessionId, draft);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interaction, sessionId, user, userData.loading]);
+
   // Show the conversation. The opening effect seeds Vita's first message — a
   // dynamic, drawn-from-context one when there's something to draw on, or the
   // module's fixed line otherwise.
@@ -781,11 +889,10 @@ export default function SessionContainer({
   async function generateOpening(recognition: string | null) {
     setSending(true);
     setError(null);
+    streamingRef.current = true;
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const raw = await streamChatReply(
+        {
           messages: [{ role: "user", text: OPENING_PRIMER }],
           isOpening: true,
           coachOpening,
@@ -795,26 +902,33 @@ export default function SessionContainer({
           sessionContent: sessionContent ?? primerText,
           interactionSummary: buildResult ? summarizeBuild(buildResult) : "",
           toneChoice: userData.getCoachTone(),
-        }),
-      });
+        },
+        // Render the opening as it streams. Strip any close marker / structured
+        // leak from the partial so neither ever flashes on screen, and cap length.
+        (partial) => {
+          const shown = capWords(
+            stripStructuredLeak(stripCompletionMarker(partial).text),
+            OPENING_WORD_CAP
+          );
+          setMessages([
+            { role: "coach", text: withRecognition(recognition, shown) },
+          ]);
+        }
+      );
 
-      if (!res.ok) throw new Error(`Opening request failed: ${res.status}`);
-
-      const data = (await res.json()) as { reply: string };
       // Some modules (4.3, 4.4) let Vita's very first message also sign the module
       // off, so the person can finish without typing. Strip the marker, show the
       // opening, then offer the close choice — mirroring the chat close.
-      const { isClosing, text } = stripCompletionMarker(data.reply);
+      const { isClosing, text } = stripCompletionMarker(raw);
       // Block any leaked {thirdPerson/secondPerson} JSON from reaching the screen,
       // then cap the length so the opening stays a warm word, not a wall of text.
       const cleaned = capWords(stripStructuredLeak(text), OPENING_WORD_CAP);
-      const openingMessages: Message[] = [
+      setMessages([
         {
           role: "coach",
           text: withRecognition(recognition, cleaned || coachOpening),
         },
-      ];
-      setMessages(openingMessages);
+      ]);
 
       if (isClosing) setPendingClose(true);
     } catch {
@@ -822,6 +936,9 @@ export default function SessionContainer({
         { role: "coach", text: withRecognition(recognition, coachOpening) },
       ]);
     } finally {
+      // Flip off before returning, so the effect for the final setMessages above
+      // (which React runs after this function settles) persists the opening.
+      streamingRef.current = false;
       setSending(false);
     }
   }
@@ -1173,17 +1290,14 @@ export default function SessionContainer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, messages.length, buildResult, user]);
 
-  // Pre-seed a Stage 3 surface: assemble the person's context (including a terse
-  // recap of what they built in earlier Stage 3 modules) and ask /api/stage3-seed
-  // for candidate content. Whatever comes back is saved and passed to the
-  // surface; on failure the surface still renders from its own palette/empty
-  // state. Either way, end on the build step.
-  async function runSeeding() {
-    if (!interaction || !isSeededType(interaction.type)) {
-      setPhase("building");
-      return;
-    }
-    setPhase("seeding");
+  // The Stage 3 seed request itself — a pure fetch with no phase/state changes.
+  // Assembles the person's context (including a terse recap of what they built in
+  // earlier Stage 3 modules) and asks /api/stage3-seed for candidate content.
+  // Shared by the during-reading prefetch and the runSeeding fallback so the seed
+  // is fetched at most once, whichever path reaches it first. Returns the seed, or
+  // null on any failure (the surface then renders from its own palette).
+  async function fetchSeedDraft(): Promise<Stage3Seed | null> {
+    if (!interaction || !isSeededType(interaction.type)) return null;
     const idx = stageModuleIds.indexOf(sessionId);
     const priorBuilds = stageModuleIds
       .slice(0, idx === -1 ? 0 : idx)
@@ -1212,12 +1326,40 @@ export default function SessionContainer({
       });
       if (!res.ok) throw new Error(`Seed request failed: ${res.status}`);
       const data = (await res.json()) as { seed: Stage3Seed | null };
-      if (data.seed) {
-        setSeed(data.seed);
-        void userData.saveSeed(sessionId, data.seed);
-      }
+      return data.seed ?? null;
     } catch {
-      // Leave the seed null — the surface renders from its palette/empty state.
+      return null;
+    }
+  }
+
+  // Pre-seed a Stage 3 surface, ending on the build step. If the during-reading
+  // prefetch is already in flight, wait on it rather than firing a second request
+  // (its own handler sets and persists the seed); otherwise fetch now — the case
+  // where the person clicked past the reading before the prefetch could run.
+  async function runSeeding() {
+    if (!interaction || !isSeededType(interaction.type)) {
+      setPhase("building");
+      return;
+    }
+    setPhase("seeding");
+    try {
+      if (seedInFlightRef.current) {
+        // The during-reading prefetch is already running (or done). Wait on it —
+        // its own handler sets and persists the seed.
+        await seedInFlightRef.current;
+      } else {
+        // No prefetch ran (e.g. the person clicked past the reading before the
+        // data layer was ready). Claim it via the shared refs so the reading
+        // prefetch effect can't also fire a second request, then fetch now.
+        seedPrefetchedRef.current = true;
+        const p = fetchSeedDraft();
+        seedInFlightRef.current = p;
+        const draft = await p;
+        if (draft) {
+          setSeed(draft);
+          void userData.saveSeed(sessionId, draft);
+        }
+      }
     } finally {
       setPhase("building");
     }
@@ -1368,6 +1510,7 @@ export default function SessionContainer({
     setInput("");
     setSending(true);
     setError(null);
+    streamingRef.current = true;
 
     // The opening can be Vita's dynamically generated first line, so tell the
     // API what she actually said rather than the fixed fallback.
@@ -1382,10 +1525,8 @@ export default function SessionContainer({
         : "";
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const raw = await streamChatReply(
+        {
           messages: conversation,
           coachOpening: actualOpening,
           sessionInstructions: sessionInstructions ?? "",
@@ -1397,17 +1538,21 @@ export default function SessionContainer({
           closeInOneStep,
           editAcknowledgement,
           toneChoice: userData.getCoachTone(),
-        }),
-      });
-
-      if (!res.ok) throw new Error(`Chat request failed: ${res.status}`);
-
-      const data = (await res.json()) as { reply: string };
+        },
+        // Render Vita's reply as it streams, stripping any close marker from the
+        // partial so it never flashes on screen before the final pass below.
+        (partial) => {
+          setMessages([
+            ...conversation,
+            { role: "coach", text: stripCompletionMarker(partial).text },
+          ]);
+        }
+      );
 
       // If Vita signalled the close, strip the marker before it's shown or
       // stored. We don't finish the module here — instead we offer the close
       // choice (keep talking / wrap up here); finalizeClose does the rest.
-      const { isClosing, text: replyText } = stripCompletionMarker(data.reply);
+      const { isClosing, text: replyText } = stripCompletionMarker(raw);
 
       const finalMessages: Message[] = [
         ...conversation,
@@ -1429,6 +1574,9 @@ export default function SessionContainer({
       setInput(text);
       setError(COACH_ERROR_REPLY);
     } finally {
+      // Flip off before returning, so the effect for the final setMessages (run
+      // by React after this function settles) persists the completed exchange.
+      streamingRef.current = false;
       setSending(false);
     }
   }
@@ -1668,7 +1816,12 @@ export default function SessionContainer({
                 <UserBubble key={i} text={m.text} />
               )
             )}
-            {sending && <TypingBubble />}
+            {/* Show the typing dots only until Vita's first streamed token
+                lands — once her (partial) bubble is on screen it carries the
+                "still writing" cue itself, so the dots would just sit below it. */}
+            {sending && messages[messages.length - 1]?.role !== "coach" && (
+              <TypingBubble />
+            )}
           </div>
 
           {completed && pendingFactRemovals.length > 0 && (

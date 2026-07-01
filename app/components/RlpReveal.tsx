@@ -15,12 +15,12 @@
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useUserData } from "@/lib/userData";
-import { buildUserModel, type ModelSource } from "@/lib/userModel";
-import { coreValuesFromFacts } from "@/lib/resolverInputs";
-import { buildRlpPlan, type RlpPlan } from "@/lib/rlpPlan";
+import { type ModelSource } from "@/lib/userModel";
+import { buildRlpPlan } from "@/lib/rlpPlan";
 import { SEED_SOURCE, SEED_MEMBER_NAME } from "@/lib/rlpPlanSeed";
 import { todayISODate } from "@/lib/planDate";
-import type { PlanIntro, PlanIntroRequest } from "@/lib/planIntro";
+import type { PlanIntro } from "@/lib/planIntro";
+import { ensurePlanIntro, ensurePlanImages } from "@/lib/planPrewarm";
 import RlpPlanDocument from "./RlpPlanDocument";
 
 export default function RlpReveal() {
@@ -71,122 +71,26 @@ export default function RlpReveal() {
   }
 
   // ---- generated-once pieces: Vita's opening, and the scene imagery ----
-  async function generateIntro() {
-    const model = buildUserModel(source);
-    // Prefer the canonical profile's verbatim value descriptions for the intro
-    // prose too, so it matches the plan document (falls back to the model).
-    const factValues = coreValuesFromFacts(source.getActiveFacts?.() ?? []);
-    const introValues = (factValues.length ? factValues : model.coreValues).map(
-      (v) => ({ value: v.value, meaning: v.meaning })
-    );
-    const req: PlanIntroRequest = {
-      name: plan.meta.name,
-      withPartner: model.onboarding.withPartner,
-      coreValues: introValues,
-      roles: model.roles.all,
-      mostAliveRoles: model.roles.mostAlive,
-      energySources: model.energySources,
-      aspirations: model.aspirations.map((a) => a.text),
-      relationships: model.relationships,
-      hopes: model.hopes,
-      // §2 — per-area fullness so the balance line can name the shape.
-      areas: plan.balance.areas.map((a) => ({
-        label: a.label,
-        goalCount: a.goals.length,
-        focusGoals: a.goals.filter((g) => g.focus).map((g) => g.label),
-        deliberateGap: a.deliberateGap,
-      })),
-      // §5 — the spotlit goals, so the insight + connections web can cite them.
-      focusGoals: plan.prioritisedAreas.flatMap((a) =>
-        a.goals.map((g) => ({
-          label: g.label,
-          area: a.label,
-          ...(g.note ? { note: g.note } : {}),
-        }))
-      ),
-      // §4 — the de-duplicated season placements + enduring threads.
-      seasons: plan.movingTowards.seasons.map((s) => ({
-        label: s.label,
-        items: s.items.map((i) => i.label),
-      })),
-      enduring: plan.movingTowards.enduring.map((e) => e.label),
-      // §7 — the week's feel and recurring activities.
-      week: plan.week
-        ? {
-            structure: plan.week.structure,
-            activities: plan.week.activities.map((a) => ({
-              label: a.label,
-              frequency: a.frequency,
-              anchor: a.anchor,
-              energy: a.energy,
-              fixed: a.fixed,
-            })),
-          }
-        : null,
-      // §8 — the leaving-work signal (surface/signpost only).
-      finance: plan.leavingWork
-        ? {
-            lean: plan.leavingWork.lean,
-            shape: plan.leavingWork.shape,
-            period: plan.leavingWork.period,
-            window: plan.leavingWork.window,
-            financeLevel: plan.leavingWork.financeLevel,
-            financeDateKnown: plan.leavingWork.financeDateKnown,
-            stillBuilding: plan.leavingWork.stillBuilding,
-          }
-        : null,
-      // §10 — factual candidate "open threads" detected from the plan.
-      openThreadSignals: openThreadSignals(plan),
-    };
-    try {
-      const res = await fetch("/api/plan-intro", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req),
-      });
-      const data = (await res.json()) as { intro: PlanIntro | null };
-      if (data.intro) {
-        setIntro(data.intro);
-        void userData.savePlanIntro(data.intro);
-      }
-    } catch {
-      // keep the deterministic opening already in the plan
-    }
-  }
-
-  async function generateImages() {
-    const cached = userData.getPlanImages();
-    const missing = plan.scenes.filter((s) => !cached[s.slot]);
-    // Sequential, not parallel: image models on a fresh account rate-limit a
-    // burst of concurrent requests (429). One at a time is slower but reliable;
-    // each result is cached as it lands, so they fill in progressively.
-    for (const scene of missing) {
-      try {
-        const res = await fetch("/api/plan-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: scene.prompt }),
-        });
-        const data = (await res.json()) as { image: string | null };
-        if (data.image) {
-          setImages((prev) => ({ ...prev, [scene.slot]: data.image as string }));
-          void userData.savePlanImage(scene.slot, data.image);
-        }
-      } catch {
-        // keep the placeholder for this slot
-      }
-    }
-  }
+  // Both live in lib/planPrewarm — the same cache-first, dedup-guarded path the
+  // 4.7 pre-warm uses, so a plan opened after pre-warm is an instant cache hit
+  // and nothing ever generates twice.
+  const io = {
+    getPlanIntro: userData.getPlanIntro,
+    savePlanIntro: userData.savePlanIntro,
+    getPlanImages: userData.getPlanImages,
+    savePlanImage: userData.savePlanImage,
+    onIntro: (next: PlanIntro) => setIntro(next),
+    onImage: (slot: string, dataUrl: string) =>
+      setImages((prev) => ({ ...prev, [slot]: dataUrl })),
+  };
 
   // Kick generation once, after the data layer is ready. Mirrors the in-render
   // guard the other reveals use (so we never setState inside an effect).
   if (user && !loaded) {
     setLoaded(true);
-    const cachedIntro = userData.getPlanIntro();
-    if (cachedIntro) setIntro(cachedIntro);
-    else void generateIntro();
     setImages(userData.getPlanImages());
-    void generateImages();
+    void ensurePlanIntro(plan, source, io);
+    void ensurePlanImages(plan, io);
   }
 
   // ---- overlay the generated prose where present ----
@@ -221,38 +125,6 @@ export default function RlpReveal() {
       onSaveSelfIntro={(text) => userData.savePlanSelfIntro(text)}
     />
   );
-}
-
-// Factual candidate "open threads" — things still in motion, detected from the
-// plan. The model turns these into honest first-person lines (or drops them).
-function openThreadSignals(plan: RlpPlan): string[] {
-  const out: string[] = [];
-  const lw = plan.leavingWork;
-  if (lw && lw.financeDateKnown && lw.financeDateKnown !== "Yes, I have a clear sense") {
-    out.push("a financial readiness date still to firm up");
-  }
-  for (const a of plan.balance.areas) {
-    if (!a.deliberateGap && a.goals.length === 0) {
-      out.push(`whether anything belongs in ${a.label}, still undecided`);
-    }
-  }
-  // A spotlit goal with no specifics yet.
-  for (const area of plan.prioritisedAreas) {
-    for (const g of area.goals) {
-      const vague =
-        g.track === "do" ? !g.looksLike && !g.cadence : !g.ordinaryWeek;
-      if (vague) out.push(`making the goal "${g.label}" more specific`);
-    }
-  }
-  // An enduring aspiration with no path drafted.
-  const pathGoals = new Set(plan.paths.paths.map((p) => p.goal.toLowerCase()));
-  for (const e of plan.movingTowards.enduring) {
-    if (!pathGoals.has(e.label.toLowerCase())) {
-      // only surface a couple, and only aspiration-like enduring items
-      if (out.length < 5) out.push(`a first move towards "${e.label}", which runs throughout but has no step yet`);
-    }
-  }
-  return out.slice(0, 5);
 }
 
 const loadingCss = `
