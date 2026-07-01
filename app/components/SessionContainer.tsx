@@ -207,15 +207,94 @@ async function streamChatReply(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let full = "";
-  // A stream error (the server errored the controller) rejects read(), which
-  // propagates out of this function as a throw — caller handles the fallback.
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    full += decoder.decode(value, { stream: true });
+
+  // Typewriter smoothing. Network chunks arrive in irregular bursts; repainting
+  // the whole partial once per chunk reads as jerky jumps. Instead we reveal the
+  // accumulated text a little each animation frame — a steady base cadence with a
+  // gentle proportional catch-up so a big burst drains smoothly rather than
+  // lagging behind. Every repaint is batched onto requestAnimationFrame: at most
+  // one per frame, no matter how fast chunks land.
+  const canAnimate = typeof requestAnimationFrame === "function";
+  if (!canAnimate) {
+    // No rAF (SSR / test env): fall back to the simple per-chunk repaint.
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      full += decoder.decode(value, { stream: true });
+      onDelta(full);
+    }
+    full += decoder.decode();
     onDelta(full);
+    return full;
   }
-  full += decoder.decode();
+
+  let shown = 0;
+  let streamDone = false;
+  let rafId: number | null = null;
+  let onCaughtUp: (() => void) | null = null;
+  let lastTs: number | null = null;
+  let budget = 0; // fractional characters we're allowed to reveal this frame
+
+  // A calm, steady reading cadence in characters/second, measured against the
+  // real frame clock so it's independent of how fast chunks arrive. We only lift
+  // the pace when the backlog grows large — a big burst landed, or the model has
+  // finished and we're draining the tail — so it stays gentle without ever
+  // lagging noticeably behind.
+  const BASE_CPS = 50;
+
+  const tick = (ts: number) => {
+    if (lastTs == null) lastTs = ts;
+    const dt = Math.min(0.1, (ts - lastTs) / 1000); // clamp tab-switch gaps
+    lastTs = ts;
+
+    const backlog = full.length - shown;
+    if (backlog <= 0) {
+      budget = 0;
+    } else {
+      let cps = BASE_CPS;
+      if (streamDone) cps = Math.max(cps, backlog / 0.8); // drain tail in ~0.8s
+      else if (backlog > 220) cps = BASE_CPS * 4;
+      else if (backlog > 110) cps = BASE_CPS * 2;
+      budget += dt * cps;
+      if (budget >= 1) {
+        const step = Math.min(backlog, Math.floor(budget));
+        budget -= step;
+        shown += step;
+        onDelta(full.slice(0, shown));
+      }
+    }
+
+    if (streamDone && shown >= full.length) {
+      rafId = null;
+      onCaughtUp?.();
+      return;
+    }
+    rafId = requestAnimationFrame(tick);
+  };
+  rafId = requestAnimationFrame(tick);
+
+  // A stream error (the server errored the controller) rejects read(), which
+  // propagates out as a throw — caller handles the fallback.
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      full += decoder.decode(value, { stream: true });
+    }
+    full += decoder.decode();
+  } catch (err) {
+    if (rafId != null) cancelAnimationFrame(rafId);
+    throw err;
+  }
+
+  // Let the typewriter drain to the very end before resolving, so the caller's
+  // final render matches what's already on screen — no end-of-stream jump.
+  streamDone = true;
+  await new Promise<void>((resolve) => {
+    onCaughtUp = resolve;
+    if (rafId == null) rafId = requestAnimationFrame(tick);
+  });
+
   return full;
 }
 
@@ -540,6 +619,9 @@ export default function SessionContainer({
   const [input, setInput] = useState("");
   // The composer is an auto-growing textarea; this lets it size to its content.
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  // A sentinel at the end of the message list, so streamed text can keep the
+  // latest words in view as they arrive.
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   // Flips true once we've read this module's saved state out of the snapshot, so
   // the persist effect can't overwrite a saved conversation with an empty one
   // before hydration.
@@ -1501,6 +1583,21 @@ export default function SessionContainer({
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [input]);
 
+  // Keep the newest streamed text in view. Runs on each smoothed frame (messages
+  // update), but only follows when the reader is already near the bottom — if
+  // they've scrolled up to re-read, we never yank them back down. The reveal
+  // grows a few characters at a time, so an instant nudge reads as a smooth,
+  // continuous scroll rather than a jump.
+  useEffect(() => {
+    if (!streamingRef.current) return;
+    const el = messagesEndRef.current;
+    if (!el) return;
+    const nearBottom =
+      window.innerHeight + window.scrollY >=
+      document.documentElement.scrollHeight - 160;
+    if (nearBottom) el.scrollIntoView({ block: "end" });
+  }, [messages]);
+
   async function handleSend() {
     const text = input.trim();
     if (!text || sending) return;
@@ -1822,6 +1919,11 @@ export default function SessionContainer({
             {sending && messages[messages.length - 1]?.role !== "coach" && (
               <TypingBubble />
             )}
+            <div
+              ref={messagesEndRef}
+              aria-hidden="true"
+              style={{ scrollMarginBottom: "24px" }}
+            />
           </div>
 
           {completed && pendingFactRemovals.length > 0 && (
@@ -2011,13 +2113,20 @@ function PendingRemovals({
   return (
     <section style={styles.pendingWrap}>
       <p style={styles.pendingIntro}>
-        One thing to check — it sounded like this might have changed:
+        One quick check — did you want to change this?
       </p>
       {removals.map((r) => (
         <div key={r.identity} style={styles.pendingRow}>
-          <span style={styles.pendingLabel}>
-            Drop &ldquo;{r.label}&rdquo;?
-          </span>
+          <div style={styles.pendingText}>
+            <span style={styles.pendingLabel}>
+              Drop &ldquo;{r.label}&rdquo;?
+            </span>
+            {r.quote && (
+              <span style={styles.pendingQuote}>
+                You said: &ldquo;{r.quote}&rdquo;
+              </span>
+            )}
+          </div>
           <div style={styles.pendingActions}>
             <button
               type="button"
@@ -2896,11 +3005,24 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     gap: "10px",
   },
+  pendingText: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+    flex: "1 1 auto",
+    minWidth: 0,
+  },
   pendingLabel: {
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-body)",
     fontWeight: 600,
     color: "var(--ink)",
+  },
+  pendingQuote: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontStyle: "italic",
+    color: "var(--text-muted)",
   },
   pendingActions: { display: "flex", gap: "8px" },
   pendingDrop: {

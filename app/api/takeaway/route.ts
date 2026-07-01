@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { filterGroundedRemovals } from "@/lib/contextFacts";
 
 type IncomingMessage = {
   role: "coach" | "user";
@@ -41,13 +42,15 @@ Produce the summary in two grammatical persons. The content and tone must be ide
 
 You ALSO extract structured fact changes that emerged ONLY in the conversation (not already in their saved selections), as a "facts" object:
 - "additions": new facts the person stated in conversation that aren't already on record. Each: {"category": one of [${FACT_CATEGORIES}], "label": the fact in their words (short), and optionally "domain" (for recurring_activity: Restore/Move/Think/Connect/Contribute), "description"}. Use one_off_dream for money-no-object/pipe dreams; aspiration for things they could realistically work toward; recurring_activity for regular activities — never mix these up. Only include something clearly new and concrete. Empty array if nothing new.
-- "removals": corrections where the person changed their mind about, dropped, or replaced something already on record (you're told what's on record). Each: {"label": the on-record fact to drop (match its wording), optionally "category", and "userConfirmedInChat": true ONLY if the person themselves clearly asked to drop or change it in this conversation (false if you merely inferred it). Empty array if nothing was corrected.
+- "removals": ONLY when the person EXPLICITLY and UNAMBIGUOUSLY asked, in their OWN words, to drop, remove, undo, or replace something already on record (you're told what's on record). This is a HIGH bar. Every removal MUST include a "quote": the person's own verbatim words, copied exactly from a "Them:" line, that make the request. If you cannot copy such words, DO NOT emit a removal. Each: {"label": the on-record fact to drop (match its wording), "quote": the person's exact words asking to drop or change it, optionally "category", and "userConfirmedInChat": true only when that quote is a direct request from the person.
+  The following do NOT count as removals — for these, emit nothing: the person simply giving a new, different, or fuller answer; you inferring they "seem to have" moved on; a change of subject; softening, hedging, or elaborating; anything you would preface with "it sounded like" or "they might have". When in any doubt, emit NO removal. A missed correction is fine — the person can edit it themselves; a wrong one is not.
+  Empty array unless the person explicitly asked, in words you can quote, to drop or change something.
 
 Respond with ONLY a JSON object of exactly this shape, and nothing else:
 {"thirdPerson": "...", "secondPerson": "...", "facts": {"additions": [], "removals": []}}
 
-Example:
-{"thirdPerson": "They pictured a family-centred day built around a morning run, time with grandkids, and an evening with their partner. What matters most is being a steady, everyday presence for family, at an unhurried pace.", "secondPerson": "You pictured a family-centred day built around a morning run, time with grandkids, and an evening with your partner. What matters most is being a steady, everyday presence for family, at an unhurried pace.", "facts": {"additions": [{"category": "recurring_activity", "domain": "Move", "label": "a solo coffee and walk at 11am"}], "removals": [{"label": "morning run", "userConfirmedInChat": true}]}}`;
+Example (note the removal quotes the person's own explicit request):
+{"thirdPerson": "They pictured a family-centred day built around time with grandkids and an evening with their partner. What matters most is being a steady, everyday presence for family, at an unhurried pace.", "secondPerson": "You pictured a family-centred day built around time with grandkids and an evening with your partner. What matters most is being a steady, everyday presence for family, at an unhurried pace.", "facts": {"additions": [{"category": "recurring_activity", "domain": "Move", "label": "a solo coffee and walk at 11am"}], "removals": [{"label": "morning run", "quote": "actually, scrap the morning run — I don't do that any more", "userConfirmedInChat": true}]}}`;
 
 // Pull the first {...} object out of the model's reply, in case it wraps the
 // JSON in prose or a code fence.
@@ -160,6 +163,20 @@ export async function POST(request: Request) {
   }
   if (!takeaway) takeaway = rawText;
   if (!takeawayDirect) takeawayDirect = toSecondPerson(takeaway);
+
+  // Ground every removal in the member's own words before it leaves this route.
+  // A removal survives only if its "quote" is verbatim member text from the
+  // transcript; anything the model inferred (no quote, or a quote it can't back
+  // up) is dropped. This is the hard precision bias: never surface a correction
+  // the member didn't explicitly ask for.
+  const memberText = body.messages
+    .filter((m) => m.role === "user")
+    .map((m) => m.text)
+    .join("\n");
+  facts = {
+    additions: facts.additions,
+    removals: filterGroundedRemovals(facts.removals, memberText),
+  };
 
   return Response.json({ takeaway, takeawayDirect, facts });
 }

@@ -6,6 +6,7 @@ import {
   draftsFromSnapshot,
   diffFacts,
   planConversationalApply,
+  filterGroundedRemovals,
   principlesAfterConversation,
   factIdentity,
   type DraftFact,
@@ -326,6 +327,63 @@ describe("4.5 principle write-back", () => {
       deltas
     );
     expect(next).toEqual(["Protect my mornings"]);
+  });
+});
+
+describe("removals must be grounded in the member's own words", () => {
+  // A senses eye-test answer ("Longer ago") on record; the member never asked to
+  // change it. The model inferred a removal with no quote — it must be dropped,
+  // so no false "did you want to drop this?" ever surfaces.
+  const transcript =
+    "It was a while back, maybe a couple of years since my last eye test. I've been meaning to book one.";
+
+  it("drops a removal with no quote at all (the false-positive case)", () => {
+    const out = filterGroundedRemovals(
+      [{ label: "Longer ago" }],
+      transcript
+    );
+    expect(out).toEqual([]);
+  });
+
+  it("drops a removal whose quote is not in the transcript", () => {
+    const out = filterGroundedRemovals(
+      [{ label: "Longer ago", quote: "no, drop the longer ago answer" }],
+      transcript
+    );
+    expect(out).toEqual([]);
+  });
+
+  it("drops a trivially short quote", () => {
+    const out = filterGroundedRemovals(
+      [{ label: "morning run", quote: "no" }],
+      "no"
+    );
+    expect(out).toEqual([]);
+  });
+
+  it("keeps a removal whose quote is verbatim member text", () => {
+    const explicit =
+      "Actually, scrap the morning run — I don't do that any more.";
+    const out = filterGroundedRemovals(
+      [
+        {
+          label: "morning run",
+          quote: "scrap the morning run",
+          userConfirmedInChat: true,
+        },
+      ],
+      explicit
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].label).toBe("morning run");
+  });
+
+  it("matches through smart quotes and punctuation differences", () => {
+    const out = filterGroundedRemovals(
+      [{ label: "the 11am coffee", quote: "drop the 11am coffee!" }],
+      "Hmm, let’s drop the 11am coffee — it never happens.",
+    );
+    expect(out).toHaveLength(1);
   });
 });
 
