@@ -2,10 +2,9 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import PlanNextModule from "./PlanNextModule";
-import { isTodayLocal, todayISODate } from "@/lib/planDate";
+import ModuleFeedbackCard from "./ModuleFeedbackCard";
+import { todayISODate } from "@/lib/planDate";
 import DayBuilder, {
   DayBuilderSummary,
   dayBuilderSummaryText,
@@ -223,20 +222,6 @@ async function streamChatReply(
 // her dynamic opening. It is never rendered as a bubble or saved — it lives in
 // the API request alone.
 const OPENING_PRIMER = "(I've just finished the activity — please open.)";
-
-// Part B of the commitment loop: the single line Vita opens with when the
-// person kept the plan they set — shown ONLY on an exact same-day match. It's
-// fixed (not model-generated) so it stays brief, obeys the banned-praise rules,
-// and never references an early, late, or missed return. It leads her normal
-// opening; it is never a badge or banner.
-const PLAN_KEPT_LINE =
-  "You planned to come back to this today — and here you are.";
-
-// Lead Vita's opening with the recognition line on a same-day match; otherwise
-// her opening stands alone.
-function withRecognition(recognition: string | null, opening: string): string {
-  return recognition ? `${recognition} ${opening}` : opening;
-}
 
 // The readable sentence Vita reads, derived from whatever they built. Switches
 // on interaction type so each future type can describe its own result.
@@ -571,9 +556,11 @@ export default function SessionContainer({
   // offer the person a choice (keep talking, or wrap up here). True while that
   // choice is on screen, between Vita's sign-off and the person deciding.
   const [pendingClose, setPendingClose] = useState(false);
-  // The return-home path shows one optional plan-capture step before the hub.
-  // "Next module" never sets this — they're carrying straight on.
-  const [showPlan, setShowPlan] = useState(false);
+  // On a fresh completion, the first forward action (home, next module, or the
+  // stage reveal) shows the short feedback card once before moving on. True
+  // while that card is on screen; pendingDestRef holds where to go after it.
+  const [showFeedback, setShowFeedback] = useState(false);
+  const pendingDestRef = useRef<string>("/home");
   // For modules with a closing commitment: whether the person has set or skipped
   // it. Shown once on fresh completion; revisits to an already-finished module
   // skip straight to the completion CTAs (set true on hydration below).
@@ -886,7 +873,7 @@ export default function SessionContainer({
   // Generate Vita's first message with one model call and a hidden priming turn:
   // she reacts to what they built and/or draws on earlier modules. The module's
   // fixed coachOpening is the fallback if the call fails.
-  async function generateOpening(recognition: string | null) {
+  async function generateOpening() {
     setSending(true);
     setError(null);
     streamingRef.current = true;
@@ -910,9 +897,7 @@ export default function SessionContainer({
             stripStructuredLeak(stripCompletionMarker(partial).text),
             OPENING_WORD_CAP
           );
-          setMessages([
-            { role: "coach", text: withRecognition(recognition, shown) },
-          ]);
+          setMessages([{ role: "coach", text: shown }]);
         }
       );
 
@@ -923,18 +908,11 @@ export default function SessionContainer({
       // Block any leaked {thirdPerson/secondPerson} JSON from reaching the screen,
       // then cap the length so the opening stays a warm word, not a wall of text.
       const cleaned = capWords(stripStructuredLeak(text), OPENING_WORD_CAP);
-      setMessages([
-        {
-          role: "coach",
-          text: withRecognition(recognition, cleaned || coachOpening),
-        },
-      ]);
+      setMessages([{ role: "coach", text: cleaned || coachOpening }]);
 
       if (isClosing) setPendingClose(true);
     } catch {
-      setMessages([
-        { role: "coach", text: withRecognition(recognition, coachOpening) },
-      ]);
+      setMessages([{ role: "coach", text: coachOpening }]);
     } finally {
       // Flip off before returning, so the effect for the final setMessages above
       // (which React runs after this function settles) persists the opening.
@@ -1249,30 +1227,13 @@ export default function SessionContainer({
     }
   }
 
-  // Read the kept-plan recognition exactly as the module starts, then clear the
-  // stored plan no matter what — so each cycle starts fresh and a plan is never
-  // acknowledged twice. Returns the line only on an exact same-day match; on an
-  // early, late, or absent plan it returns null and Vita says nothing of timing.
-  function consumePlanRecognition(): string | null {
-    if (!user) return null;
-    const planned = userData.getPlannedNextModule();
-    if (!planned) return null;
-    const matchedToday = isTodayLocal(planned.date);
-    void userData.clearPlannedNextModule();
-    return matchedToday ? PLAN_KEPT_LINE : null;
-  }
-
   // Seed Vita's opening. Open dynamically whenever there's something to draw on
   // — an interaction output OR earlier takeaways — otherwise use the fixed line.
-  // Either way, lead with the kept-plan recognition on a same-day match.
   async function seedOpening() {
-    const recognition = consumePlanRecognition();
     if (buildResult || (user && userData.hasPriorTakeaways(sessionId))) {
-      await generateOpening(recognition);
+      await generateOpening();
     } else {
-      setMessages([
-        { role: "coach", text: withRecognition(recognition, coachOpening) },
-      ]);
+      setMessages([{ role: "coach", text: coachOpening }]);
     }
   }
 
@@ -1461,22 +1422,25 @@ export default function SessionContainer({
     setPhase("conversation");
   }
 
-  // The return-home choice opens the optional plan-capture step instead of
-  // navigating straight away.
-  function handleReturnHome() {
-    setShowPlan(true);
+  // Every forward action from a finished module (home, next module, the stage
+  // reveal) routes through here. On a fresh completion we show the short
+  // feedback card once, remembering where they were headed; on a revisit — or
+  // once the card has already been shown for this module — we go straight there.
+  function requestExit(dest: string) {
+    if (!userData.hasPromptedModuleFeedback(sessionId)) {
+      void userData.markModuleFeedbackPrompted(sessionId);
+      pendingDestRef.current = dest;
+      setShowFeedback(true);
+      return;
+    }
+    router.push(dest);
   }
 
-  // They chose a day for their next module — store it (keyed to the user, with
-  // the timestamp) and head to the hub.
-  async function handlePlanConfirm(date: string) {
-    await userData.setPlannedNextModule(date);
-    router.push("/home");
-  }
-
-  // The easy out — store nothing and go straight to the hub.
-  function handlePlanSkip() {
-    router.push("/home");
+  // The feedback card is done with (submitted or skipped) — carry on to wherever
+  // they were headed. The card saves its own answers, so there's nothing to do
+  // here but navigate.
+  function handleFeedbackContinue() {
+    router.push(pendingDestRef.current);
   }
 
   // They set a closing commitment (e.g. a screening rhythm) — save it as a
@@ -1603,14 +1567,6 @@ export default function SessionContainer({
       </div>
     );
   }
-
-  // Pre-fill the capture step with a future plan that's already on file, so the
-  // person confirms or changes it rather than starting from scratch.
-  const existingPlan = userData.getPlannedNextModule();
-  const prefillDate =
-    existingPlan && existingPlan.date >= todayISODate()
-      ? existingPlan.date
-      : undefined;
 
   // The Stage 4 modules are pre-populated from the person's earlier answers,
   // deterministic and free, no seed call. Both now read the resolver's seed view
@@ -1841,13 +1797,12 @@ export default function SessionContainer({
               />
             ) : (
               <CompletionBlock
-                showPlan={showPlan}
-                prefillDate={prefillDate}
-                onPlanConfirm={handlePlanConfirm}
-                onPlanSkip={handlePlanSkip}
+                showFeedback={showFeedback}
+                moduleId={sessionId}
+                onFeedbackContinue={handleFeedbackContinue}
                 revealHref={revealHref}
                 revealLabel={revealLabel}
-                onReturnHome={handleReturnHome}
+                onExit={requestExit}
                 nextHref={nextHref}
                 onKeepTalking={() => setReopened(true)}
               />
@@ -1931,13 +1886,12 @@ export default function SessionContainer({
           )}
 
           <CompletionBlock
-            showPlan={showPlan}
-            prefillDate={prefillDate}
-            onPlanConfirm={handlePlanConfirm}
-            onPlanSkip={handlePlanSkip}
+            showFeedback={showFeedback}
+            moduleId={sessionId}
+            onFeedbackContinue={handleFeedbackContinue}
             revealHref={revealHref}
             revealLabel={revealLabel}
-            onReturnHome={handleReturnHome}
+            onExit={requestExit}
             nextHref={nextHref}
           />
         </section>
@@ -1983,13 +1937,12 @@ export default function SessionContainer({
           )}
 
           <CompletionBlock
-            showPlan={showPlan}
-            prefillDate={prefillDate}
-            onPlanConfirm={handlePlanConfirm}
-            onPlanSkip={handlePlanSkip}
+            showFeedback={showFeedback}
+            moduleId={sessionId}
+            onFeedbackContinue={handleFeedbackContinue}
             revealHref={revealHref}
             revealLabel={revealLabel}
-            onReturnHome={handleReturnHome}
+            onExit={requestExit}
             nextHref={nextHref}
           />
         </section>
@@ -2042,36 +1995,36 @@ function PendingRemovals({
 
 // The finished-module panel: Vita's "you've finished" cue and the forward CTAs
 // (the stage reveal where there is one, otherwise back-to-home and an optional
-// next module), or the optional plan-capture step when the person chose to set
-// a return date. "Keep talking" only applies to conversation modules, so it's
-// shown only when onKeepTalking is provided.
+// next module), or the short feedback card when a forward action has just fired
+// on a fresh completion. Every forward action goes through onExit, so the card
+// can appear once before moving on. "Keep talking" only applies to conversation
+// modules, so it's shown only when onKeepTalking is provided.
 function CompletionBlock({
-  showPlan,
-  prefillDate,
-  onPlanConfirm,
-  onPlanSkip,
+  showFeedback,
+  moduleId,
+  onFeedbackContinue,
   revealHref,
   revealLabel,
-  onReturnHome,
+  onExit,
   nextHref,
   onKeepTalking,
 }: {
-  showPlan: boolean;
-  prefillDate?: string;
-  onPlanConfirm: (date: string) => void;
-  onPlanSkip: () => void;
+  showFeedback: boolean;
+  moduleId: string;
+  onFeedbackContinue: () => void;
   revealHref: string | null;
   revealLabel: string | null;
-  onReturnHome: () => void;
+  onExit: (dest: string) => void;
   nextHref: string | null;
   onKeepTalking?: () => void;
 }) {
-  if (showPlan) {
+  if (showFeedback) {
+    // Done and Skip both simply continue — the card saves its own answers.
     return (
-      <PlanNextModule
-        initialDate={prefillDate}
-        onConfirm={onPlanConfirm}
-        onSkip={onPlanSkip}
+      <ModuleFeedbackCard
+        moduleId={moduleId}
+        onDone={onFeedbackContinue}
+        onSkip={onFeedbackContinue}
       />
     );
   }
@@ -2084,20 +2037,21 @@ function CompletionBlock({
         {revealHref ? (
           <>
             {/* End of the stage — the reveal is the natural next step, so it
-                leads; "Back to home" still offers the plan-capture out as the
-                secondary action. */}
-            <Link
-              href={revealHref}
+                leads; "Back to home" is the secondary action. Both route through
+                onExit, which shows the feedback card once before moving on. */}
+            <button
+              type="button"
               className="home-complete-btn"
               style={styles.homeCompleteButton}
+              onClick={() => onExit(revealHref)}
             >
               {revealLabel ?? "See your reveal →"}
-            </Link>
+            </button>
             <button
               type="button"
               className="next-complete-btn"
               style={styles.nextCompleteButton}
-              onClick={onReturnHome}
+              onClick={() => onExit("/home")}
             >
               Back to home
             </button>
@@ -2108,18 +2062,19 @@ function CompletionBlock({
               type="button"
               className="home-complete-btn"
               style={styles.homeCompleteButton}
-              onClick={onReturnHome}
+              onClick={() => onExit("/home")}
             >
               Back to home
             </button>
             {nextHref && (
-              <Link
-                href={nextHref}
+              <button
+                type="button"
                 className="next-complete-btn"
                 style={styles.nextCompleteButton}
+                onClick={() => onExit(nextHref)}
               >
                 Next module →
-              </Link>
+              </button>
             )}
           </>
         )}

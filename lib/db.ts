@@ -346,3 +346,63 @@ export async function insertFeedback(input: {
     VALUES (${input.userId}, ${input.message}, ${input.replyEmail}, ${input.page})
   `;
 }
+
+// --- Per-module feedback --------------------------------------------------
+// The short card shown at the close of every module (all 24), for aggregate
+// per-module analysis — how useful / engaging each module felt, plus an
+// optional note. Its own table (not the support `feedback` one) because the
+// shape is different — structured ratings keyed by module — and, crucially,
+// because this path must NOT email: 24 modules per member would be spam, so
+// unlike insertFeedback there is deliberately no email side-effect anywhere
+// above the call site. Each rating is 'very' | 'somewhat' | 'not_really', or
+// null when that question was skipped. The index supports the per-module rollup.
+let moduleFeedbackTableReady: Promise<void> | null = null;
+
+function ensureModuleFeedbackTable(): Promise<void> {
+  if (!moduleFeedbackTableReady) {
+    moduleFeedbackTableReady = (async () => {
+      await sql()`
+        CREATE TABLE IF NOT EXISTS module_feedback (
+          id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+          user_id text NOT NULL,
+          module_id text NOT NULL,
+          useful text,
+          engaging text,
+          comment text,
+          created_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+      await sql()`
+        CREATE INDEX IF NOT EXISTS module_feedback_module_idx
+        ON module_feedback (module_id)
+      `;
+    })()
+      .then(() => undefined)
+      .catch((err) => {
+        moduleFeedbackTableReady = null;
+        throw err;
+      });
+  }
+  return moduleFeedbackTableReady;
+}
+
+export type ModuleRating = "very" | "somewhat" | "not_really" | null;
+
+// Record one per-module feedback submission. user_id always comes from the
+// authenticated Clerk session at the call site, never from client input.
+export async function insertModuleFeedback(input: {
+  userId: string;
+  moduleId: string;
+  useful: ModuleRating;
+  engaging: ModuleRating;
+  comment: string | null;
+}): Promise<void> {
+  await ensureModuleFeedbackTable();
+  await sql()`
+    INSERT INTO module_feedback (user_id, module_id, useful, engaging, comment)
+    VALUES (
+      ${input.userId}, ${input.moduleId},
+      ${input.useful}, ${input.engaging}, ${input.comment}
+    )
+  `;
+}
