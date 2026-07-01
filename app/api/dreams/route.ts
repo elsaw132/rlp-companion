@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { HAIKU_MODEL } from "@/lib/models";
 import type { DreamEntry } from "@/lib/dreams";
 
 type IncomingMessage = {
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
   const userContent = `Their captured dreams:\n${dreamList || "(none captured)"}\n\nConversation transcript:\n${transcript}`;
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
+    model: HAIKU_MODEL,
     max_tokens: 600,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userContent }],
