@@ -129,6 +129,7 @@ export default function ProviderBand() {
         <FeedbackPanel
           open
           onClose={() => setSupportOpen(false)}
+          kind="support"
           title="Need a hand?"
           intro="Send us a message and we’ll get back to you. Tell us what you’re stuck on or what you need."
         />

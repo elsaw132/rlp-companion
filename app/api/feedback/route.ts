@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     message?: unknown;
     replyEmail?: unknown;
     page?: unknown;
+    type?: unknown;
   };
 
   const message =
@@ -29,8 +30,11 @@ export async function POST(request: Request) {
       ? body.replyEmail.trim()
       : null;
   const page = typeof body.page === "string" ? body.page : null;
+  // Which entry point sent this: the header's Support button, or the general
+  // feedback pill. Anything unexpected falls back to 'feedback'.
+  const type = body.type === "support" ? "support" : "feedback";
 
-  await insertFeedback({ userId, message, replyEmail, page });
+  await insertFeedback({ userId, message, replyEmail, page, type });
 
   // Email it on too. Best-effort — a failure here is logged inside the helper
   // and doesn't undo the save above, so feedback is never lost.

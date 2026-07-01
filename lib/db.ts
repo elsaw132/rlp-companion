@@ -309,20 +309,32 @@ export async function allFacts(userId: string): Promise<StoredFact[]> {
 // (not user_data) because it's append-only and not keyed per user/key: one row
 // per submission, with the page the tester was on so we know where it came
 // from. reply_email is optional — only set when the tester asks for a reply.
+// `type` records which entry point it came from: 'feedback' (the floating
+// feedback pill) or 'support' (the header's Support button). It's nullable with
+// no default on purpose: rows written before this column existed stay NULL and
+// the portal shows them as "unknown", rather than being silently relabelled.
 let feedbackTableReady: Promise<void> | null = null;
+
+export type FeedbackType = "feedback" | "support";
 
 function ensureFeedbackTable(): Promise<void> {
   if (!feedbackTableReady) {
-    feedbackTableReady = sql()`
-      CREATE TABLE IF NOT EXISTS feedback (
-        id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        user_id text NOT NULL,
-        message text NOT NULL,
-        reply_email text,
-        page text,
-        created_at timestamptz NOT NULL DEFAULT now()
-      )
-    `
+    feedbackTableReady = (async () => {
+      await sql()`
+        CREATE TABLE IF NOT EXISTS feedback (
+          id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+          user_id text NOT NULL,
+          message text NOT NULL,
+          reply_email text,
+          page text,
+          type text,
+          created_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+      // For instances whose table predates the type column, add it in place.
+      // No default, so existing rows read back as NULL ("unknown" in the portal).
+      await sql()`ALTER TABLE feedback ADD COLUMN IF NOT EXISTS type text`;
+    })()
       .then(() => undefined)
       .catch((err) => {
         feedbackTableReady = null;
@@ -333,18 +345,67 @@ function ensureFeedbackTable(): Promise<void> {
 }
 
 // Record one feedback submission. user_id always comes from the authenticated
-// Clerk session at the call site, never from client input.
+// Clerk session at the call site, never from client input. type is which entry
+// point it came from ('feedback' | 'support').
 export async function insertFeedback(input: {
   userId: string;
   message: string;
   replyEmail: string | null;
   page: string | null;
+  type: FeedbackType;
 }): Promise<void> {
   await ensureFeedbackTable();
   await sql()`
-    INSERT INTO feedback (user_id, message, reply_email, page)
-    VALUES (${input.userId}, ${input.message}, ${input.replyEmail}, ${input.page})
+    INSERT INTO feedback (user_id, message, reply_email, page, type)
+    VALUES (
+      ${input.userId}, ${input.message}, ${input.replyEmail},
+      ${input.page}, ${input.type}
+    )
   `;
+}
+
+// One general-feedback / support row, as read by the admin portal. Read-only:
+// the portal never writes here.
+export type FeedbackRow = {
+  id: string;
+  userId: string;
+  message: string;
+  replyEmail: string | null;
+  page: string | null;
+  // 'feedback' | 'support', or null for rows written before the column existed.
+  type: FeedbackType | null;
+  createdAt: string;
+};
+
+// Every general-feedback submission, newest first — for the admin portal. Reads
+// across all users, so it is only ever called behind the admin gate.
+export async function getAllFeedback(): Promise<FeedbackRow[]> {
+  await ensureFeedbackTable();
+  const rows = (await sql()`
+    SELECT id, user_id, message, reply_email, page, type, created_at
+    FROM feedback
+    ORDER BY created_at DESC
+  `) as {
+    id: number | string;
+    user_id: string;
+    message: string;
+    reply_email: string | null;
+    page: string | null;
+    type: string | null;
+    created_at: string | Date;
+  }[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    userId: r.user_id,
+    message: r.message,
+    replyEmail: r.reply_email,
+    page: r.page,
+    type:
+      r.type === "feedback" || r.type === "support"
+        ? (r.type as FeedbackType)
+        : null,
+    createdAt: toIso(r.created_at) ?? new Date().toISOString(),
+  }));
 }
 
 // --- Per-module feedback --------------------------------------------------
@@ -405,4 +466,46 @@ export async function insertModuleFeedback(input: {
       ${input.useful}, ${input.engaging}, ${input.comment}
     )
   `;
+}
+
+// One per-module feedback row, as read by the admin portal. Read-only.
+export type ModuleFeedbackRow = {
+  id: string;
+  userId: string;
+  moduleId: string;
+  useful: ModuleRating;
+  engaging: ModuleRating;
+  comment: string | null;
+  createdAt: string;
+};
+
+// Every per-module feedback submission, newest first — for the admin portal. It
+// reads across all users, so it is only ever called behind the admin gate. The
+// portal computes the per-module rollup (counts, rating distributions) in JS
+// from these raw rows; at pilot scale that is cheap and keeps one query serving
+// the summary, the comments view, and the CSV export alike.
+export async function getAllModuleFeedback(): Promise<ModuleFeedbackRow[]> {
+  await ensureModuleFeedbackTable();
+  const rows = (await sql()`
+    SELECT id, user_id, module_id, useful, engaging, comment, created_at
+    FROM module_feedback
+    ORDER BY created_at DESC
+  `) as {
+    id: number | string;
+    user_id: string;
+    module_id: string;
+    useful: string | null;
+    engaging: string | null;
+    comment: string | null;
+    created_at: string | Date;
+  }[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    userId: r.user_id,
+    moduleId: r.module_id,
+    useful: (r.useful as ModuleRating) ?? null,
+    engaging: (r.engaging as ModuleRating) ?? null,
+    comment: r.comment,
+    createdAt: toIso(r.created_at) ?? new Date().toISOString(),
+  }));
 }
