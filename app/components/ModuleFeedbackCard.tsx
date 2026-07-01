@@ -14,13 +14,12 @@
 
 import { useState } from "react";
 
-type Rating = "very" | "somewhat" | "not_really";
+// A 0–10 scale, stored as the string of the number ("0".."10"). null means the
+// question was skipped. The scale is anchored by an end label at each pole
+// (the middle numbers speak for themselves).
+type Rating = string;
 
-const OPTIONS: { value: Rating; label: string }[] = [
-  { value: "very", label: "Very" },
-  { value: "somewhat", label: "Somewhat" },
-  { value: "not_really", label: "Not really" },
-];
+const SCALE: Rating[] = Array.from({ length: 11 }, (_, i) => String(i));
 
 export default function ModuleFeedbackCard({
   moduleId,
@@ -79,39 +78,21 @@ export default function ModuleFeedbackCard({
         Before you go
       </p>
 
-      <fieldset className="question">
-        <legend className="q-label">How useful was this module?</legend>
-        <div className="options" role="group">
-          {OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className="opt"
-              aria-pressed={useful === o.value}
-              onClick={() => pick(useful, o.value, setUseful)}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <Scale
+        label="How useful was this module?"
+        lowLabel="Not useful"
+        highLabel="Very useful"
+        value={useful}
+        onPick={(v) => pick(useful, v, setUseful)}
+      />
 
-      <fieldset className="question">
-        <legend className="q-label">How engaging was it?</legend>
-        <div className="options" role="group">
-          {OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className="opt"
-              aria-pressed={engaging === o.value}
-              onClick={() => pick(engaging, o.value, setEngaging)}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <Scale
+        label="How engaging was it?"
+        lowLabel="Not engaging"
+        highLabel="Very engaging"
+        value={engaging}
+        onPick={(v) => pick(engaging, v, setEngaging)}
+      />
 
       <label className="question">
         <span className="q-label">
@@ -149,6 +130,45 @@ export default function ModuleFeedbackCard({
   );
 }
 
+// One 0–10 question: the label, a row of eleven numbered buttons, and a word
+// anchor under each end. Tapping the chosen number again clears it.
+function Scale({
+  label,
+  lowLabel,
+  highLabel,
+  value,
+  onPick,
+}: {
+  label: string;
+  lowLabel: string;
+  highLabel: string;
+  value: Rating | null;
+  onPick: (v: Rating) => void;
+}) {
+  return (
+    <fieldset className="question">
+      <legend className="q-label">{label}</legend>
+      <div className="scale-row" role="group" aria-label={label}>
+        {SCALE.map((v) => (
+          <button
+            key={v}
+            type="button"
+            className="opt"
+            aria-pressed={value === v}
+            onClick={() => onPick(v)}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+      <div className="scale-ends">
+        <span>{lowLabel}</span>
+        <span>{highLabel}</span>
+      </div>
+    </fieldset>
+  );
+}
+
 const css = `
 .mfc{
   background:var(--warm-surface);
@@ -181,11 +201,12 @@ const css = `
   font-weight:500;
   color:var(--text-muted);
 }
-.mfc .options{
-  display:flex;gap:8px;
+.mfc .scale-row{
+  display:flex;gap:4px;
 }
 .mfc .opt{
-  flex:1;
+  flex:1 1 0;
+  min-width:0;
   font-family:var(--font-sans);
   font-size:var(--fs-sm);
   font-weight:600;
@@ -193,10 +214,18 @@ const css = `
   background:var(--bg);
   border:1.5px solid var(--border-strong);
   border-radius:var(--r-sm);
-  padding:11px 6px;
-  min-height:46px;
+  padding:11px 0;
+  min-height:44px;
   cursor:pointer;
   transition:background .12s ease,border-color .12s ease,color .12s ease;
+}
+.mfc .scale-ends{
+  display:flex;
+  justify-content:space-between;
+  margin-top:6px;
+  font-family:var(--font-sans);
+  font-size:var(--fs-eyebrow);
+  color:var(--text-muted);
 }
 .mfc .opt:hover{border-color:var(--brand-primary)}
 .mfc .opt[aria-pressed="true"]{
