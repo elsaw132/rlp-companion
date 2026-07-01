@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { UserDataProvider } from "@/lib/userData";
 import FeedbackButton from "./components/FeedbackButton";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -27,6 +29,8 @@ export default function RootLayout({
           {/* Global in-app feedback panel — fixed bottom-right on every screen. */}
           <FeedbackButton />
         </ClerkProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
