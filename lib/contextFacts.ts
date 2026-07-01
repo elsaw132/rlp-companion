@@ -866,6 +866,46 @@ export function normalizeDeltas(raw: unknown): ConversationalDeltas {
   };
 }
 
+// Lowercased, punctuation- and whitespace-normalised text, for matching a quote
+// against the transcript. Loose enough to survive smart quotes and spacing,
+// strict enough that the matched words must genuinely be the member's own.
+function normalizeForMatch(s: string): string {
+  return (s ?? "")
+    .toLowerCase()
+    .replace(/[“”‘’"']/g, "")
+    .replace(/[.,;:!?—–-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Ground removals in the member's own words. A conversational removal is only
+// trustworthy when the member EXPLICITLY asked for it, so the delta pass is
+// required to return the member's verbatim words as `quote`. Here we verify that
+// quote is real: a substantive phrase that actually appears in what the member
+// said (the concatenated "user" turns). Any removal without a grounded quote is
+// dropped — it is far better to miss a genuine correction (the member can always
+// re-edit via the widget) than to surface a false one, which erodes trust in the
+// very feature meant to build it. Pure, so it's unit-testable.
+export function filterGroundedRemovals(
+  removals: unknown[],
+  memberText: string
+): FactRemovalDelta[] {
+  const haystack = normalizeForMatch(memberText);
+  const out: FactRemovalDelta[] = [];
+  for (const r of removals) {
+    if (!r || typeof r !== "object") continue;
+    const rr = r as FactRemovalDelta;
+    if (typeof rr.label !== "string" || clean(rr.label) === "") continue;
+    const quote =
+      typeof rr.quote === "string" ? normalizeForMatch(rr.quote) : "";
+    // Require a real, non-trivial phrase actually spoken by the member.
+    if (quote.length < 4) continue;
+    if (!haystack.includes(quote)) continue;
+    out.push(rr);
+  }
+  return out;
+}
+
 // Decide what to apply for a set of conversational deltas, given the facts
 // currently active for the module and the set of removal identities the person
 // has confirmed. PURE — the route executes the result. Additions that duplicate

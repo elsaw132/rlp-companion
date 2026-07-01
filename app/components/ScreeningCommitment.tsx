@@ -2,9 +2,9 @@
 
 // A post-conversation commitment step: after a module closes, Vita invites the
 // person to set a concrete plan entry (the senses module's eye/hearing-check
-// rhythm, plus an optional first action). Mirrors PlanNextModule — a Vita-voiced
-// moment on a cream surface, with tappable options and a navy primary. It never
-// blocks the way home: skipping stores nothing and goes straight on.
+// rhythm, plus an optional first action). A Vita-voiced moment on a cream
+// surface, with tappable options and a navy primary. It never blocks the way
+// home: skipping stores nothing and goes straight on.
 
 import { useState } from "react";
 import VitaMark from "./VitaMark";

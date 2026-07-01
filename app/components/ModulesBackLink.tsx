@@ -2,53 +2,48 @@
 
 // The "← Your modules" exit link in the module's top nav. Normally it's just a
 // link to the hub. But once this module is finished, leaving this way is a
-// return-home moment too — so it offers the same optional plan-capture step the
-// "Back to home" button does, shown here in a light modal before the hub. The
+// module-close moment too — so it shows the same short feedback card the
+// completion buttons do, once per module, in a light modal before the hub. The
 // backdrop and Escape simply dismiss and stay on the module, so it never traps
-// the person, and it never fires mid-module (asking about the next module only
-// makes sense once this one is done).
+// the person; it never fires mid-module (the module isn't finished yet), and it
+// never fires again once the card has already been shown for this module.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUserData } from "@/lib/userData";
-import { todayISODate } from "@/lib/planDate";
-import PlanNextModule from "./PlanNextModule";
+import ModuleFeedbackCard from "./ModuleFeedbackCard";
 
 export function ModulesBackLink({ sessionId }: { sessionId: string }) {
   const userData = useUserData();
   const router = useRouter();
-  const [showPlan, setShowPlan] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const finished = userData.getCompletedIds().includes(sessionId);
+  // Only prompt for feedback the first time this finished module is left this
+  // way — never again on a revisit.
+  const shouldPrompt = finished && !userData.hasPromptedModuleFeedback(sessionId);
 
-  // Pre-fill a future plan that's already on file, so they confirm or change it.
-  const existing = userData.getPlannedNextModule();
-  const prefillDate =
-    existing && existing.date >= todayISODate() ? existing.date : undefined;
-
-  // Escape dismisses the capture and stays on the module — never a forced step.
+  // Escape dismisses the card and stays on the module — never a forced step.
   useEffect(() => {
-    if (!showPlan) return;
+    if (!showFeedback) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowPlan(false);
+      if (e.key === "Escape") setShowFeedback(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showPlan]);
+  }, [showFeedback]);
 
   function handleClick(e: React.MouseEvent) {
-    if (!finished) return; // mid-module: leave normally, no capture
+    // Mid-module, or the card has already been shown for this module: leave
+    // normally, letting the link navigate home on its own.
+    if (!shouldPrompt) return;
     e.preventDefault();
-    setShowPlan(true);
+    void userData.markModuleFeedbackPrompted(sessionId);
+    setShowFeedback(true);
   }
 
-  async function handleConfirm(date: string) {
-    await userData.setPlannedNextModule(date);
-    router.push("/home");
-  }
-
-  function handleSkip() {
+  function handleContinue() {
     router.push("/home");
   }
 
@@ -64,20 +59,20 @@ export function ModulesBackLink({ sessionId }: { sessionId: string }) {
         ← Your modules
       </Link>
 
-      {showPlan && (
+      {showFeedback && (
         <div
           className="plan-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label="Plan your next module"
+          aria-label="A quick word on this module"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setShowPlan(false);
+            if (e.target === e.currentTarget) setShowFeedback(false);
           }}
         >
-          <PlanNextModule
-            initialDate={prefillDate}
-            onConfirm={handleConfirm}
-            onSkip={handleSkip}
+          <ModuleFeedbackCard
+            moduleId={sessionId}
+            onDone={handleContinue}
+            onSkip={handleContinue}
           />
         </div>
       )}
