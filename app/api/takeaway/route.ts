@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { HAIKU_MODEL } from "@/lib/models";
+import { SONNET_MODEL } from "@/lib/models";
 
 type IncomingMessage = {
   role: "coach" | "user";
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
   const userContent = `Module: ${body.moduleTitle}\n\n${built}${known}Conversation transcript:\n${transcript}`;
 
   const response = await anthropic.messages.create({
-    model: HAIKU_MODEL,
+    model: SONNET_MODEL,
     max_tokens: 300,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userContent }],
