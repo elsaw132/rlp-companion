@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { HAIKU_MODEL } from "@/lib/models";
 import { STATS_BY_ID } from "@/lib/stage2Stats";
 import {
   FALLBACK_STAGE2_SYNTHESIS,
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: HAIKU_MODEL,
       max_tokens: 1200,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildUserContent(body) }],

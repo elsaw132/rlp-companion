@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { HAIKU_MODEL } from "@/lib/models";
 import { ARCHETYPES, DEFAULT_ARCHETYPE_ID } from "@/lib/archetypes";
 import { FALLBACK_SYNTHESIS, type RevealSynthesis } from "@/lib/stageReveal";
 
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: HAIKU_MODEL,
       max_tokens: 700,
       system: SYSTEM_PROMPT,
       messages: [

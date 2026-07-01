@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { HAIKU_MODEL } from "@/lib/models";
 
 type ReviewRequest = {
   // Who the letter is addressed to, in the words shown to the user.
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: HAIKU_MODEL,
       max_tokens: 300,
       system: body.final ? FINAL_SYSTEM_PROMPT : SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContent }],

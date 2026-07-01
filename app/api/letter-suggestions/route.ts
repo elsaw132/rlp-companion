@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { HAIKU_MODEL } from "@/lib/models";
 
 type SuggestionsRequest = {
   // Who the letter is addressed to, in the words shown to the user (e.g. "an
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: HAIKU_MODEL,
       max_tokens: 500,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContent }],
