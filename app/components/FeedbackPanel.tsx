@@ -16,6 +16,11 @@ type FeedbackPanelProps = {
   onClose: () => void;
   title?: string;
   intro?: string;
+  // Which entry point this panel is backing, recorded with the submission so
+  // the admin portal can tell general feedback from support requests. Defaults
+  // to "feedback" (the floating pill); the header's Support button passes
+  // "support".
+  kind?: "feedback" | "support";
 };
 
 export default function FeedbackPanel({
@@ -23,6 +28,7 @@ export default function FeedbackPanel({
   onClose,
   title = "Send feedback",
   intro = "Tell us anything — what worked, what didn’t, what confused you.",
+  kind = "feedback",
 }: FeedbackPanelProps) {
   const pathname = usePathname();
   const [message, setMessage] = useState("");
@@ -56,6 +62,7 @@ export default function FeedbackPanel({
           message,
           replyEmail,
           page: pathname,
+          type: kind,
         }),
       });
       if (!res.ok) throw new Error("send failed");

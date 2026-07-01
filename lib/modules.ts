@@ -3104,6 +3104,34 @@ export function getModulesBefore(id: string): { id: string; title: string }[] {
   return [];
 }
 
+// Every module in programme order, each with its stage context. Used by the
+// admin feedback portal to lay modules out in the order testers meet them and to
+// show titles alongside the raw module ids stored with each rating.
+export function allModulesInOrder(): {
+  id: string;
+  title: string;
+  stageNumber: number;
+  stageName: string;
+}[] {
+  const ordered: {
+    id: string;
+    title: string;
+    stageNumber: number;
+    stageName: string;
+  }[] = [];
+  for (const stage of STAGES) {
+    for (const m of stage.modules) {
+      ordered.push({
+        id: m.id,
+        title: m.title,
+        stageNumber: stage.number,
+        stageName: stage.name,
+      });
+    }
+  }
+  return ordered;
+}
+
 // The id of the next module in the same stage, or null if this is the last one.
 export function getNextModule(id: string): string | null {
   for (const stage of STAGES) {
