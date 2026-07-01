@@ -63,36 +63,56 @@ export const TONE_DIRECTIVES: Record<
     "Lighter and playful — the most characterful of the three. Carry a genuine light touch all the way THROUGH the reply, not saved for a quip at the end: a brighter image, a vivid turn of phrase, or a wry aside woven into the body itself. Still plain and grown-up (never twee, bubbly or \"young\"), but this is the mode where humour and personality are most welcome.",
 };
 
+// A segment of the system prompt, with an optional cache breakpoint. The route
+// turns these into separate cacheable `system` blocks (see the cache-hardening
+// note in app/api/chat/route.ts); buildSystemPrompt (below) joins them back into
+// the single string the dev tooling expects. Each block carries its own leading
+// blank-line separators, so concatenating them (with "") reproduces the EXACT
+// prompt the model used to receive as one string — the split changes only where
+// the cache breakpoints fall, never the words Vita reads.
+export type SystemBlock = { text: string; cache?: "5m" | "1h" };
+
 // basePrompt defaults to the live COACH_BASE_PROMPT (what the route always uses).
 // The dev report passes an older snapshot here to compare old vs new prompts
 // through the identical assembly path — the route never overrides it.
-export function buildSystemPrompt(
+export function buildSystemBlocks(
   body: ChatRequest,
   basePrompt: string = COACH_BASE_PROMPT
-): string {
+): SystemBlock[] {
   const filled = basePrompt
     .replace("{onboardingContext}", body.onboardingContext)
     .replace("{priorReflections}", body.priorReflections)
     .replace("{sessionContent}", body.sessionContent)
     .replace("{toneDirective}", TONE_DIRECTIVES[body.toneChoice ?? "warm"]);
 
-  const sections = [
-    filled,
-    "",
-    "THIS MODULE'S INSTRUCTIONS",
-    body.sessionInstructions,
-  ];
+  // Block 1 — the stable base. Every turn of one module fills it identically
+  // (the member context is resolved once when the module loads), so a 1-hour TTL
+  // lets it survive the reading/thinking pauses between turns that would expire
+  // the default 5-minute cache and force a full-price re-write. It's by far the
+  // biggest chunk of the prompt, so this is where caching earns its keep.
+  const blocks: SystemBlock[] = [{ text: filled, cache: "1h" }];
 
+  // Block 2 — this module's instructions (and what they built). Also identical
+  // across a module's turns; it caches on top of block 1. The default 5-minute
+  // TTL is enough — it's re-read on every turn of the same conversation.
+  let moduleText = "\n\nTHIS MODULE'S INSTRUCTIONS\n" + body.sessionInstructions;
   if (body.interactionSummary && body.interactionSummary.trim()) {
-    sections.push("", "WHAT THEY BUILT IN THIS MODULE:", body.interactionSummary);
+    moduleText +=
+      "\n\nWHAT THEY BUILT IN THIS MODULE:\n" + body.interactionSummary;
   }
+  blocks.push({ text: moduleText, cache: "5m" });
 
+  // Block 3 — the volatile tail: opening-vs-closing guidance, the marker rules,
+  // the verbatim opening line, any edit acknowledgement. This is the part that
+  // differs between the opening call and later turns, so it is deliberately left
+  // uncached — keeping it out of the cached blocks means these changes never
+  // invalidate the base above.
   if (body.isOpening) {
-    sections.push(
-      "",
-      "This is the very start of the conversation, and you are speaking first. Open with a short, warm first message and ask one question — no greeting, no preamble, no welcome. If this module had a build step, react to something specific in what they made (under WHAT THEY BUILT above). Otherwise, open by gently drawing on the picture they've built in earlier modules where it's relevant — following this module's own brief and tone. Engage directly; don't recap everything back to them."
-    );
-    return sections.join("\n");
+    blocks.push({
+      text:
+        "\n\nThis is the very start of the conversation, and you are speaking first. Open with a short, warm first message and ask one question — no greeting, no preamble, no welcome. If this module had a build step, react to something specific in what they made (under WHAT THEY BUILT above). Otherwise, open by gently drawing on the picture they've built in earlier modules where it's relevant — following this module's own brief and tone. Engage directly; don't recap everything back to them.",
+    });
+    return blocks;
   }
 
   const nextModuleGuidance =
@@ -104,24 +124,33 @@ export function buildSystemPrompt(
     ? `CLOSING THIS MODULE — ONE STEP. This was a short, practical conversation, so there is nothing to mirror back or confirm — do NOT add a wrap-up that restates their answers and asks whether it's a fair summary. That would just be noise here. Once they've given their answer (or made clear they're done), close in a single message: a brief, warm sign-off that asks nothing at all and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question.`
     : `CLOSING THIS MODULE — TWO STEPS. When you're ready to close, first offer your wrap-up: name what matters in their words and check it feels right to them. This message asks a question (does this land? anything to add?), so it must NOT contain the marker. Then, only after they respond, send a brief final sign-off that points to the next module, asks nothing at all, and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question. Only ever include the marker in that one final sign-off.`;
 
-  sections.push("", closingInstruction);
-
-  sections.push(
-    "",
-    "THE MARKER IS A LITERAL TOKEN. When you close, write the marker exactly as these eight characters — two open brackets, MODULE_COMPLETE, two close brackets: [[MODULE_COMPLETE]]. Never reword it, translate it, wrap it in tildes, asterisks or other punctuation, and never write any variant such as ~~COMPLETION_MARKER~~ or \"completion marker\". It is invisible plumbing the person never sees, so it must match exactly or it will leak into your message."
-  );
-
-  sections.push(
-    "",
-    "You have already opened this conversation by saying, word for word:",
-    `"${body.coachOpening}"`
-  );
+  let tail =
+    "\n\n" +
+    closingInstruction +
+    "\n\n" +
+    'THE MARKER IS A LITERAL TOKEN. When you close, write the marker exactly as these eight characters — two open brackets, MODULE_COMPLETE, two close brackets: [[MODULE_COMPLETE]]. Never reword it, translate it, wrap it in tildes, asterisks or other punctuation, and never write any variant such as ~~COMPLETION_MARKER~~ or "completion marker". It is invisible plumbing the person never sees, so it must match exactly or it will leak into your message.' +
+    "\n\n" +
+    "You have already opened this conversation by saying, word for word:\n" +
+    `"${body.coachOpening}"`;
 
   if (body.editAcknowledgement && body.editAcknowledgement.trim()) {
-    sections.push("", body.editAcknowledgement);
+    tail += "\n\n" + body.editAcknowledgement;
   }
 
-  return sections.join("\n");
+  blocks.push({ text: tail });
+  return blocks;
+}
+
+// The single-string form of the system prompt — the exact concatenation of the
+// blocks above. Kept for the dev tooling (the Vita-check report) that assembles
+// and diffs the prompt as one string. The route uses buildSystemBlocks directly.
+export function buildSystemPrompt(
+  body: ChatRequest,
+  basePrompt: string = COACH_BASE_PROMPT
+): string {
+  return buildSystemBlocks(body, basePrompt)
+    .map((block) => block.text)
+    .join("");
 }
 
 // The Messages API requires the list to start with a user turn. Vita's opening

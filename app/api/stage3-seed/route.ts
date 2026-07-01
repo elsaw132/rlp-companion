@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { HAIKU_MODEL } from "@/lib/models";
 import {
   coerceSeed,
   isSeededType,
@@ -134,7 +135,7 @@ export async function POST(request: Request) {
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: HAIKU_MODEL,
       max_tokens: 900,
       system: systemPrompt(seedType, body.hasPartner ?? false),
       messages: [

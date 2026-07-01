@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { HAIKU_MODEL } from "@/lib/models";
 import type { Stage3Value } from "@/lib/stage3Seed";
 
 // Synthesises the person's confirmed values at the close of the Understand
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
   let values: Stage3Value[] = [];
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: HAIKU_MODEL,
       max_tokens: 700,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContent }],
