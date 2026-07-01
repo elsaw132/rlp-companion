@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ModuleFeedbackRow, FeedbackRow } from "@/lib/db";
+import AdminSignOut from "../AdminSignOut";
 
 // The read-only admin view over both feedback sources. All data is passed in
 // from the server page (already behind the admin gate), so everything here —
@@ -23,21 +24,46 @@ type Props = {
   modules: ModuleMeta[];
 };
 
-type Rating = "very" | "somewhat" | "not_really";
-const RATING_ORDER: Rating[] = ["very", "somewhat", "not_really"];
-const RATING_LABEL: Record<Rating, string> = {
+const SCALE_MAX = 10;
+
+// A stored rating is the string of a 0–10 number for current submissions. A few
+// early rows used the old three words; those aren't on the 0–10 scale, so they
+// parse to null here and are counted as "legacy" instead of skewing an average.
+function parseScore(v: string | null): number | null {
+  if (v === null) return null;
+  if (!/^\d+$/.test(v)) return null;
+  const n = Number(v);
+  return n >= 0 && n <= SCALE_MAX ? n : null;
+}
+
+// Legacy word ratings we still want to show readably in the comments context.
+const LEGACY_LABEL: Record<string, string> = {
   very: "Very",
   somewhat: "Somewhat",
   not_really: "Not really",
 };
-// The stacked-bar colours: green = strong signal, orange = mixed, grey = weak.
-const RATING_COLOR: Record<Rating, string> = {
-  very: "var(--success)",
-  somewhat: "var(--accent)",
-  not_really: "var(--text-faint)",
-};
 
-type Dist = { very: number; somewhat: number; not_really: number };
+// How one stored rating reads in the comments view: "8 / 10" for a scale value,
+// the old word for a legacy value, "—" when skipped.
+function ratingDisplay(v: string | null): string {
+  const n = parseScore(v);
+  if (n !== null) return `${n} / ${SCALE_MAX}`;
+  if (v && LEGACY_LABEL[v]) return LEGACY_LABEL[v];
+  return "—";
+}
+
+// A colour cue for an average: green when strong, orange in the middle, muted
+// when weak — so weak modules read at a glance, not just by their number.
+function scoreColor(avg: number | null): string {
+  if (avg === null) return "var(--text-faint)";
+  if (avg >= 7) return "var(--success)";
+  if (avg >= 4) return "var(--accent)";
+  return "var(--text-muted)";
+}
+
+// One dimension's rollup for a module: the mean of the 0–10 answers, how many
+// gave one, and how many older word-ratings were set aside.
+type DimStat = { avg: number | null; answered: number; legacy: number };
 
 type SummaryRow = {
   id: string;
@@ -45,12 +71,8 @@ type SummaryRow = {
   stageName: string;
   known: boolean; // false for a module_id in the data but not in the programme
   responses: number; // total rows for this module
-  useful: Dist;
-  usefulAnswered: number;
-  usefulScore: number | null; // 0–100, weighted; null when nothing answered
-  engaging: Dist;
-  engagingAnswered: number;
-  engagingScore: number | null;
+  useful: DimStat;
+  engaging: DimStat;
 };
 
 const MONTHS = [
@@ -78,16 +100,11 @@ function shortUser(userId: string): string {
   return userId.length > 8 ? `…${userId.slice(-6)}` : userId;
 }
 
-function pct(n: number, total: number): number {
-  return total === 0 ? 0 : Math.round((n / total) * 100);
-}
-
-// Weighted 0–100 score: very = 100, somewhat = 50, not really = 0. A single
-// number per dimension so "weakest first" sorting surfaces problem modules even
-// when the picture is split across the three buckets.
-function score(d: Dist, answered: number): number | null {
-  if (answered === 0) return null;
-  return Math.round(((d.very * 100 + d.somewhat * 50) / answered) * 10) / 10;
+// The mean of a list of 0–10 scores, to one decimal, or null when empty.
+function mean(nums: number[]): number | null {
+  if (nums.length === 0) return null;
+  const sum = nums.reduce((a, b) => a + b, 0);
+  return Math.round((sum / nums.length) * 10) / 10;
 }
 
 function csvEscape(v: string | null): string {
@@ -129,34 +146,27 @@ export default function AdminFeedbackView({
       byModule.set(r.moduleId, list);
     }
 
+    function dim(values: (string | null)[]): DimStat {
+      const scores: number[] = [];
+      let legacy = 0;
+      for (const v of values) {
+        const n = parseScore(v);
+        if (n !== null) scores.push(n);
+        else if (v !== null) legacy++; // a non-null value that isn't a 0–10 score
+      }
+      return { avg: mean(scores), answered: scores.length, legacy };
+    }
+
     function build(id: string, meta: ModuleMeta | null): SummaryRow {
       const rows = byModule.get(id) ?? [];
-      const useful: Dist = { very: 0, somewhat: 0, not_really: 0 };
-      const engaging: Dist = { very: 0, somewhat: 0, not_really: 0 };
-      let usefulAnswered = 0;
-      let engagingAnswered = 0;
-      for (const r of rows) {
-        if (r.useful) {
-          useful[r.useful as Rating]++;
-          usefulAnswered++;
-        }
-        if (r.engaging) {
-          engaging[r.engaging as Rating]++;
-          engagingAnswered++;
-        }
-      }
       return {
         id,
         title: meta?.title ?? "(unknown module)",
         stageName: meta ? `Stage ${meta.stageNumber} · ${meta.stageName}` : "—",
         known: meta !== null,
         responses: rows.length,
-        useful,
-        usefulAnswered,
-        usefulScore: score(useful, usefulAnswered),
-        engaging,
-        engagingAnswered,
-        engagingScore: score(engaging, engagingAnswered),
+        useful: dim(rows.map((r) => r.useful)),
+        engaging: dim(rows.map((r) => r.engaging)),
       };
     }
 
@@ -184,11 +194,11 @@ export default function AdminFeedbackView({
         bv = b.responses;
       } else if (sortKey === "useful") {
         // Modules with no answers sort last regardless of direction.
-        av = a.usefulScore ?? Infinity;
-        bv = b.usefulScore ?? Infinity;
+        av = a.useful.avg ?? Infinity;
+        bv = b.useful.avg ?? Infinity;
       } else {
-        av = a.engagingScore ?? Infinity;
-        bv = b.engagingScore ?? Infinity;
+        av = a.engaging.avg ?? Infinity;
+        bv = b.engaging.avg ?? Infinity;
       }
       return asc ? av - bv : bv - av;
     });
@@ -325,7 +335,10 @@ export default function AdminFeedbackView({
             <p style={S.eyebrow}>Admin · read-only</p>
             <h1 style={S.h1}>Pilot feedback</h1>
           </div>
-          <p style={S.signedIn}>Signed in as {adminEmail}</p>
+          <div style={S.headerRight}>
+            <p style={S.signedIn}>Signed in as {adminEmail}</p>
+            <AdminSignOut label="Sign out / switch account" />
+          </div>
         </header>
 
         <div style={S.statStrip}>
@@ -351,10 +364,10 @@ export default function AdminFeedbackView({
           <section>
             <div style={S.toolbar}>
               <p style={S.help}>
-                One row per module, in programme order. Click{" "}
-                <strong>Useful</strong> or <strong>Engaging</strong> to sort — the
-                weakest modules come first. Percentages are of the testers who
-                answered that question.
+                One row per module, in programme order. Scores are the average of
+                the testers&apos; 0–10 ratings (with the number who answered in
+                brackets). Click <strong>Useful</strong> or{" "}
+                <strong>Engaging</strong> to sort — the weakest modules come first.
               </p>
               <button style={S.csvBtn} onClick={exportModuleCsv}>
                 ↓ Download CSV
@@ -411,10 +424,10 @@ export default function AdminFeedbackView({
                         </td>
                         <td style={S.tdNum}>{row.responses}</td>
                         <td style={S.tdDist}>
-                          <RatingCell dist={row.useful} answered={row.usefulAnswered} />
+                          <AvgCell stat={row.useful} />
                         </td>
                         <td style={S.tdDist}>
-                          <RatingCell dist={row.engaging} answered={row.engagingAnswered} />
+                          <AvgCell stat={row.engaging} />
                         </td>
                       </tr>
                     ))}
@@ -631,43 +644,44 @@ function Th({
   );
 }
 
-function RatingCell({
-  dist,
-  answered,
-}: {
-  dist: Dist;
-  answered: number;
-}) {
-  if (answered === 0) {
-    return <span style={S.muted}>—</span>;
-  }
-  return (
-    <div>
-      <div style={S.bar} title={RATING_ORDER.map((r) => `${RATING_LABEL[r]}: ${dist[r]}`).join(" · ")}>
-        {RATING_ORDER.map((r) =>
-          dist[r] > 0 ? (
-            <div
-              key={r}
-              style={{
-                width: `${pct(dist[r], answered)}%`,
-                background: RATING_COLOR[r],
-                height: "100%",
-              }}
-            />
-          ) : null
+function AvgCell({ stat }: { stat: DimStat }) {
+  if (stat.avg === null) {
+    return (
+      <div>
+        <span style={S.muted}>—</span>
+        {stat.legacy > 0 && (
+          <div style={S.legacyNote}>{stat.legacy} legacy rating(s)</div>
         )}
       </div>
-      <div style={S.distText}>
-        {RATING_ORDER.map((r, i) => (
-          <span key={r}>
-            {i > 0 && " · "}
-            <span style={{ color: RATING_COLOR[r], fontWeight: 600 }}>
-              {pct(dist[r], answered)}%
-            </span>{" "}
-            {RATING_LABEL[r]}
-          </span>
-        ))}
+    );
+  }
+  const color = scoreColor(stat.avg);
+  return (
+    <div>
+      <div style={S.avgRow}>
+        <span style={{ ...S.avgNum, color }}>{stat.avg.toFixed(1)}</span>
+        <span style={S.avgOutOf}>/ {SCALE_MAX}</span>
+        <span style={S.avgCount}>
+          ({stat.answered} answered)
+        </span>
       </div>
+      <div
+        style={S.bar}
+        title={`Average ${stat.avg} out of ${SCALE_MAX} from ${stat.answered} rating(s)`}
+      >
+        <div
+          style={{
+            width: `${(stat.avg / SCALE_MAX) * 100}%`,
+            background: color,
+            height: "100%",
+          }}
+        />
+      </div>
+      {stat.legacy > 0 && (
+        <div style={S.legacyNote}>
+          + {stat.legacy} legacy rating(s), not in average
+        </div>
+      )}
     </div>
   );
 }
@@ -677,14 +691,14 @@ function RatingPill({
   value,
 }: {
   label: string;
-  value: Rating | null;
+  value: string | null;
 }) {
-  const text = value ? RATING_LABEL[value] : "—";
-  const color = value ? RATING_COLOR[value] : "var(--text-faint)";
+  const n = parseScore(value);
+  const color = scoreColor(n);
   return (
     <span style={S.ratingPill}>
       <span style={{ ...S.dot, background: color }} />
-      {label}: <strong>{text}</strong>
+      {label}: <strong>{ratingDisplay(value)}</strong>
     </span>
   );
 }
@@ -750,6 +764,12 @@ const S: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-serif)",
     fontSize: "var(--fs-title)",
     margin: "4px 0 0",
+  },
+  headerRight: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 8,
   },
   signedIn: { fontSize: "var(--fs-sm)", color: "var(--text-muted)", margin: 0 },
   statStrip: {
@@ -888,7 +908,7 @@ const S: Record<string, React.CSSProperties> = {
     fontVariantNumeric: "tabular-nums",
     fontWeight: 600,
   },
-  tdDist: { padding: "12px 14px", verticalAlign: "top", minWidth: 200 },
+  tdDist: { padding: "12px 14px", verticalAlign: "top", minWidth: 180 },
   bar: {
     display: "flex",
     width: "100%",
@@ -896,12 +916,22 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: "var(--r-pill)",
     overflow: "hidden",
     background: "var(--muted-surface)",
-  },
-  distText: {
-    fontSize: "var(--fs-eyebrow)",
-    color: "var(--text-muted)",
     marginTop: 6,
-    lineHeight: 1.5,
+  },
+  avgRow: { display: "flex", alignItems: "baseline", gap: 5 },
+  avgNum: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "22px",
+    fontWeight: 600,
+    lineHeight: 1,
+    fontVariantNumeric: "tabular-nums",
+  },
+  avgOutOf: { fontSize: "var(--fs-sm)", color: "var(--text-muted)" },
+  avgCount: { fontSize: "var(--fs-eyebrow)", color: "var(--text-muted)", marginLeft: 2 },
+  legacyNote: {
+    fontSize: "var(--fs-eyebrow)",
+    color: "var(--text-faint)",
+    marginTop: 5,
   },
   code: {
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",

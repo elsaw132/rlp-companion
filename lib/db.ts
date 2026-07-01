@@ -447,7 +447,13 @@ function ensureModuleFeedbackTable(): Promise<void> {
   return moduleFeedbackTableReady;
 }
 
-export type ModuleRating = "very" | "somewhat" | "not_really" | null;
+// A stored rating value. New submissions use the 0–10 scale, stored as the
+// string of the number ("0".."10"). A handful of early pilot rows used the old
+// three-point words ("very" | "somewhat" | "not_really"); those still read back
+// as-is (the admin portal treats them as legacy and keeps them out of the 0–10
+// averages). null means the question was skipped. The column has no DB-level
+// constraint, so the allowlist in /api/module-feedback is what bounds new writes.
+export type ModuleRating = string | null;
 
 // Record one per-module feedback submission. user_id always comes from the
 // authenticated Clerk session at the call site, never from client input.

@@ -7,9 +7,9 @@ import { insertModuleFeedback, type ModuleRating } from "@/lib/db";
 // and, unlike the support feedback route, send NO email — this fires up to 24
 // times per member, so alerting on each one would be spam.
 
-// The three allowed rating values; anything else (including a skipped question)
-// is stored as null.
-const RATINGS = new Set(["very", "somewhat", "not_really"]);
+// The allowed rating values: the strings "0".."10" (a 0–10 scale). Anything
+// else (including a skipped question) is stored as null.
+const RATINGS = new Set(Array.from({ length: 11 }, (_, i) => String(i)));
 
 function toRating(v: unknown): ModuleRating {
   return typeof v === "string" && RATINGS.has(v) ? (v as ModuleRating) : null;
