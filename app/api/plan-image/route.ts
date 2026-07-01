@@ -31,9 +31,13 @@ async function openai(path: string, key: string, body: unknown): Promise<Respons
   });
 }
 
+// The result of one image-model call: the data URL on success, plus the HTTP
+// status so the caller can tell a rate-limit (429) apart from other failures.
+type ImageResult = { image: string | null; status: number };
+
 // Primary: gpt-image-1, JPEG output so the base64 data URL is small (~150–300KB)
 // — important because the image is cached in the user_data row.
-async function viaGptImage1(key: string, prompt: string): Promise<string | null> {
+async function viaGptImage1(key: string, prompt: string): Promise<ImageResult> {
   const res = await openai("images/generations", key, {
     model: "gpt-image-1",
     prompt: `${prompt}\n\nStyle: ${STYLE}`,
@@ -46,16 +50,16 @@ async function viaGptImage1(key: string, prompt: string): Promise<string | null>
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     console.error(`[plan-image] gpt-image-1 — status=${res.status} ${detail.slice(0, 200)}`);
-    return null;
+    return { image: null, status: res.status };
   }
   const data = (await res.json()) as { data?: { b64_json?: string }[] };
   const b64 = data.data?.[0]?.b64_json;
-  return b64 ? `data:image/jpeg;base64,${b64}` : null;
+  return { image: b64 ? `data:image/jpeg;base64,${b64}` : null, status: 200 };
 }
 
 // Fallback: DALL·E 3 (widely available, no image verification needed). Returns a
 // PNG, requested at 1024x1024 to keep the cached data URL manageable.
-async function viaDalle3(key: string, prompt: string): Promise<string | null> {
+async function viaDalle3(key: string, prompt: string): Promise<ImageResult> {
   const res = await openai("images/generations", key, {
     model: "dall-e-3",
     prompt: `${prompt}\n\nStyle: ${STYLE}`,
@@ -67,19 +71,26 @@ async function viaDalle3(key: string, prompt: string): Promise<string | null> {
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     console.error(`[plan-image] dall-e-3 — status=${res.status} ${detail.slice(0, 200)}`);
-    return null;
+    return { image: null, status: res.status };
   }
   const data = (await res.json()) as { data?: { b64_json?: string }[] };
   const b64 = data.data?.[0]?.b64_json;
-  return b64 ? `data:image/png;base64,${b64}` : null;
+  return { image: b64 ? `data:image/png;base64,${b64}` : null, status: 200 };
 }
 
-async function generate(prompt: string): Promise<string | null> {
+// Try gpt-image-1, then DALL·E 3. rateLimited is true when a throttle (429) is
+// what stopped us, so the client can back off and retry rather than give up.
+async function generate(prompt: string): Promise<{ image: string | null; rateLimited: boolean }> {
   const key = process.env.OPENAI_API_KEY;
-  if (!key) return null;
+  if (!key) return { image: null, rateLimited: false };
   const primary = await viaGptImage1(key, prompt);
-  if (primary) return primary;
-  return viaDalle3(key, prompt);
+  if (primary.image) return { image: primary.image, rateLimited: false };
+  const fallback = await viaDalle3(key, prompt);
+  if (fallback.image) return { image: fallback.image, rateLimited: false };
+  return {
+    image: null,
+    rateLimited: primary.status === 429 || fallback.status === 429,
+  };
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -93,8 +104,10 @@ export async function POST(request: Request): Promise<Response> {
   if (!prompt) return Response.json({ image: null });
 
   try {
-    const image = await generate(prompt);
-    return Response.json({ image });
+    const { image, rateLimited } = await generate(prompt);
+    // Surface a throttle as 429 (with no image) so the client backs off and
+    // retries; every other outcome is a normal 200 with image or null.
+    return Response.json({ image }, rateLimited && !image ? { status: 429 } : undefined);
   } catch (error) {
     console.error("[plan-image] Unexpected error:", error);
     return Response.json({ image: null });

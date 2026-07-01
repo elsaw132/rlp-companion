@@ -319,7 +319,9 @@ async function migrateModuleIds(
 type ContextValue = {
   loading: boolean;
   snapshot: Record<string, unknown>;
-  setKey: (key: string, value: unknown) => Promise<void>;
+  // value may be a plain value or a functional updater (prev) => next, resolved
+  // against the latest stored value for race-safe merges.
+  setKey: (key: string, value: unknown | ((prev: unknown) => unknown)) => Promise<void>;
   removeKey: (key: string) => Promise<void>;
   removeAll: () => Promise<void>;
 };
@@ -399,12 +401,19 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   const setKey = useCallback(
     async (key: string, value: unknown) => {
-      commit({ ...snapshotRef.current, [key]: value });
+      // A functional updater resolves against the authoritative snapshotRef, so
+      // concurrent merges into the same key (e.g. several plan images landing at
+      // once) never clobber one another the way a stale read-then-write would.
+      const resolved =
+        typeof value === "function"
+          ? (value as (prev: unknown) => unknown)(snapshotRef.current[key])
+          : value;
+      commit({ ...snapshotRef.current, [key]: resolved });
       try {
         await fetch("/api/user-data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key, value }),
+          body: JSON.stringify({ key, value: resolved }),
         });
       } catch {
         // optimistic — UI already reflects it
@@ -953,7 +962,12 @@ export function useUserData() {
   };
 
   const savePlanImage = (slot: string, dataUrl: string) =>
-    setKey(KEYS.planImages, { ...getPlanImages(), [slot]: dataUrl });
+    // Functional updater so images generated concurrently (the pre-warm pool)
+    // each merge into the latest map rather than a stale snapshot read.
+    setKey(KEYS.planImages, (prev: unknown) => ({
+      ...((prev && typeof prev === "object" ? prev : {}) as Record<string, string>),
+      [slot]: dataUrl,
+    }));
 
   // ---- Closing commitment (a concrete plan entry) ----
   const getCommitment = (id: string): ScreeningCommitment | null => {
