@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ModuleFeedbackRow, FeedbackRow } from "@/lib/db";
+import AdminSignOut from "../AdminSignOut";
 
 // The read-only admin view over both feedback sources. All data is passed in
 // from the server page (already behind the admin gate), so everything here —
@@ -334,7 +335,10 @@ export default function AdminFeedbackView({
             <p style={S.eyebrow}>Admin · read-only</p>
             <h1 style={S.h1}>Pilot feedback</h1>
           </div>
-          <p style={S.signedIn}>Signed in as {adminEmail}</p>
+          <div style={S.headerRight}>
+            <p style={S.signedIn}>Signed in as {adminEmail}</p>
+            <AdminSignOut label="Sign out / switch account" />
+          </div>
         </header>
 
         <div style={S.statStrip}>
@@ -760,6 +764,12 @@ const S: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-serif)",
     fontSize: "var(--fs-title)",
     margin: "4px 0 0",
+  },
+  headerRight: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 8,
   },
   signedIn: { fontSize: "var(--fs-sm)", color: "var(--text-muted)", margin: 0 },
   statStrip: {
