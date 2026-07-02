@@ -29,6 +29,7 @@ import type { Takeaway } from "@/lib/takeaways";
 import type { Dreams } from "@/lib/dreams";
 import type { Stage3ValuesSummary } from "@/lib/stage3Seed";
 import type { StoredFact } from "@/lib/contextFacts";
+import type { RetirementStage } from "@/lib/userData";
 
 // ---- The read surface ----
 // The useUserData() hook satisfies this directly, so callers pass it straight
@@ -42,6 +43,7 @@ export type ModelSource = {
     partner?: string;
     horizon?: string;
     motivation?: string | null;
+    retirementStage?: RetirementStage;
   };
   // The canonical profile's active facts (phase 2). Optional so older callers and
   // fixtures still satisfy the surface; when present, the RLP reads values
@@ -78,6 +80,10 @@ export type UserModel = {
     withPartner: boolean | null;
     horizon: string | null;
     motivation: string | null;
+    // Where they are with work and retirement, or null if not recorded. Carried
+    // on the same rail as withPartner for later phases; nothing branches on it
+    // in the assembled plan yet.
+    retirementStage: RetirementStage | null;
   };
   // Core values, ordered by relative importance where it's known (the Stage 3
   // ranking). Each carries the person's own description and how settled it felt.
@@ -327,6 +333,7 @@ export function buildUserModel(source: ModelSource): UserModel {
             : null,
       horizon: onboarding.horizon?.trim() || null,
       motivation: onboarding.motivation?.trim() || null,
+      retirementStage: onboarding.retirementStage ?? null,
     },
     coreValues: coreValues(source),
     valueTensions: valueTensions(source),

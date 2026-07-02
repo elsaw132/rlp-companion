@@ -9,6 +9,7 @@ import {
   fearHorizonsFor,
   type Stage3SeedType,
 } from "@/lib/stage3Seed";
+import type { RetirementStage } from "@/lib/userData";
 
 // Pre-seeds a Stage 3 surface. The session container sends the module's seed
 // type and the assembled context (onboarding + earlier reflections + a Stage 3
@@ -29,6 +30,10 @@ type SeedRequest = {
   // Whether the person flagged a partner at onboarding. Used by the hopes-fears
   // seed to keep partner-only worries out of the bank for someone planning alone.
   hasPartner?: boolean;
+  // Where they are with work and retirement. Threaded on the same rail as
+  // hasPartner for later phases (which reframe the "transition" fear horizon per
+  // cohort); nothing branches on it yet.
+  retirementStage?: RetirementStage | null;
 };
 
 export const maxDuration = 30;
@@ -80,12 +85,16 @@ Return each horizon with its EXACT name from above and its chosen fears. JSON sh
 JSON shape: {"threads":["..."],"draft":""}`,
 };
 
-function systemPrompt(seedType: Stage3SeedType, hasPartner: boolean): string {
+function systemPrompt(
+  seedType: Stage3SeedType,
+  hasPartner: boolean,
+  retirementStage: RetirementStage | null
+): string {
   let spec = SEED_SPECS[seedType];
   if (seedType === "hopes-fears") {
     // Inject the fear bank, filtered to this person — a solo person never sees
     // the partner-only worries, so the model can't pick or personalise them.
-    const bank = fearHorizonsFor(hasPartner)
+    const bank = fearHorizonsFor(hasPartner, retirementStage)
       .map((h) => `${h.name}:\n${h.fears.map((f) => `  - ${f}`).join("\n")}`)
       .join("\n\n");
     spec = spec.replace("__FEAR_BANK__", bank);
@@ -137,7 +146,11 @@ export async function POST(request: Request) {
     const response = await anthropic.messages.create({
       model: HAIKU_MODEL,
       max_tokens: 900,
-      system: systemPrompt(seedType, body.hasPartner ?? false),
+      system: systemPrompt(
+        seedType,
+        body.hasPartner ?? false,
+        body.retirementStage ?? null
+      ),
       messages: [
         {
           role: "user",

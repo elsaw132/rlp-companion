@@ -61,6 +61,7 @@ export function buildPlanIntroRequest(
   return {
     name: plan.meta.name,
     withPartner: model.onboarding.withPartner,
+    retirementStage: model.onboarding.retirementStage,
     coreValues: introValues,
     roles: model.roles.all,
     mostAliveRoles: model.roles.mostAlive,

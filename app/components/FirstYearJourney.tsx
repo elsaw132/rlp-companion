@@ -441,6 +441,7 @@ export default function FirstYearJourney({
         userModel: userModelText,
         onboarding: onboardingContext,
         hasPartner,
+        retirementStage: userData.getRetirementStage(),
         goals: di.goals,
         rhythm: di.rhythm,
         seasonPriorities: di.seasonPriorities,

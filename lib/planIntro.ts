@@ -13,6 +13,8 @@
 // ONLY on the material it's given, cites the real things, and invents no motives
 // or patterns. Said less and true, never more and gilded.
 
+import type { RetirementStage } from "@/lib/userData";
+
 // The "see how it all connects" web: real, stated links between the member's
 // goals, values and the people who matter. Built only from connections the
 // member would recognise — never speculative associations.
@@ -62,6 +64,10 @@ export type PlanIntro = PlanProse;
 export type PlanIntroRequest = {
   name?: string | null;
   withPartner?: boolean | null;
+  // Where they are with work and retirement, or null when uncaptured. Carried on
+  // the same rail as withPartner for later phases; the prose writer ignores it
+  // for now.
+  retirementStage?: RetirementStage | null;
   coreValues?: { value: string; meaning?: string }[];
   roles?: string[];
   mostAliveRoles?: string[];

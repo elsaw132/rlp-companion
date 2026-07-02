@@ -250,6 +250,7 @@ export default function BalancedGoals({
           userModel: userModelText,
           onboarding: onboardingContext,
           hasPartner,
+          retirementStage: userData.getRetirementStage(),
           springboards: areas.map((a) => ({
             area: a.id,
             labels: seed.springboards

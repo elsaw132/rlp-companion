@@ -9,6 +9,7 @@
 // falls back to a small generic set so the surface always renders.
 
 import type { BalancedAreaId } from "@/lib/modules";
+import type { RetirementStage } from "@/lib/userData";
 import { BALANCED_AREAS } from "@/lib/userModel";
 
 // One intensity of a goal — a complete, standalone phrasing that reads clearly
@@ -47,6 +48,9 @@ export type BalancedGoalsDraftInput = {
   userModel: string;
   onboarding: string;
   hasPartner: boolean;
+  // Where they are with work and retirement, or null when uncaptured. Carried on
+  // the same rail as hasPartner for later phases; nothing branches on it yet.
+  retirementStage: RetirementStage | null;
   springboards: { area: string; labels: string[] }[];
 };
 

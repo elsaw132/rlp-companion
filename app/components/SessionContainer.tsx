@@ -746,6 +746,7 @@ export default function SessionContainer({
         userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
+        retirementStage: userData.getRetirementStage(),
         springboards,
       });
       if (draft) void userData.saveGoalSeed(sessionId, draft);
@@ -771,6 +772,7 @@ export default function SessionContainer({
         userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
+        retirementStage: userData.getRetirementStage(),
         goals,
       });
       if (draft) void userData.saveGoalPathSeed(sessionId, draft);
@@ -802,6 +804,7 @@ export default function SessionContainer({
         userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
+        retirementStage: userData.getRetirementStage(),
         goals,
         finance,
         values,
@@ -826,6 +829,7 @@ export default function SessionContainer({
         userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
+        retirementStage: userData.getRetirementStage(),
         goals: weekShapeGoalInputs(
           (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
         ),
@@ -862,6 +866,7 @@ export default function SessionContainer({
         userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
+        retirementStage: userData.getRetirementStage(),
         goals: firstYearGoalInputs(
           (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
         ),
@@ -1365,6 +1370,7 @@ export default function SessionContainer({
           carryForward: resolveSeedText(sessionId, userData.getActiveFacts()),
           priorBuilds,
           hasPartner: userData.hasPartner(),
+          retirementStage: userData.getRetirementStage(),
         }),
       });
       if (!res.ok) throw new Error(`Seed request failed: ${res.status}`);

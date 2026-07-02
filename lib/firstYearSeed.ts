@@ -17,6 +17,7 @@ import type {
   WeekShapeResult,
 } from "@/lib/modules";
 import { transitionShape, type TransitionShape } from "@/lib/weekShapeSeed";
+import type { RetirementStage } from "@/lib/userData";
 
 export { transitionShape, type TransitionShape };
 
@@ -92,6 +93,9 @@ export type FirstYearDraftInput = {
   userModel: string;
   onboarding: string;
   hasPartner: boolean;
+  // Where they are with work and retirement, or null when uncaptured. Carried on
+  // the same rail as hasPartner for later phases; nothing branches on it yet.
+  retirementStage: RetirementStage | null;
   goals: FirstYearGoal[];
   rhythm: FirstYearRhythm[];
   // The early-leaning priorities from 4.2, plus the season order so the model

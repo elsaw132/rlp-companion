@@ -156,6 +156,10 @@ const CATEGORY_LABEL: Record<FactCategory, string> = {
   first_year_plan: "Their first-year picture",
   concern: "Concerns they've raised",
   onboarding_fact: "About them",
+  wind_down_exit: "How and when they'll leave work",
+  retirement_onset: "How leaving work came about",
+  unfinished_work: "Work threads they left unfinished",
+  keep_change_leave: "What they'd keep, change, or leave behind",
 };
 
 function renderFact(f: ResolvedFact): string {
