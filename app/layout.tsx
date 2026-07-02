@@ -1,6 +1,21 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
+import { Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
+
+// Self-hosted via next/font: the font files are served from our own domain and
+// preloaded, so there are no render-blocking requests to Google on each visit.
+// Each exposes a CSS variable that tokens.css feeds into --font-sans/--font-serif.
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+const sourceSerif = Source_Serif_4({
+  subsets: ["latin"],
+  variable: "--font-source-serif",
+  display: "swap",
+});
 import { UserDataProvider } from "@/lib/userData";
 import FeedbackButton from "./components/FeedbackButton";
 import { Analytics } from "@vercel/analytics/next";
@@ -17,12 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      </head>
+    <html lang="en" className={`h-full ${inter.variable} ${sourceSerif.variable}`}>
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
           <UserDataProvider>{children}</UserDataProvider>
