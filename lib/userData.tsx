@@ -57,10 +57,27 @@ import { stripStructuredLeak } from "@/lib/coachText";
 // Shifts surface tone only — never the structural coaching rules.
 export type CoachTone = "warm" | "professional" | "playful";
 
+// Where the person is with work and retirement, captured at onboarding (behind
+// the RETIREMENT_PATHS flag). Threaded through the same rails as hasPartner so
+// later phases can adapt content per cohort; nothing branches on it yet.
+//   working          — still working, planning ahead
+//   winding_down     — phasing out of work now
+//   recently_retired — retired within about the last 18 months
+//   established      — retired longer than that
+export type RetirementStage =
+  | "working"
+  | "winding_down"
+  | "recently_retired"
+  | "established";
+
 export type OnboardingAnswers = {
   partner?: string;
   horizon?: string;
   motivation?: string | null;
+  // Where they are with work and retirement. Absent for existing users and
+  // anyone onboarded with the RETIREMENT_PATHS flag off — read through
+  // getRetirementStage(), which returns null when it isn't set.
+  retirementStage?: RetirementStage;
   // Date of birth, ISO YYYY-MM-DD. Optional: existing users and anyone who skips
   // it have none, and every age-dependent path degrades gracefully without it.
   // Used to compute real age at read time (the 2.6 hearing-check gate).
@@ -648,6 +665,18 @@ export function useUserData() {
     return p === "Yes" || p === "Me and my partner";
   };
 
+  // Where they are with work and retirement, or null when it was never captured
+  // (existing users, or anyone onboarded with the RETIREMENT_PATHS flag off).
+  const getRetirementStage = (): RetirementStage | null => {
+    const s = getOnboarding().retirementStage;
+    return s === "working" ||
+      s === "winding_down" ||
+      s === "recently_retired" ||
+      s === "established"
+      ? s
+      : null;
+  };
+
   // The register Vita should use, defaulting to "warm" (the pre-selected option)
   // for anyone who hasn't set one.
   const getCoachTone = (): CoachTone => {
@@ -672,6 +701,25 @@ export function useUserData() {
       return nameSentence || "Nothing recorded yet.";
     }
 
+    // Where they are with work and retirement — its own sentence, so Vita's
+    // tense can adapt globally (the framing directive in the base prompt reads
+    // it). Empty when unset, so it drops out for anyone onboarded before the
+    // RETIREMENT_PATHS flag and leaves the context identical to before.
+    const statusSentence = ((): string => {
+      switch (answers.retirementStage) {
+        case "working":
+          return "They're still working and planning ahead for retirement.";
+        case "winding_down":
+          return "They're winding down — phasing out of work now.";
+        case "recently_retired":
+          return "They retired recently, within about the last 18 months, and are still settling into it.";
+        case "established":
+          return "They've been retired for a good while now.";
+        default:
+          return "";
+      }
+    })();
+
     const parts: string[] = [];
     // "Yes"/"No" are the current answers; the older "Me and my partner"/"Just me"
     // values are still honoured for anyone who answered before the change.
@@ -690,7 +738,9 @@ export function useUserData() {
     if (answers.motivation) {
       sentence += `${sentence ? " " : ""}What prompted them to start: ${answers.motivation.toLowerCase()}.`;
     }
-    const combined = [nameSentence, sentence.trim()].filter(Boolean).join(" ");
+    const combined = [nameSentence, statusSentence, sentence.trim()]
+      .filter(Boolean)
+      .join(" ");
     return combined || "Nothing recorded yet.";
   };
 
@@ -1037,6 +1087,7 @@ export function useUserData() {
     getOnboarding,
     saveOnboarding,
     hasPartner,
+    getRetirementStage,
     getCoachTone,
     buildOnboardingContext,
     getStage1Reveal,

@@ -70,7 +70,14 @@ export type FactCategory =
   | "week_plan"
   | "first_year_plan"
   | "concern"
-  | "onboarding_fact";
+  | "onboarding_fact"
+  // Retirement-paths categories (registered in Phase 1; written by later
+  // phases). Defined and validated now so the store is ready — nothing writes
+  // to them yet.
+  | "wind_down_exit" // how + when they'll leave (winding module, Phase 3)
+  | "retirement_onset" // how leaving came about — chosen / circumstantial
+  | "unfinished_work" // a work thread they left unfinished
+  | "keep_change_leave"; // current-retirement elements: keep / change / leave behind
 
 // The five life areas a recurring_activity (and a goal) can belong to. Named to
 // match the balanced-goals area ids, capitalised per Appendix A's Restore/Move/

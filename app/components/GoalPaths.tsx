@@ -169,6 +169,7 @@ export default function GoalPaths({
           userModel: userModelText,
           onboarding: onboardingContext,
           hasPartner,
+          retirementStage: userData.getRetirementStage(),
           goals: goalInputs,
         }));
       if (cancelled) return;

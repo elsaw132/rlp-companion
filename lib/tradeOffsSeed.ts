@@ -16,6 +16,7 @@ import type {
   ReadinessSnapshotResult,
 } from "@/lib/modules";
 import type { Stage3ValuesSummary } from "@/lib/stage3Seed";
+import type { RetirementStage } from "@/lib/userData";
 
 // One drafted trade-off — the framing only. The person supplies where they lean
 // and the two free-text answers on the surface.
@@ -62,6 +63,9 @@ export type TradeOffsDraftInput = {
   userModel: string;
   onboarding: string;
   hasPartner: boolean;
+  // Where they are with work and retirement, or null when uncaptured. Carried on
+  // the same rail as hasPartner for later phases; nothing branches on it yet.
+  retirementStage: RetirementStage | null;
   goals: TradeOffGoal[];
   finance: FinanceSignal | null;
   values: ValueInput[];

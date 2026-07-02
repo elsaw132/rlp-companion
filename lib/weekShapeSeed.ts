@@ -16,6 +16,7 @@ import type {
   BalancedGoalsResult,
   ReadinessSnapshotResult,
 } from "@/lib/modules";
+import type { RetirementStage } from "@/lib/userData";
 
 // The rough frequencies — the grain people can answer this far out. These strings
 // are exactly what the result stores and what the component renders as options.
@@ -74,6 +75,9 @@ export type WeekShapeDraftInput = {
   userModel: string;
   onboarding: string;
   hasPartner: boolean;
+  // Where they are with work and retirement, or null when uncaptured. Carried on
+  // the same rail as hasPartner for later phases; nothing branches on it yet.
+  retirementStage: RetirementStage | null;
   goals: WeekShapeGoal[];
   transition: TransitionShape | null;
   // The person's real, recurring activities — drawn from structured

@@ -4,7 +4,24 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import ProviderBand from "../components/ProviderBand";
-import { useUserData, type CoachTone } from "@/lib/userData";
+import {
+  useUserData,
+  type CoachTone,
+  type RetirementStage,
+} from "@/lib/userData";
+import { RETIREMENT_PATHS } from "@/lib/flags";
+
+// Where the person is with work and retirement, asked before the horizon and
+// motivation questions when the RETIREMENT_PATHS flag is on. Each label maps to a
+// stable RetirementStage code stored against the user. The two not-yet-retired
+// stages (working / winding_down) are the only ones that go on to see the
+// horizon and motivation questions.
+const STATUS_OPTIONS: { label: string; value: RetirementStage }[] = [
+  { label: "Still working, planning ahead", value: "working" },
+  { label: "Winding down / phasing out of work", value: "winding_down" },
+  { label: "Retired in the last 18 months or so", value: "recently_retired" },
+  { label: "Retired longer than that", value: "established" },
+];
 
 const HORIZON_OPTIONS = [
   "Less than 2 years",
@@ -37,16 +54,56 @@ export default function OnboardingPage() {
   const data = useUserData();
   const router = useRouter();
 
-  const [step, setStep] = useState(1);
+  // The flow is an ordered list of step keys, and stepIndex points at the current
+  // one. The list is computed each render (below) from the flag and the chosen
+  // status, so inserting the status step and gating horizon/motivation never
+  // needs the handlers to know fixed step numbers.
+  const [stepIndex, setStepIndex] = useState(0);
   const [understood, setUnderstood] = useState(false);
   const [name, setName] = useState("");
   const [nameInit, setNameInit] = useState(false);
   const [partner, setPartner] = useState("");
   const [dob, setDob] = useState("");
+  const [statusLabel, setStatusLabel] = useState("");
+  const [retirementStage, setRetirementStage] = useState<RetirementStage | "">(
+    ""
+  );
   const [horizon, setHorizon] = useState("");
   const [motivation, setMotivation] = useState("");
   // Pre-select "Warm and friendly" — it's the default, not the only proper choice.
   const [tone, setTone] = useState<CoachTone>("warm");
+
+  // Horizon + motivation are only relevant to someone not yet retired. With the
+  // flag off they're always shown (today's flow); with it on they're gated to the
+  // two not-yet-retired stages. Retired stages skip both entirely.
+  const notYetRetired =
+    retirementStage === "working" || retirementStage === "winding_down";
+  const showHorizonMotivation = !RETIREMENT_PATHS || notYetRetired;
+
+  type StepKey =
+    | "welcome"
+    | "name"
+    | "partner"
+    | "dob"
+    | "status"
+    | "horizon"
+    | "motivation"
+    | "tone";
+
+  const steps: StepKey[] = [
+    "welcome",
+    "name",
+    "partner",
+    "dob",
+    ...(RETIREMENT_PATHS ? (["status"] as StepKey[]) : []),
+    ...(showHorizonMotivation ? (["horizon", "motivation"] as StepKey[]) : []),
+    "tone",
+  ];
+  // The status step (when shown) only ever inserts horizon/motivation AFTER
+  // itself, so advancing by one index is always safe — nothing before the current
+  // position shifts.
+  const current = steps[stepIndex];
+  const goNext = () => setStepIndex((i) => i + 1);
 
   // Once the data layer has loaded (running the one-time migration if needed),
   // anyone who has already finished onboarding is sent straight to /home — they
@@ -89,27 +146,27 @@ export default function OnboardingPage() {
       <main className="rlp-onb">
         <style>{css}</style>
         <div className="column">
-          {step === 1 && (
+          {current === "welcome" && (
             <Welcome
               firstName={user?.firstName?.trim() || ""}
               understood={understood}
               setUnderstood={setUnderstood}
-              onContinue={() => setStep(2)}
+              onContinue={goNext}
             />
           )}
 
-          {step === 2 && (
+          {current === "name" && (
             <NameStep
               name={name}
               setName={setName}
               onContinue={() => {
                 if (name.trim()) data.setPreferredName(name.trim());
-                setStep(3);
+                goNext();
               }}
             />
           )}
 
-          {step === 3 && (
+          {current === "partner" && (
             <CardStep
               heading="Do you have a partner?"
               options={PARTNER_OPTIONS}
@@ -133,25 +190,45 @@ export default function OnboardingPage() {
               }
               onContinue={() => {
                 data.saveOnboarding({ partner });
-                setStep(4);
+                goNext();
               }}
               buttonLabel="Continue"
             />
           )}
 
-          {step === 4 && (
+          {current === "dob" && (
             <DateStep
               dob={dob}
               setDob={setDob}
               onContinue={() => {
                 if (dob.trim()) data.saveOnboarding({ dob: dob.trim() });
-                setStep(5);
+                goNext();
               }}
-              onSkip={() => setStep(5)}
+              onSkip={goNext}
             />
           )}
 
-          {step === 5 && (
+          {current === "status" && (
+            <CardStep
+              heading="Where are you with work and retirement?"
+              options={STATUS_OPTIONS.map((s) => s.label)}
+              selected={statusLabel}
+              onSelect={setStatusLabel}
+              onContinue={() => {
+                const match = STATUS_OPTIONS.find(
+                  (s) => s.label === statusLabel
+                );
+                if (match) {
+                  setRetirementStage(match.value);
+                  data.saveOnboarding({ retirementStage: match.value });
+                }
+                goNext();
+              }}
+              buttonLabel="Continue"
+            />
+          )}
+
+          {current === "horizon" && (
             <CardStep
               heading="Roughly how far from retirement are you?"
               options={HORIZON_OPTIONS}
@@ -159,13 +236,13 @@ export default function OnboardingPage() {
               onSelect={setHorizon}
               onContinue={() => {
                 data.saveOnboarding({ horizon });
-                setStep(6);
+                goNext();
               }}
               buttonLabel="Continue"
             />
           )}
 
-          {step === 6 && (
+          {current === "motivation" && (
             <CardStep
               heading="What's prompted you to start thinking about retirement?"
               options={MOTIVATION_OPTIONS}
@@ -173,17 +250,17 @@ export default function OnboardingPage() {
               onSelect={setMotivation}
               onContinue={async () => {
                 await data.saveOnboarding({ motivation });
-                setStep(7);
+                goNext();
               }}
               buttonLabel="Continue"
               onSkip={async () => {
                 await data.saveOnboarding({ motivation: null });
-                setStep(7);
+                goNext();
               }}
             />
           )}
 
-          {step === 7 && (
+          {current === "tone" && (
             <CardStep
               heading="How would you like Vita, our AI coach, to talk with you?"
               options={TONE_OPTIONS.map((t) => t.label)}

@@ -11,6 +11,7 @@
 // generic path so the surface always renders.
 
 import type { BalancedGoalsResult, GoalPathsResult } from "@/lib/modules";
+import type { RetirementStage } from "@/lib/userData";
 
 // One stepping stone on a do/achieve ladder. `when` is an optional ROUGH sense
 // of timing (never a date); `done` marks a rung already behind the person.
@@ -45,6 +46,9 @@ export type GoalPathsDraftInput = {
   userModel: string;
   onboarding: string;
   hasPartner: boolean;
+  // Where they are with work and retirement, or null when uncaptured. Carried on
+  // the same rail as hasPartner for later phases; nothing branches on it yet.
+  retirementStage: RetirementStage | null;
   goals: GoalPathInput[];
 };
 

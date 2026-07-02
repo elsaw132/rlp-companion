@@ -66,6 +66,7 @@ export async function POST(request: Request) {
         userModel: "",
         onboarding: "",
         hasPartner: false,
+        retirementStage: null,
         goals: [],
         transition: null,
         recurring: [],
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
     userModel: typeof body.userModel === "string" ? body.userModel : "",
     onboarding: typeof body.onboarding === "string" ? body.onboarding : "",
     hasPartner: body.hasPartner === true,
+    retirementStage: body.retirementStage ?? null,
     goals: Array.isArray(body.goals) ? body.goals : [],
     transition: body.transition ?? null,
     recurring: Array.isArray(body.recurring)

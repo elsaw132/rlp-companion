@@ -373,6 +373,7 @@ const REAL_CATEGORIES = new Set<FactCategory>([
   "social_balance_pref", "commitment", "strength", "value", "value_priority",
   "hope", "fear", "meaning_thread", "readiness", "chapter", "goal", "goal_path",
   "principle", "week_plan", "first_year_plan", "concern", "onboarding_fact",
+  "wind_down_exit", "retirement_onset", "unfinished_work", "keep_change_leave",
 ]);
 
 // Check the manifest table for structural errors. Returns a list of problems

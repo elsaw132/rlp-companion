@@ -10,6 +10,8 @@
 // JSON, sparse inputs) falls back to a safe generic seed — the surface must
 // always render with something on it.
 
+import type { RetirementStage } from "@/lib/userData";
+
 // One inferred candidate with a short evidence line in the person's own terms,
 // e.g. { label: "Curiosity", evidence: "showed up when you talked about
 // astronomy in Keeping Your Mind Alive" }.
@@ -207,8 +209,13 @@ export const PARTNER_FEARS: Set<string> = new Set([
 // otherwise the bank with the partner-only worries removed (empty horizons are
 // kept so the three horizons stay stable).
 export function fearHorizonsFor(
-  hasPartner: boolean
+  hasPartner: boolean,
+  // Where they are with work and retirement, carried on the same rail as
+  // hasPartner for later phases (which will reframe the "transition" horizon per
+  // cohort). Accepted now so callers can thread it; nothing branches on it yet.
+  _retirementStage: RetirementStage | null = null
 ): { name: string; fears: string[] }[] {
+  void _retirementStage; // reserved for later phases; nothing branches on it yet
   if (hasPartner) return FEAR_HORIZONS;
   return FEAR_HORIZONS.map((h) => ({
     name: h.name,
