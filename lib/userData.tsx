@@ -155,6 +155,17 @@ const KEYS = {
   planImages: "plan-images-v4",
 };
 
+// Versioned key families where only the current version (per KEYS above) should
+// live in a user's data. Older siblings are pruned on load, so superseded blobs
+// — e.g. a previous `plan-images` version — can never accumulate and bloat the
+// snapshot the way an 8.5 MB orphan once did. The "keep" value is read straight
+// from KEYS, so bumping a version needs no other change here.
+const VERSIONED_FAMILIES: { current: string; pattern: RegExp }[] = [
+  { current: KEYS.planImages, pattern: /^plan-images(-v\d+)?$/ },
+  { current: KEYS.planIntro, pattern: /^plan-prose(-v\d+)?$/ },
+  { current: KEYS.planSelfIntroEdits, pattern: /^plan-self-intro(-v\d+)?$/ },
+];
+
 // The Stage 1 opening capture ("Where you're starting from") is stored as a
 // takeaway under its own id, kept deliberately distinct from any real module id
 // (1.day, 1.money, …) so it never counts as a module or shows up in module-driven
@@ -397,6 +408,23 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       // a no-op once a user's data is already on the new ids.
       data = await migrateModuleIds(data);
 
+      // Prune superseded versions of versioned key families (e.g. old plan-images
+      // blobs) so stale data can't pile up and bloat the snapshot. Removes them
+      // from the in-memory snapshot and, best-effort, from the database.
+      for (const staleKey of Object.keys(data)) {
+        const isStale = VERSIONED_FAMILIES.some(
+          (f) => staleKey !== f.current && f.pattern.test(staleKey)
+        );
+        if (isStale) {
+          delete data[staleKey];
+          void fetch("/api/user-data", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: staleKey }),
+          }).catch(() => {});
+        }
+      }
+
       if (cancelled || loadedFor.current !== userId) return;
       commit(data);
       setLoading(false);
@@ -497,7 +525,8 @@ export function useUserData() {
   const clearModuleComplete = (moduleId: string) =>
     setKey(KEYS.completed, getCompletedIds().filter((id) => id !== moduleId));
 
-  const getActiveStage = (): number => getActiveStageNumber(getCompletedIds());
+  const getActiveStage = (): number =>
+    getActiveStageNumber(getCompletedIds(), getRetirementStage());
 
   // ---- Per-module feedback prompt (once-per-module dedup) ----
   // The ids of modules for which the close-of-module feedback card has already
@@ -575,14 +604,16 @@ export function useUserData() {
     });
 
   const hasPriorTakeaways = (moduleId: string): boolean =>
-    getModulesBefore(moduleId).some((m) => getTakeaway(m.id));
+    getModulesBefore(moduleId, getRetirementStage()).some((m) =>
+      getTakeaway(m.id)
+    );
 
   const buildPriorReflections = (
     moduleId: string,
     includeStartingThoughts = false
   ): string => {
     const fallback = "No earlier modules completed yet.";
-    const lines = getModulesBefore(moduleId).flatMap((m) => {
+    const lines = getModulesBefore(moduleId, getRetirementStage()).flatMap((m) => {
       const t = getTakeaway(m.id);
       // Guard against a takeaway that was stored as raw {thirdPerson,...} JSON, so
       // the model is never fed the structure to echo back.
