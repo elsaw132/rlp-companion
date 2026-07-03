@@ -359,6 +359,32 @@ function factsFromBuildRaw(moduleId: string, result: BuildResult): DraftFact[] {
       ];
     }
 
+    // Winding-down only — the wind-down context module (Phase 3). Writes an
+    // exit fact ONLY when they've settled a plan; a rough window / still-open
+    // answer goes to the 4.1 readiness widget instead, so Phase 5's §8 reads
+    // whichever source exists. The reasoning and feelings behind the decision are
+    // drawn out in conversation and land in the module's takeaway.
+    case "1.winddown": {
+      if (result.type !== "screening-check") return [];
+      const r = result as ScreeningCheckResult;
+      const choiceOf = (id: string) =>
+        r.answers.find((a) => a.id === id)?.choice ?? "";
+      const decision = choiceOf("decision");
+      if (decision !== "A set date or plan") return [];
+      return [
+        draft(
+          "wind_down_exit",
+          {
+            label: "Has a settled plan for how and when to leave work fully",
+            decision,
+            currentShape: choiceOf("shape"),
+            windingDuration: choiceOf("duration"),
+          },
+          "1.winddown"
+        ),
+      ];
+    }
+
     // ---- Stage 2 — Explore ----
     case "2.1": {
       if (result.type !== "composite") return [];

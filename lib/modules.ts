@@ -3,6 +3,9 @@
 // Private field (Vita only, never shown to the user): sessionInstructions.
 // Readings/videos are placeholders for now — replace the primer blocks when the real content is ready.
 
+import type { RetirementStage } from "@/lib/userData";
+import { RETIREMENT_PATHS } from "@/lib/flags";
+
 // An optional step between the reading and the conversation, where the person
 // builds something Vita then opens from. Only "day-builder" exists so far; the
 // union is ready to grow as new interaction types are added.
@@ -851,7 +854,34 @@ export type Module = {
   // validate — restating two plain answers is just noise. Leave unset for richer
   // modules (purpose, roles, people) where the mirror turn earns its place.
   closeInOneStep?: boolean;
+  // When set, this module is shown ONLY to people in one of these retirement
+  // stages (Phase 3, behind the RETIREMENT_PATHS flag). Undefined = everyone
+  // (the default for every existing module). Filtered out of ordering, gating,
+  // progress and the dashboard for anyone else, so with the flag off or for a
+  // non-matching stage the programme is byte-identical to today. See
+  // moduleVisibleFor / visibleModules below.
+  audience?: RetirementStage[];
 };
+
+// Whether a module is visible to someone in the given retirement stage. A module
+// with no `audience` is universal. An audience-restricted module appears only
+// when the flag is on AND the person's stage is in its audience — so rs=null (the
+// default everywhere that doesn't thread a stage) hides it, keeping today's
+// behaviour unchanged.
+export function moduleVisibleFor(
+  m: Module,
+  rs: RetirementStage | null
+): boolean {
+  if (!m.audience) return true;
+  if (!RETIREMENT_PATHS) return false;
+  return rs !== null && m.audience.includes(rs);
+}
+
+// A stage's modules filtered to those visible for this retirement stage, in
+// order. This is the single lens all ordering/gating/progress goes through.
+export function visibleModules(stage: Stage, rs: RetirementStage | null): Module[] {
+  return stage.modules.filter((m) => moduleVisibleFor(m, rs));
+}
 
 // Copy for a module's post-conversation commitment widget: Vita's prompt, the
 // tappable cadence options, and the optional one-line next-action field.
@@ -1022,6 +1052,76 @@ export const STAGES: Stage[] = [
       buttonLabel: "Let's begin",
     },
     modules: [
+      // Winding-down only (Phase 3): a brief context-setter shown FIRST in
+      // Imagine, so the rest of the stage builds on where they already are.
+      // audience hides it from everyone else, keeping Imagine at five modules.
+      {
+        id: "1.winddown",
+        title: "Your wind-down so far",
+        description:
+          "A quick picture of where you are with winding down — the shape of it now, and how it's felt so far.",
+        durationMin: 5,
+        audience: ["winding_down"],
+        primer: [
+          {
+            type: "text",
+            value: `Winding down is its own stage: one foot in work, one stepping into what's next. You've already started the shift, which gives you a head start on picturing the rest. First, a quick picture of where you are.`,
+          },
+        ],
+        interaction: {
+          type: "screening-check",
+          instruction:
+            "A few quick taps to set the scene. There's no right answer — just what's true for you right now.",
+          summaryLabel: "Where you are with winding down",
+          questions: [
+            {
+              id: "shape",
+              prompt: "How much are you still working?",
+              options: [
+                "Most of the week",
+                "About half",
+                "A day or two",
+                "Very little",
+              ],
+            },
+            {
+              id: "duration",
+              prompt: "How long have you been winding down?",
+              options: [
+                "Just started",
+                "Under a year",
+                "One to two years",
+                "Longer than that",
+              ],
+            },
+            {
+              id: "decision",
+              prompt:
+                "Have you decided how and when you'll leave work altogether?",
+              options: ["A set date or plan", "A rough window", "Not yet — still open"],
+            },
+          ],
+        },
+        coachOpening: `Thanks — that gives me a clear sense of where you are. On the whole, how have you found winding down so far — what's been good about it, and what's been more of an adjustment?`,
+        sessionInstructions: `PURPOSE
+This is the first module of the programme for someone who is already winding down — one foot in work, one stepping into what's next. It's brief and mostly about context: get a warm, real picture of where they are, so everything that follows builds on it. They've just tapped how much they're still working, how long they've been winding down, and whether they've decided how and when they'll leave work altogether (shown under WHAT THEY BUILT). Reflect that back and draw out one genuine thread — don't dwell or turn it into a full session.
+
+HOW TO RUN IT
+- Open by reflecting their situation back warmly and specifically, using what they tapped: how much they're still working and how long they've been at it. Then take their answer to how winding down has felt.
+- Pick up ONE genuine thread from what they say — something good, or something they're finding an adjustment — and stay with it briefly. One or two exchanges, not a deep dive.
+- Look at their answer to the decision question (under WHAT THEY BUILT):
+  - If they have "A set date or plan": they've decided. Gently ask how they came to that decision — what settled it — and how they feel about it now the end is in view. Draw out both the reasoning and the emotion, lightly. Don't relitigate the decision or push on the date.
+  - If "A rough window" or "Not yet — still open": they haven't fully decided, and that's completely fine. Note warmly that there's a module in the Plan stage that looks at the shape and timing of the rest properly, so they don't need to work it out now.
+- Keep the whole thing short and warm — a few exchanges.
+
+MUST NOT
+- Don't treat winding down as a problem to fix or a loss to mourn. It's a stage with its own texture; meet it as that.
+- Don't push toward a leaving date, and don't imply that leaving sooner (or staying longer) is the better choice.
+- Don't pile on praise, and don't over-interpret. Keep it plain.
+
+CLOSING
+Briefly reflect what you've heard — where they are with winding down, and the one thread that stood out — and check it feels right. Note warmly that this sets the scene, and that the next modules help them picture the retirement the wind-down is leading toward.`,
+      },
       {
         id: "1.day",
         title: "A day in your retirement",
@@ -3072,18 +3172,22 @@ A short, warm sign-off — one or two sentences. Note that this first-year pictu
   },
 ];
 
-// Look up a module by its id (e.g. "1.day"), with the stage context the session screen needs.
-export function getModule(id: string) {
+// Look up a module by its id (e.g. "1.day"), with the stage context the session
+// screen needs. `rs` scopes visibility: an audience-restricted module is found
+// only for a matching stage, and modulesInStage / stageModuleIds count only the
+// modules that stage actually sees. rs omitted (=null) → today's universal set.
+export function getModule(id: string, rs: RetirementStage | null = null) {
   for (const stage of STAGES) {
-    const found = stage.modules.find((m) => m.id === id);
+    const mods = visibleModules(stage, rs);
+    const found = mods.find((m) => m.id === id);
     if (found) {
       return {
         module: found,
         stageNumber: stage.number,
         stageName: stage.name,
         totalStages: TOTAL_STAGES,
-        modulesInStage: stage.modules.length,
-        stageModuleIds: stage.modules.map((m) => m.id),
+        modulesInStage: mods.length,
+        stageModuleIds: mods.map((m) => m.id),
       };
     }
   }
@@ -3093,10 +3197,13 @@ export function getModule(id: string) {
 // Every module that comes before the given id in programme order (across all
 // stages), as { id, title }, in order. Empty if it's the first module or the id
 // isn't found. Used to gather earlier takeaways for the current module.
-export function getModulesBefore(id: string): { id: string; title: string }[] {
+export function getModulesBefore(
+  id: string,
+  rs: RetirementStage | null = null
+): { id: string; title: string }[] {
   const ordered: { id: string; title: string }[] = [];
   for (const stage of STAGES) {
-    for (const m of stage.modules) {
+    for (const m of visibleModules(stage, rs)) {
       if (m.id === id) return ordered;
       ordered.push({ id: m.id, title: m.title });
     }
@@ -3133,13 +3240,152 @@ export function allModulesInOrder(): {
 }
 
 // The id of the next module in the same stage, or null if this is the last one.
-export function getNextModule(id: string): string | null {
+// rs scopes visibility so the chain skips modules this person doesn't see.
+export function getNextModule(
+  id: string,
+  rs: RetirementStage | null = null
+): string | null {
   for (const stage of STAGES) {
-    const index = stage.modules.findIndex((m) => m.id === id);
+    const mods = visibleModules(stage, rs);
+    const index = mods.findIndex((m) => m.id === id);
     if (index !== -1) {
-      const next = stage.modules[index + 1];
+      const next = mods[index + 1];
       return next ? next.id : null;
     }
   }
   return null;
 }
+
+// ---- Winding-down: module 1.winddown → 4.1 routing (Phase 3) ----------------
+
+// Whether a winding-down person's wind-down module says they've settled how and
+// when they'll leave work. Read from the 1.winddown build (a screening-check).
+// "A set date or plan" is the only truly-decided answer; "A rough window" and
+// "Not yet — still open" still need the readiness work, so they count as not
+// decided here.
+export function windDownDecided(build: BuildResult | null): boolean {
+  if (!build || build.type !== "screening-check") return false;
+  const answer = build.answers.find((a) => a.id === "decision");
+  return answer?.choice === "A set date or plan";
+}
+
+// The 4.1 module content for a winding-down person, chosen by whether they've
+// decided how/when they'll leave (see windDownDecided). Two shapes:
+//   decided   → an anticipatory REFLECTION (no readiness widget): they've settled
+//               the plan, so this draws out what they'll miss and what they want
+//               to carry or replace as they approach leaving fully. The exit shape
+//               itself is already captured as a wind_down_exit fact in 1.winddown.
+//   undecided → the working readiness widget, RE-ANCHORED to completing an exit
+//               they've already begun: the shape and timing of the rest of the
+//               wind-down and their readiness for the final step, not a decision
+//               made from scratch.
+// baseInteraction is 4.1's own readiness-snapshot interaction, re-labelled for
+// the undecided path and dropped entirely for the decided one.
+export function windDownFourOne(
+  decided: boolean,
+  baseInteraction: Interaction | undefined
+): {
+  description: string;
+  primer: ContentBlock[];
+  coachOpening: string;
+  sessionInstructions: string;
+  interaction: Interaction | undefined;
+} {
+  if (decided) {
+    return {
+      description:
+        "A short reflection as you approach leaving work fully — what you'll miss, and what you want to carry with you or replace.",
+      primer: [
+        {
+          type: "text",
+          value: `You've already settled how and when you'll leave work — that part's in hand. This is the other half of the same threshold: what it actually means to step away, now the end is in view. Not the logistics, but the quieter things — what you'll miss, what you want to carry into what comes next, and what you'll want to find another home for.`,
+        },
+      ],
+      coachOpening: `You've got your plan for leaving work in place, which is a real thing to have settled. As you get closer to actually stepping away, I'm curious — when you picture that last stretch of work behind you, what do you think you'll miss most?`,
+      sessionInstructions: `PURPOSE
+This person is winding down and has already decided how and when they'll leave work — that's settled, and captured elsewhere. This module is NOT about the decision. It's an anticipatory reflection: as they approach leaving fully, help them look at what work has given them, what they'll miss, and what they want to carry into what's next or replace. The emotional centre is letting go well, on their own terms.
+
+HOW TO RUN IT
+- Open on what they'll miss, drawing on anything you already know about what they value or draw identity from in work. Take their answer seriously and stay with it.
+- Move gently across three threads as they fit, not as a checklist: what they'll miss when the work is behind them; what they want to carry with them into what's next (a skill, a rhythm, a part of who they are); and what work gave them that they'll want to find another source for (structure, status, people, purpose).
+- One thread at a time. Let feeling surface without rushing to reassure or fix.
+- Aim to reach your close within roughly four to six exchanges.
+
+MUST NOT
+- Do NOT reopen the decision, push on the date, or turn this into readiness-planning — they've decided. If they raise a practical worry, acknowledge it and steer back to the reflection.
+- Don't imply that leaving is a loss to be mourned, or that they should feel more (or less) than they do.
+- Don't pile on praise or over-interpret.
+
+CLOSING
+Mirror back, in their words: what they'll miss, what they want to carry with them, and anything they'll want to replace. Note warmly that this becomes part of their Retirement Life Plan, and that the next module looks at how retirement itself changes over time.`,
+      interaction: undefined,
+    };
+  }
+
+  // Undecided: keep the readiness widget, re-anchored to completing the wind-down.
+  const reAnchored: Interaction | undefined =
+    baseInteraction && baseInteraction.type === "readiness-snapshot"
+      ? {
+          ...baseInteraction,
+          transitionInstruction:
+            "You're already winding down. For the rest of it, where do you picture yourself? Slide toward wrapping up before long, or easing out more gradually.",
+          transition: {
+            left: "Wrap it up before long",
+            right: "Keep easing out gradually",
+          },
+          windowInstruction:
+            "Roughly when do you picture taking the final step out of work? Drag out a band rather than a single date — this is a window, not a deadline.",
+        }
+      : baseInteraction;
+
+  return {
+    description:
+      "The shape and timing of the rest of your wind-down — how you want it to go from here, and what would make you feel ready for the final step.",
+    primer: [
+      {
+        type: "text",
+        value: `You've already started winding down — the shift out of work is underway. What's still open is the rest of it: how you want the wind-down to go from here, and when and how you take the final step out. Deciding that on your own terms — rather than letting it drift or be decided for you — is what this module is for. The visible date is only the surface; beneath it sit finances, confidence, identity, relationships, purpose, and the things you still want to finish.`,
+      },
+      {
+        type: "text",
+        value: `In a moment you'll build a readiness snapshot. First, mark how you want the rest of the wind-down to go — wrapping up before long at one end, easing out more gradually at the other. Then mark the rough window you picture for the final step, as a band rather than a single date. Last, rate how ready each part of the picture feels — finances, health, who you are beyond work, relationships, purpose, and the things you still want to finish. There are no right answers, and "not yet" is one of them.`,
+      },
+    ],
+    coachOpening: `Here's the readiness snapshot you've just built. You're already on your way out — so before we look at where it feels strong and where it feels shaky, tell me: when you picture the final step out of work, does it feel close, or still a good way off?`,
+    sessionInstructions: `PURPOSE
+This person is already winding down and has NOT yet settled how and when they'll leave work altogether. They've just built a readiness snapshot re-anchored to completing the exit they've already started: how they want the rest of the wind-down to go, the rough window for the final step, and how ready each part of the picture feels — finances, health, identity beyond work, relationships, purpose, and things they still want to finish. Your job is to help them complete the exit BY CHOICE rather than let it drift. The aim is clarity about what would make them ready for the final step, not a committed date. A thoughtful "not yet — and here's what would need to change" is a complete and valuable outcome.
+
+MOST IMPORTANT
+They've already begun — so this is about the rest of the road, not a decision from scratch. Don't ask "will you retire?"; they're on the way. Ask what would make them ready to take the final step, and what shape they want the remaining wind-down to have. Work the snapshot they built: lead with where readiness feels strong and where it feels shaky, and draw out what sits underneath, in their own words.
+
+HOW TO RUN IT
+- Open by reflecting where they already are — they're winding down, some of the shift is behind them — then use the snapshot as the anchor.
+- Lead with the contrast in the readiness profile: name one part that feels strong and one that feels shaky, and ask what's underneath each.
+- Draw on these as they fit, not as a checklist: how they want the rest of the wind-down to go; what would make the final step feel right; anything they'd like to complete or resolve before leaving fully; what might hold the last step up.
+- Take the shape of the remaining wind-down seriously — it determines how full the early years really are, and later modules build on it.
+- Aim to reach your close within roughly five to seven exchanges.
+
+FINANCIAL CONFIDENCE — HANDLE WITH CARE (CONSUMER DUTY)
+The finance factor is paired with a confidence-only follow-up. You surface and signpost financial confidence; you must NEVER provide, imply, or substitute for regulated financial advice, never estimate figures, and never comment on whether their finances are adequate. If finances feel low or building, or they don't yet know when they'll be financially ready, gently encourage them to build that clarity in the right place — their pension provider, their existing financial plan, or a financial adviser — and note it as an open area. That's the whole of your role here.
+
+HOLD BACK WHERE
+- They're not ready to name a date for the final step — don't push for one. The goal is clarity, not commitment.
+- Hesitation surfaces — treat it as information, not a problem to fix.
+- You're tempted to plan first steps or sequencing — STOP. This stage settles direction and readiness; the concrete steps belong to Stage 5 (Act).
+
+CLOSING
+Mirror back, in their words: how they want the rest of the wind-down to go, the window they picture for the final step (however wide or provisional), what supports their readiness, any conditions they'd want in place, and any concerns that remain. Reflect their financial-confidence signal plainly. Note warmly that this adds to their Retirement Life Plan, and that the next module looks at how retirement itself changes over time.`,
+    interaction: reAnchored,
+  };
+}
+
+// The Stage 1 (Imagine) intro body for someone winding down — present-progressive
+// framing that meets them mid-shift, rather than the "before you can plan a
+// retirement" opening written for someone with it all still ahead. The stage
+// label stays "STAGE 1 · IMAGINE"; only the body changes. Applied in the home
+// dashboard behind the flag; everyone else keeps the default intro.
+export const WINDING_STAGE1_INTRO_BODY: string[] = [
+  "You've already started the shift out of work — one foot in, one stepping into what's next. That gives you a real head start: you're not imagining retirement from a standing start, you're picturing the rest of a change that's already underway.",
+  "There's no right answer here, and nothing to get perfect. These first few modules help you build a vivid picture of the retirement your wind-down is leading toward — something you'll come back to, deepen, and reshape as you go.",
+  "We'd suggest taking about one a day, so each has time to settle.",
+];
