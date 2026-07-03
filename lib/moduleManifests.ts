@@ -154,6 +154,9 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
   // ---- Stage 1 — Imagine ----
   // Winding-down only (Phase 3). Reads onboarding context; writes wind_down_exit.
   "1.winddown": { moduleId: "1.winddown", inputs: [v("onboarding_fact")] },
+  // Retired only (Phase 4). Reads onboarding; writes retirement_onset (+ any
+  // unfinished_work drawn out in conversation).
+  "1.worklife": { moduleId: "1.worklife", inputs: [v("onboarding_fact")] },
   "1.day": { moduleId: "1.day", inputs: [v("onboarding_fact")] },
   "1.money": { moduleId: "1.money", inputs: [v("onboarding_fact")] },
   "1.roles": {
@@ -207,9 +210,11 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
   "2.4": {
     moduleId: "2.4",
     inputs: [
-      ev("role", { tag: "contribution" }),
-      ev("day_picture_item", { tag: "helping" }),
-      ev("aspiration"),
+      // Vita-only: 2.4 runs no structured generation call, so these feed the
+      // conversation ({priorReflections}), not a seed view.
+      v("role", { tag: "contribution" }),
+      v("day_picture_item", { tag: "helping" }),
+      v("aspiration"),
     ],
   },
   "2.5": {
@@ -222,7 +227,12 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
   },
   "2.6": {
     moduleId: "2.6",
-    inputs: [e("onboarding_fact", { tag: "age" }), v("letter_thread")],
+    inputs: [
+      // Vita-role so the person's age actually reaches the conversation — the
+      // sight/hearing advice is age-shaped. (2.6 runs no seed generation call.)
+      v("onboarding_fact", { tag: "age" }),
+      v("letter_thread"),
+    ],
   },
 
   // ---- Stage 3 — Understand (foreground fixed VIA/values sets, never narrow) ----
@@ -252,31 +262,61 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
   },
   "3.3": {
     moduleId: "3.3",
-    inputs: [ev("value"), e("day_picture_item")],
+    inputs: [
+      ev("value"),
+      // Full self-picture so the values work is grounded in their real life,
+      // not distilled from values alone. Same six Stage 3 foregrounds (3.1/3.2).
+      ev("day_picture_item"),
+      ev("role"),
+      ev("recurring_activity"),
+      ev("relationship"),
+      ev("aspiration"),
+      ev("energy_pattern"),
+    ],
   },
   "3.4": {
     moduleId: "3.4",
     inputs: [
       ev("value", { withDescription: true }),
-      e("day_picture_item"),
+      // Full self-picture (see 3.3).
+      ev("day_picture_item"),
+      ev("role"),
+      ev("recurring_activity"),
+      ev("relationship"),
+      ev("aspiration"),
+      ev("energy_pattern"),
       e("week_shape_pref"),
-      e("recurring_activity"),
     ],
   },
   "3.5": {
     moduleId: "3.5",
     inputs: [
-      ev("value"),
       ev("strength"),
-      e("relationship"),
-      e("recurring_activity"),
+      ev("value"),
+      // Full self-picture so the strengths work is grounded in their real life.
+      ev("day_picture_item"),
+      ev("role"),
+      ev("recurring_activity"),
+      ev("relationship"),
+      ev("aspiration"),
+      ev("energy_pattern"),
       ev("concern"),
       e("onboarding_fact", { tag: "partner" }),
     ],
   },
   "3.6": {
     moduleId: "3.6",
-    inputs: [ev("strength"), ev("value"), ev("relationship")],
+    inputs: [
+      ev("strength"),
+      ev("value"),
+      // Full self-picture (see 3.5).
+      ev("day_picture_item"),
+      ev("role"),
+      ev("recurring_activity"),
+      ev("relationship"),
+      ev("aspiration"),
+      ev("energy_pattern"),
+    ],
   },
 
   // ---- Stage 4 — Plan (dream wall throughout — NO one_off_dream) ----
@@ -287,6 +327,10 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
       v("role"),
       v("strength"),
       v("concern"),
+      // When and how to leave work hinges on the partner's situation and on what
+      // they're retiring toward — give Vita both.
+      v("relationship"),
+      v("aspiration"),
       v("onboarding_fact", { tag: "timeframe" }),
     ],
   },
@@ -299,16 +343,29 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
       ev("energy_pattern"),
       ev("value"),
       ev("hope"),
+      // Vita-only: the person's roles inform the seasons conversation without
+      // becoming sortable cards (seasonCardsFromFacts reads seed items only).
+      v("role"),
     ],
   },
   "4.3": {
     moduleId: "4.3",
     inputs: [
+      // The full self-picture — the same six Stage 3 foregrounds — so goals are
+      // personal to this person, not a generic five-area template. (Dream wall
+      // holds: no one_off_dream.)
+      ev("day_picture_item"),
+      ev("role"),
       ev("recurring_activity"),
-      ev("value"),
+      ev("relationship"),
       ev("aspiration"),
-      e("energy_pattern"),
-      e("relationship"),
+      ev("energy_pattern"),
+      // What matters (in their own words) and what they're good at.
+      ev("value", { withDescription: true }),
+      ev("strength"),
+      // What they're reaching for and what's on their mind.
+      ev("hope"),
+      ev("concern"),
       v("onboarding_fact", { tag: "partner" }),
     ],
   },
@@ -317,6 +374,8 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
     inputs: [
       ev("goal", { crossRef: "4.3" }),
       ev("strength"),
+      // The "why" behind each goal shapes which milestones actually matter.
+      ev("value"),
       e("relationship"),
       v("readiness", { crossRef: "4.1" }),
       e("recurring_activity"),
@@ -327,6 +386,8 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
     inputs: [
       ev("value", { withDescription: true, withThreatProtector: true }),
       ev("value_priority"),
+      // Trade-offs are so often a goal weighed against the people in their life.
+      ev("relationship"),
       e("goal", { crossRef: "4.3" }),
       e("readiness", { crossRef: "4.1" }),
     ],
@@ -337,6 +398,9 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
       ev("recurring_activity"),
       ev("energy_pattern"),
       ev("week_shape_pref"),
+      // A week's anchors are largely people-driven (Fridays with the grandkids,
+      // a partner's own routine) — the structured activity list is unaffected.
+      ev("relationship"),
       e("readiness", { tag: "work-transition", crossRef: "4.1" }),
       e("goal", { crossRef: "4.3" }),
     ],
