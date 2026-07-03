@@ -385,6 +385,19 @@ function factsFromBuildRaw(moduleId: string, result: BuildResult): DraftFact[] {
       ];
     }
 
+    // Retired only — the "what work gave you" reflection (Phase 4). Writes how
+    // leaving came about as a retirement_onset fact from the onset picker (the
+    // second composite step). What they miss stays in the build for Phase 5;
+    // any unfinished-work thread is drawn out in conversation, not here.
+    case "1.worklife": {
+      if (result.type !== "composite") return [];
+      const onset = (result as CompositeResult).results[1];
+      if (!onset || onset.type !== "role-picker") return [];
+      const choice = (onset as RolePickerResult).picked[0];
+      if (!choice) return [];
+      return [draft("retirement_onset", { label: choice }, "1.worklife")];
+    }
+
     // ---- Stage 2 — Explore ----
     case "2.1": {
       if (result.type !== "composite") return [];

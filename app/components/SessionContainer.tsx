@@ -504,6 +504,9 @@ type SessionContainerProps = {
   // Optional build step shown between the reading and the conversation. When
   // absent, the module keeps the plain reading → conversation flow.
   interaction?: Interaction;
+  // A reframed placeholder for the letter writing surface (retired "retirement
+  // so far" reflection, Phase 4). Undefined keeps LetterFlow's default prompt.
+  letterWritingPlaceholder?: string;
   // Optional commitment captured after the conversation closes (a concrete plan
   // entry). When set, a small Vita-voiced widget appears on completion before
   // the home CTAs. Only the senses module uses it so far.
@@ -555,6 +558,7 @@ export default function SessionContainer({
   sessionContent,
   sessionInstructions,
   interaction,
+  letterWritingPlaceholder,
   closingCommitment,
   closeInOneStep = false,
 }: SessionContainerProps) {
@@ -582,6 +586,11 @@ export default function SessionContainer({
   // The letter module replaces the build → conversation flow with a single
   // writing surface (LetterFlow), so it takes its own "letter" phase.
   const isLetter = interaction?.type === "letter";
+  // The retired letter (Phase 4) leads into a keep/change/leave conversation
+  // rather than completing straight away; the default letter has no chat. Keyed
+  // off sessionInstructions, which only the retired letter supplies — so the
+  // default letter flow below is entirely unchanged.
+  const letterHasConversation = isLetter && !!sessionInstructions;
   const isFirstYear = interaction?.type === "first-year";
 
   // Where the person is in the module: the reading, the build step (only for
@@ -1440,6 +1449,15 @@ export default function SessionContainer({
     setBuildResult(result);
     void userData.saveBuild(sessionId, result);
     reconcileBuildFacts(result);
+    // The retired letter (Phase 4) doesn't finish here — it flows into a
+    // keep/change/leave conversation. Persist the letter and its letter_thread
+    // fact (above), then open the chat; the conversation's normal close captures
+    // the takeaway and the keep_change_leave deltas. The default letter keeps its
+    // original single-nudge completion.
+    if (letterHasConversation) {
+      startConversation();
+      return;
+    }
     setLetterAck(vitaMessage);
     if (user) {
       void userData.markModuleComplete(sessionId);
@@ -1972,12 +1990,15 @@ export default function SessionContainer({
             interaction={interaction}
             priorReflections={resolveSeedText(sessionId, userData.getActiveFacts())}
             initial={buildResult?.type === "letter" ? buildResult : undefined}
+            writingPlaceholder={letterWritingPlaceholder}
             onComplete={handleLetterComplete}
           />
         )}
 
-      {/* ZONE 4.5 — LETTER COMPLETE (Vita's closing line + the reveal/home CTAs) */}
-      {isLetter && completed && (
+      {/* ZONE 4.5 — LETTER COMPLETE (Vita's closing line + the reveal/home CTAs).
+          Only the default letter, which has no conversation, closes here; the
+          retired letter closes through the normal conversation zone below. */}
+      {isLetter && completed && !letterHasConversation && (
         <section style={styles.conversationZone}>
           <div style={styles.vitaLockup}>
             <span style={styles.sun} aria-hidden="true">

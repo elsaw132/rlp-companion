@@ -58,6 +58,12 @@ const FACT_CATEGORIES = [
   "social_balance_pref", "commitment", "strength", "value", "value_priority",
   "hope", "fear", "meaning_thread", "readiness", "chapter", "goal", "goal_path",
   "principle", "week_plan", "first_year_plan", "concern", "onboarding_fact",
+  // Retired-cohort categories surfaced only in conversation (Phase 3/4), so the
+  // delta pass needs them available. The model still only emits one when the
+  // person states it clearly. unfinished_work: the "what work gave you" module.
+  // keep_change_leave: the retired letter's keep / change / leave reflection.
+  "unfinished_work",
+  "keep_change_leave",
 ].join(", ");
 
 export const TAKEAWAY_SYSTEM_PROMPT = `You are summarising one module of a guided retirement life-planning programme. The transcript below is a conversation between a coach (Vita) and a person. The summary is used in two ways: it is carried into later modules so the coach can draw on the whole picture, and a version of it is read back to the person on their home screen. It also seeds the person's Retirement Life Plan.
@@ -69,7 +75,7 @@ Produce the summary in two grammatical persons. The content and tone must be ide
 - "secondPerson": written in the second person, addressing the person directly ("you"/"your").
 
 You ALSO extract structured fact changes that emerged ONLY in the conversation (not already in their saved selections), as a "facts" object:
-- "additions": new facts the person stated in conversation that aren't already on record. Each: {"category": one of [${FACT_CATEGORIES}], "label": the fact in their words (short), and optionally "domain" (for recurring_activity: Restore/Move/Think/Connect/Contribute), "description"}. Use one_off_dream for money-no-object/pipe dreams; aspiration for things they could realistically work toward; recurring_activity for regular activities — never mix these up. Only include something clearly new and concrete. Empty array if nothing new.
+- "additions": new facts the person stated in conversation that aren't already on record. Each: {"category": one of [${FACT_CATEGORIES}], "label": the fact in their words (short), and optionally "domain" (for recurring_activity: Restore/Move/Think/Connect/Contribute), "description"}. Use one_off_dream for money-no-object/pipe dreams; aspiration for things they could realistically work toward; recurring_activity for regular activities — never mix these up. For keep_change_leave (the retired letter's stock-take of their current retirement), the "label" is the element of their life in their words and the "description" is exactly one of "keep", "change", or "leave" — whether they want to keep it as it is, reshape it, or let it go. Only include something clearly new and concrete. Empty array if nothing new.
 - "removals": ONLY when the person EXPLICITLY and UNAMBIGUOUSLY asked, in their OWN words, to drop, remove, undo, or replace something already on record (you're told what's on record). This is a HIGH bar. Every removal MUST include a "quote": the person's own verbatim words, copied exactly from a "Them:" line, that make the request. If you cannot copy such words, DO NOT emit a removal. Each: {"label": the on-record fact to drop (match its wording), "quote": the person's exact words asking to drop or change it, optionally "category", and "userConfirmedInChat": true only when that quote is a direct request from the person.
   The following do NOT count as removals — for these, emit nothing: the person simply giving a new, different, or fuller answer; you inferring they "seem to have" moved on; a change of subject; softening, hedging, or elaborating; anything you would preface with "it sounded like" or "they might have". When in any doubt, emit NO removal. A missed correction is fine — the person can edit it themselves; a wrong one is not.
   Empty array unless the person explicitly asked, in words you can quote, to drop or change something.

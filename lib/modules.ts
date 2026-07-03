@@ -861,26 +861,78 @@ export type Module = {
   // non-matching stage the programme is byte-identical to today. See
   // moduleVisibleFor / visibleModules below.
   audience?: RetirementStage[];
+  // The inverse of audience (Phase 4): shown to everyone EXCEPT these stages
+  // (when the flag is on). Undefined = shown to all. Used to drop module 4.1 from
+  // Plan for the retired cohorts, who meet it as a reflection in the Review stage
+  // instead. Unlike audience, a hideFrom module stays universal with the flag off,
+  // so today's behaviour is unchanged.
+  hideFrom?: RetirementStage[];
 };
 
+// The two already-retired cohorts. Stage 1 becomes "Review" for them, re-ordered
+// and re-purposed to take stock of the retirement they're living.
+export function isRetired(rs: RetirementStage | null): boolean {
+  return rs === "recently_retired" || rs === "established";
+}
+
 // Whether a module is visible to someone in the given retirement stage. A module
-// with no `audience` is universal. An audience-restricted module appears only
-// when the flag is on AND the person's stage is in its audience — so rs=null (the
-// default everywhere that doesn't thread a stage) hides it, keeping today's
-// behaviour unchanged.
+// with no audience/hideFrom is universal. `audience` is an allow-list (shown only
+// to those stages, flag on); `hideFrom` is a deny-list (shown to all except those
+// stages, flag on). rs=null (the default everywhere that doesn't thread a stage)
+// or the flag off keeps today's behaviour: audience modules hidden, hideFrom
+// modules shown.
 export function moduleVisibleFor(
   m: Module,
   rs: RetirementStage | null
 ): boolean {
-  if (!m.audience) return true;
-  if (!RETIREMENT_PATHS) return false;
-  return rs !== null && m.audience.includes(rs);
+  if (m.audience) {
+    if (!RETIREMENT_PATHS) return false;
+    return rs !== null && m.audience.includes(rs);
+  }
+  if (m.hideFrom && RETIREMENT_PATHS && rs !== null && m.hideFrom.includes(rs)) {
+    return false;
+  }
+  return true;
 }
 
-// A stage's modules filtered to those visible for this retirement stage, in
-// order. This is the single lens all ordering/gating/progress goes through.
+// The order the retired cohorts meet the Review (Stage 1) modules in — different
+// from the Imagine order (money moves later; the work-life reflection sits second).
+// Ids not listed keep their array order after the listed ones.
+const REVIEW_ORDER = [
+  "1.day",
+  "1.worklife",
+  "1.roles",
+  "1.week",
+  "1.money",
+  "1.letter",
+];
+
+// A stage's modules filtered to those visible for this retirement stage, in the
+// order they should appear. This is the single lens all ordering/gating/progress
+// goes through. For the retired cohorts, Stage 1 (Review) is re-ordered per
+// REVIEW_ORDER; everyone else keeps array order.
 export function visibleModules(stage: Stage, rs: RetirementStage | null): Module[] {
-  return stage.modules.filter((m) => moduleVisibleFor(m, rs));
+  const mods = stage.modules.filter((m) => moduleVisibleFor(m, rs));
+  if (stage.number === 1 && RETIREMENT_PATHS && isRetired(rs)) {
+    const rank = (id: string) => {
+      const i = REVIEW_ORDER.indexOf(id);
+      return i === -1 ? REVIEW_ORDER.length : i;
+    };
+    return [...mods].sort((a, b) => rank(a.id) - rank(b.id));
+  }
+  return mods;
+}
+
+// The stage's name for this person. Retired cohorts see Stage 1 as "Review" and
+// Stage 4 as "Retirement Reset Plan" (naming only in Phase 4; the plan surfaces
+// themselves come in Phase 5). Everyone else, and the flag off, keeps the base
+// name.
+export function stageNameFor(stage: Stage, rs: RetirementStage | null): string {
+  if (RETIREMENT_PATHS && isRetired(rs)) {
+    if (stage.number === 1) return "Review";
+    if (stage.number === 4) return "Retirement Reset Plan";
+  }
+  return stage.name;
 }
 
 // Copy for a module's post-conversation commitment widget: Vita's prompt, the
@@ -1121,6 +1173,89 @@ MUST NOT
 
 CLOSING
 Briefly reflect what you've heard — where they are with winding down, and the one thread that stood out — and check it feels right. Note warmly that this sets the scene, and that the next modules help them picture the retirement the wind-down is leading toward.`,
+      },
+      // Retired cohorts only (Phase 4): the "what work gave you" reflection that
+      // used to sit in Plan (4.1) now lives in Review, second in the stage
+      // (positioned by REVIEW_ORDER). audience hides it from everyone else.
+      {
+        id: "1.worklife",
+        title: "What work gave you",
+        description:
+          "A look at what work quietly provided — and what you might want to bring into this chapter on purpose.",
+        durationMin: 15,
+        audience: ["recently_retired", "established"],
+        primer: [
+          {
+            type: "text",
+            value: `Work quietly gives us a lot — purpose, structure, people, a sense of who we are. When it ends, some of that can be missed, often more than people expect. Let's look at what work gave you, and what you might want to bring into this chapter on purpose.`,
+          },
+        ],
+        interaction: {
+          type: "composite",
+          stepHeadings: ["What you miss from work", "How leaving came about"],
+          steps: [
+            {
+              type: "role-picker",
+              instruction:
+                "Work gives us a lot without our noticing. Which of these did it give you that you now miss, or would like to find another source for?",
+              starrable: false,
+              allowCustom: true,
+              summaryLabel: "What you miss from work",
+              groups: [
+                {
+                  name: "",
+                  options: [
+                    "A sense of purpose",
+                    "Structure to the day",
+                    "A sense of who I am",
+                    "Social contact and colleagues",
+                    "A feeling of achievement",
+                    "Routine and rhythm",
+                  ],
+                },
+              ],
+            },
+            {
+              type: "role-picker",
+              instruction: "And how did leaving work come about for you?",
+              starrable: false,
+              allowCustom: false,
+              selectRange: { min: 1, max: 1 },
+              summaryLabel: "How leaving came about",
+              groups: [
+                {
+                  name: "",
+                  options: [
+                    "Mostly my own choice",
+                    "A mix of both",
+                    "Mostly decided by circumstances",
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        coachOpening: `Thanks for marking those. Let's start with what you miss — of the things you picked, which one do you feel the absence of most in an ordinary week now?`,
+        sessionInstructions: `PURPOSE
+This person has retired. This module looks at what work quietly gave them — purpose, structure, identity, social contact, achievement, routine — so anything they miss can be brought into this chapter on purpose rather than left as a quiet gap. They've marked what they miss and how leaving work came about (both under WHAT THEY BUILT). Handle it warmly and with care; this can touch identity and loss.
+
+HOW TO RUN IT
+- Open on what they miss most, from what they marked. Draw out the real texture — what specifically they miss about it, and where an ordinary week feels the absence.
+- Move toward how that thing might find another home now — a source of the same purpose, contact, or structure — without rushing to fix it or turn it into a to-do list. Keep it reflective.
+- Aim to reach your close within roughly five to seven exchanges.
+
+HOW LEAVING CAME ABOUT — HANDLE WITH CARE
+- NEVER presume leaving was chosen. Read what they marked.
+- If they marked "Mostly my own choice": treat it lightly and move on — no need to dwell.
+- If they marked "A mix" or "Mostly decided by circumstances": meet it with care. Acknowledge that leaving wasn't fully on their terms, without pressing on anything painful. Where it fits, gently ask — once — whether there's any part of their working life that feels unfinished, something they'd have liked to round off. If they name something, reflect it back plainly as a real thread (it becomes something the plan can help with later). If they'd rather not, let it go cleanly. Don't dwell, don't counsel, don't try to resolve it.
+
+MUST NOT
+- Don't imply that missing work is a problem, or that they should be "over it".
+- Don't turn this into planning or first steps — that comes later. Keep it reflective.
+- Don't pile on praise or over-interpret.
+
+CLOSING
+Mirror back, in their words: what they miss most, any sense of where it might find another home, and — if it came up — the unfinished thread. Note warmly that this adds to their Retirement Life Plan, and that the next module looks at the roles they play now.`,
       },
       {
         id: "1.day",
@@ -2610,6 +2745,10 @@ WATCH FOR
         description:
           "The shape of your move out of work — your own timing, and what would make you feel ready by choice.",
         durationMin: 15,
+        // Retired cohorts have already left work — for them this reflection lives
+        // in the Review stage (1.worklife), not Plan (Phase 4). Hidden from them
+        // here; unchanged for everyone else and with the flag off.
+        hideFrom: ["recently_retired", "established"],
         primer: [
           {
             type: "text",
@@ -3184,7 +3323,7 @@ export function getModule(id: string, rs: RetirementStage | null = null) {
       return {
         module: found,
         stageNumber: stage.number,
-        stageName: stage.name,
+        stageName: stageNameFor(stage, rs),
         totalStages: TOTAL_STAGES,
         modulesInStage: mods.length,
         stageModuleIds: mods.map((m) => m.id),
@@ -3387,5 +3526,61 @@ Mirror back, in their words: how they want the rest of the wind-down to go, the 
 export const WINDING_STAGE1_INTRO_BODY: string[] = [
   "You've already started the shift out of work — one foot in, one stepping into what's next. That gives you a real head start: you're not imagining retirement from a standing start, you're picturing the rest of a change that's already underway.",
   "There's no right answer here, and nothing to get perfect. These first few modules help you build a vivid picture of the retirement your wind-down is leading toward — something you'll come back to, deepen, and reshape as you go.",
+  "We'd suggest taking about one a day, so each has time to settle.",
+];
+
+// The Stage 1 intro for the retired cohorts, where Stage 1 is "Review" rather
+// than "Imagine": the heading, and body that meets someone already living
+// retirement — taking stock of it as it is, and as they'd like it. RR and EST
+// share this; the tense/depth difference lives in the per-module copy. Applied in
+// the home dashboard behind the flag, which also swaps the stage name to "Review".
+// The retired cohorts' version of the letter module (Phase 4): the letter is
+// reframed from "a letter from your future self" to reflecting on the retirement
+// they're already living, and — unlike the default letter, which has no chat — it
+// leads into a Vita conversation that draws out what they'd keep, reshape, or
+// leave behind (captured as keep_change_leave facts via the conversation). The
+// letter-writing surface itself is unchanged; only the prompt/framing differs.
+// Presence of sessionInstructions is what tells SessionContainer to run the
+// follow-on conversation, so the default letter flow stays untouched.
+export function retiredLetter(): {
+  primer: ContentBlock[];
+  writingPlaceholder: string;
+  coachOpening: string;
+  sessionInstructions: string;
+} {
+  return {
+    primer: [
+      {
+        type: "text",
+        value: `You've been living this a while now. A good way to take stock is to write about it — what an ordinary good stretch of your retirement actually looks like, what's been good, what's been harder than you expected, and what's surprised you. Write it to someone in your life, in your own words. Afterwards, Vita will read it back and talk it through with you.`,
+      },
+    ],
+    writingPlaceholder:
+      "Tell them how retirement has been — what an ordinary good week looks like now, what's been good, what's been harder than you expected, and anything that's surprised you…",
+    coachOpening: `Thank you for that — it's a real picture of how things are. Reading it back, what stands out first: is it something that's been good, or something that's been harder than you expected?`,
+    sessionInstructions: `PURPOSE
+This person is already retired and has just written a short reflection on how their retirement has actually been — what's good, what's been harder than expected, what's surprised them (their letter is under WHAT THEY BUILT). Read it properly and talk it through. The real work of this conversation is helping them take stock: looking at the elements of their current retirement and sorting each into what they'd KEEP as it is, what they'd CHANGE or reshape, and what they'd LEAVE BEHIND. Stay warm and reflective — this is a stock-take, not a fix-it session.
+
+HOW TO RUN IT
+- Open on what stood out in their letter — something good or something harder — and take it seriously before moving on.
+- Draw on the whole picture they've built in the earlier Review modules (their days, their week, the roles they play, what they miss from work) as well as the letter, and reflect specific elements back to them.
+- For the elements that carry weight, help them place each one: is this something to keep as it is, to reshape, or to let go of? Ask it plainly and in their own terms — never as a checklist, and one thread at a time.
+- Let them lead on what matters most. Some things they'll be settled on; others they'll want to change. Both are useful. Don't rush to solutions or first steps — naming what to keep, change, or leave is the whole job here.
+- Aim to reach your close within roughly five to seven exchanges.
+
+MUST NOT
+- Don't turn this into planning, goals, or first steps — that comes later. Keep it reflective.
+- Don't imply their retirement should look any particular way, or that wanting to change something means it's going wrong.
+- Don't pile on praise or over-interpret.
+
+CLOSING
+Mirror back, in their words: what they'd keep as it is, what they'd like to reshape, and anything they'd happily leave behind. Note warmly that this becomes part of their Retirement Life Plan, and that it points to what the planning stages can help them act on.`,
+  };
+}
+
+export const REVIEW_STAGE1_INTRO_HEADING = "Let's take stock";
+export const REVIEW_STAGE1_INTRO_BODY: string[] = [
+  "You're living your retirement already, so we'll start where you are. This first stage is about seeing it clearly — the shape of your days, the roles you play, what work gave you, and how it all feels — as it is now, and as you'd like it to be.",
+  "There's no right answer here, and nothing to get perfect. It's a chance to take stock: what's working and worth keeping, what you'd like to reshape, and what you'd happily leave behind.",
   "We'd suggest taking about one a day, so each has time to settle.",
 ];

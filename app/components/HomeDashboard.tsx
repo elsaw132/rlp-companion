@@ -10,8 +10,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { STAGES, TOTAL_STAGES, visibleModules } from "@/lib/modules";
-import { WINDING_STAGE1_INTRO_BODY } from "@/lib/modules";
+import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, isRetired } from "@/lib/modules";
+import {
+  WINDING_STAGE1_INTRO_BODY,
+  REVIEW_STAGE1_INTRO_HEADING,
+  REVIEW_STAGE1_INTRO_BODY,
+} from "@/lib/modules";
 import { RETIREMENT_PATHS } from "@/lib/flags";
 import { getActiveStageNumber } from "@/lib/progress";
 import { useUserData } from "@/lib/userData";
@@ -133,14 +137,24 @@ export default function HomeDashboard() {
         RETIREMENT_PATHS &&
         retirementStage === "winding_down" &&
         stage.number === 1;
+      // Retired cohorts: Stage 1 is "Review" — a new heading, present-tense body,
+      // and the eyebrow name swapped to "Review" (via stageNameFor). Phase 4.
+      const reviewStage1 =
+        RETIREMENT_PATHS && isRetired(retirementStage) && stage.number === 1;
       const introStageObj = stage.intro
         ? {
             ...stage,
+            name: stageNameFor(stage, retirementStage),
             intro: {
               ...stage.intro,
-              body: windingStage1
-                ? WINDING_STAGE1_INTRO_BODY
-                : stage.intro.body.map((p) => tailorCopy(p, retirementStage)),
+              heading: reviewStage1
+                ? REVIEW_STAGE1_INTRO_HEADING
+                : stage.intro.heading,
+              body: reviewStage1
+                ? REVIEW_STAGE1_INTRO_BODY
+                : windingStage1
+                  ? WINDING_STAGE1_INTRO_BODY
+                  : stage.intro.body.map((p) => tailorCopy(p, retirementStage)),
             },
           }
         : stage;
@@ -194,8 +208,16 @@ export default function HomeDashboard() {
   // The stage the person is "on": the one holding the next step, or — if every
   // built module is complete — the first stage that isn't fully finished.
   const activeStageNumber = getActiveStageNumber(completed, retirementStage);
+  // STAGES with each stage's NAME resolved for this person (Review / Retirement
+  // Reset Plan for the retired cohorts). Used wherever a stage name is shown; the
+  // module/gating logic still reads the real STAGES via visibleModules, so only
+  // the labels change.
+  const stagesView = STAGES.map((s) => ({
+    ...s,
+    name: stageNameFor(s, retirementStage),
+  }));
   const activeStage =
-    STAGES.find((s) => s.number === activeStageNumber) ?? STAGES[0];
+    stagesView.find((s) => s.number === activeStageNumber) ?? stagesView[0];
 
   // Whether a stage is fully finished (every module this person sees is
   // complete). Empty future stages don't count as done.
@@ -212,7 +234,7 @@ export default function HomeDashboard() {
       ? viewedStage
       : activeStageNumber;
   const viewedStageData =
-    STAGES.find((s) => s.number === viewedStageNumber) ?? activeStage;
+    stagesView.find((s) => s.number === viewedStageNumber) ?? activeStage;
   const isViewingCurrent = viewedStageNumber === activeStageNumber;
 
   const stageModules = visibleModules(viewedStageData, retirementStage);
@@ -241,10 +263,10 @@ export default function HomeDashboard() {
     // Crossing into a new stage: don't echo the last module's takeaway, which
     // reads as an arbitrary fragment here. Speak to the whole stage just closed
     // and frame the one beginning, then hand off to today's first module.
-    const finishedStage = STAGES.find(
+    const finishedStage = stagesView.find(
       (s) => s.number === lastCompleted.stageNumber
     );
-    const startingStage = STAGES.find(
+    const startingStage = stagesView.find(
       (s) => s.number === nextModule.stageNumber
     );
     const finishedName = finishedStage?.name ?? "the last stage";
@@ -286,7 +308,7 @@ export default function HomeDashboard() {
         <aside className="sidebar">
           <div className="side-eyebrow">Your programme</div>
           <nav className="navlist">
-            {STAGES.map((s) => {
+            {stagesView.map((s) => {
               const isCurrent = s.number === activeStageNumber;
               const isDone = isStageDone(s);
               const isLocked = s.number > activeStageNumber;
@@ -366,7 +388,7 @@ export default function HomeDashboard() {
 
             {/* STAGE ARC */}
             <div className="steps">
-              {STAGES.map((s) => {
+              {stagesView.map((s) => {
                 const isCurrent = s.number === activeStageNumber;
                 const isDone = isStageDone(s);
                 const isLocked = s.number > activeStageNumber;

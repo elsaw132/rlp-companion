@@ -11,6 +11,8 @@ import {
   sensesClosingCommitment,
   windDownFourOne,
   windDownDecided,
+  retiredLetter,
+  isRetired,
   type BuildResult,
 } from "@/lib/modules";
 import { getUserData } from "@/lib/db";
@@ -132,6 +134,15 @@ export default async function SessionPage({
     windDown = windDownFourOne(windDownDecided(wdBuild), mod.interaction);
   }
 
+  // Retired letter (Phase 4): the letter reflects on retirement so far and then
+  // leads into a keep/change/leave conversation. Supplies a reframed primer and
+  // writing prompt, plus the coachOpening/sessionInstructions that turn the
+  // letter into a conversation (the presence of sessionInstructions is what
+  // SessionContainer keys off). Null for everyone else — the default letter,
+  // which has no conversation, is untouched.
+  const retiredLtr =
+    isRetired(effectiveRs) && mod.id === "1.letter" ? retiredLetter() : null;
+
   // Tailor the user- and Vita-facing copy for this person's retirement stage.
   // tailorCopy is a no-op when the flag is off, the stage is unset, or they're
   // still working — so those paths render the original strings unchanged. The
@@ -140,26 +151,35 @@ export default async function SessionPage({
   const sessionDescription = windDown
     ? windDown.description
     : tailorCopy(mod.description, retirementStage);
-  const coachOpening = windDown
-    ? windDown.coachOpening
-    : mod.coachOpening !== undefined
-      ? tailorCopy(mod.coachOpening, retirementStage)
-      : undefined;
-  const primer = windDown
-    ? windDown.primer
-    : mod.primer.map((block) =>
-        block.type === "text"
-          ? { ...block, value: tailorCopy(block.value, retirementStage) }
-          : block
-      );
+  const coachOpening = retiredLtr
+    ? retiredLtr.coachOpening
+    : windDown
+      ? windDown.coachOpening
+      : mod.coachOpening !== undefined
+        ? tailorCopy(mod.coachOpening, retirementStage)
+        : undefined;
+  const primer = retiredLtr
+    ? retiredLtr.primer
+    : windDown
+      ? windDown.primer
+      : mod.primer.map((block) =>
+          block.type === "text"
+            ? { ...block, value: tailorCopy(block.value, retirementStage) }
+            : block
+        );
   const interaction = windDown ? windDown.interaction : mod.interaction;
   const sessionInstructions = isSenses
     ? sensesSessionInstructions(horizon, age)
-    : windDown
-      ? windDown.sessionInstructions
-      : mod.sessionInstructions !== undefined
-        ? tailorCopy(mod.sessionInstructions, retirementStage)
-        : undefined;
+    : retiredLtr
+      ? retiredLtr.sessionInstructions
+      : windDown
+        ? windDown.sessionInstructions
+        : mod.sessionInstructions !== undefined
+          ? tailorCopy(mod.sessionInstructions, retirementStage)
+          : undefined;
+  // The reframed writing prompt for the retired letter surface (undefined
+  // otherwise, so LetterFlow keeps its default placeholder).
+  const letterWritingPlaceholder = retiredLtr?.writingPlaceholder;
   const closingCommitment = isSenses
     ? sensesClosingCommitment(horizon, age)
     : mod.closingCommitment;
@@ -221,6 +241,7 @@ export default async function SessionPage({
         coachOpening={coachOpening}
         sessionInstructions={sessionInstructions}
         interaction={interaction}
+        letterWritingPlaceholder={letterWritingPlaceholder}
         closingCommitment={closingCommitment}
         closeInOneStep={mod.closeInOneStep ?? false}
       />

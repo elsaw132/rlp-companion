@@ -20,6 +20,9 @@ type LetterFlowProps = {
   priorReflections: string;
   // A saved draft to resume from, if any.
   initial?: LetterResult;
+  // Optional reframed placeholder for the writing surface (the retired
+  // "retirement so far" reflection). Falls back to the future-self prompt.
+  writingPlaceholder?: string;
   // Called once the letter is finalised: the result to store, plus Vita's
   // closing acknowledgement to show alongside the reveal.
   onComplete: (result: LetterResult, vitaMessage: string) => void;
@@ -34,6 +37,7 @@ export default function LetterFlow({
   interaction,
   priorReflections,
   initial,
+  writingPlaceholder,
   onComplete,
 }: LetterFlowProps) {
   const [step, setStep] = useState<"recipient" | "writing">(
@@ -258,7 +262,10 @@ export default function LetterFlow({
         <textarea
           className="letter-textarea"
           style={styles.textarea}
-          placeholder="Tell them how it all looks now — what fills your days, the people around you, an ordinary good week…"
+          placeholder={
+            writingPlaceholder ??
+            "Tell them how it all looks now — what fills your days, the people around you, an ordinary good week…"
+          }
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={12}
