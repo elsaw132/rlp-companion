@@ -183,7 +183,8 @@ export default function OnboardingPage() {
                     <p>
                       At the end you&rsquo;ll be able to share it with your partner,
                       and there&rsquo;s a module to help you work through any
-                      differences in how you each imagine retirement.
+                      differences in how you each{" "}
+                      {RETIREMENT_PATHS ? "see" : "imagine"} retirement.
                     </p>
                   </div>
                 ) : null
@@ -325,9 +326,13 @@ function Welcome({
         <p className="paragraph">
           By the end of Stage 4: Plan, you&apos;ll have a Retirement Life Plan
           that captures your values, goals, and priorities for your retirement,
-          as well as practical information like when you plan to leave work and
-          how. Stage 5: Act is there to help you start putting that plan into
-          practice.
+          {/* This intro is shown before we ask about their retirement status, so
+              the flag-on wording stays neutral for everyone — anyone already
+              retired has no leaving-work decision still ahead of them. */}
+          {RETIREMENT_PATHS
+            ? " along with the practical detail to help you make the most of it."
+            : " as well as practical information like when you plan to leave work and how."}{" "}
+          Stage 5: Act is there to help you start putting that plan into practice.
         </p>
         <p className="paragraph">
           Vita, your AI coach, is there to guide you the whole way through. Vita

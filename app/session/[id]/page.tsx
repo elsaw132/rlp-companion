@@ -12,6 +12,9 @@ import {
 } from "@/lib/modules";
 import { getUserData } from "@/lib/db";
 import { ageFromDob } from "@/lib/planDate";
+import { tailorCopy } from "@/lib/retirementCopy";
+import { RETIREMENT_PATHS } from "@/lib/flags";
+import type { RetirementStage } from "@/lib/userData";
 
 export default async function SessionPage({
   params,
@@ -65,27 +68,61 @@ export default async function SessionPage({
   // Read it here so the conversation guidance and the closing plan step can be
   // tailored before they reach the client. Any miss (no data, a DB hiccup) falls
   // back to withholding the hearing nudge rather than showing it to everyone.
+  // One onboarding read serves two needs: the senses hearing gate (horizon/age)
+  // and — behind the RETIREMENT_PATHS flag — the person's retirementStage, which
+  // tailors this module's copy per cohort (Phase 2 sweep). With the flag off and
+  // a non-senses module we skip the read entirely, so the copy passes through
+  // untouched and byte-identical to today.
   const isSenses = mod.id === "2.6";
   let horizon: string | null = null;
   let age: number | null = null;
-  if (isSenses && userId) {
+  let retirementStage: RetirementStage | null = null;
+  if ((isSenses || RETIREMENT_PATHS) && userId) {
     try {
       const onboarding = await getUserData(userId, "onboarding");
       if (onboarding && typeof onboarding === "object") {
-        const h = (onboarding as { horizon?: unknown }).horizon;
-        if (typeof h === "string") horizon = h;
+        const o = onboarding as {
+          horizon?: unknown;
+          dob?: unknown;
+          retirementStage?: unknown;
+        };
+        if (typeof o.horizon === "string") horizon = o.horizon;
         // Prefer the real age computed from the onboarding date of birth; the
         // horizon stays as the graceful fallback when no DOB was given.
-        const d = (onboarding as { dob?: unknown }).dob;
-        if (typeof d === "string") age = ageFromDob(d);
+        if (typeof o.dob === "string") age = ageFromDob(o.dob);
+        const s = o.retirementStage;
+        if (
+          s === "working" ||
+          s === "winding_down" ||
+          s === "recently_retired" ||
+          s === "established"
+        ) {
+          retirementStage = s;
+        }
       }
     } catch {
       horizon = null;
     }
   }
+
+  // Tailor the user- and Vita-facing copy for this person's retirement stage.
+  // tailorCopy is a no-op when the flag is off, the stage is unset, or they're
+  // still working — so those paths render the original strings unchanged.
+  const sessionDescription = tailorCopy(mod.description, retirementStage);
+  const coachOpening =
+    mod.coachOpening !== undefined
+      ? tailorCopy(mod.coachOpening, retirementStage)
+      : undefined;
+  const primer = mod.primer.map((block) =>
+    block.type === "text"
+      ? { ...block, value: tailorCopy(block.value, retirementStage) }
+      : block
+  );
   const sessionInstructions = isSenses
     ? sensesSessionInstructions(horizon, age)
-    : mod.sessionInstructions;
+    : mod.sessionInstructions !== undefined
+      ? tailorCopy(mod.sessionInstructions, retirementStage)
+      : undefined;
   const closingCommitment = isSenses
     ? sensesClosingCommitment(horizon, age)
     : mod.closingCommitment;
@@ -139,10 +176,10 @@ export default async function SessionPage({
         revealHref={revealHref}
         revealLabel={revealLabel}
         sessionTitle={mod.title}
-        sessionDescription={mod.description}
+        sessionDescription={sessionDescription}
         durationMin={mod.durationMin}
-        primer={mod.primer}
-        coachOpening={mod.coachOpening}
+        primer={primer}
+        coachOpening={coachOpening}
         sessionInstructions={sessionInstructions}
         interaction={mod.interaction}
         closingCommitment={closingCommitment}
