@@ -468,24 +468,25 @@ const summaryStyles: Record<string, React.CSSProperties> = {
     color: "var(--text-muted)",
     margin: "2px 0 10px",
   },
-  leanings: { display: "flex", flexWrap: "wrap", gap: "8px" },
+  leanings: { display: "flex", flexDirection: "column", gap: "8px" },
   // Each leaning shows both sides of the trade-off — the chosen side emphasised,
   // the other shown muted as "over X" — so the person can see what they were
-  // choosing between while talking it through with Vita.
+  // choosing between while talking it through with Vita. These are full
+  // sentences, so they stack as cards rather than inline pills.
   chip: {
-    display: "inline-flex",
-    alignItems: "baseline",
-    flexWrap: "wrap",
-    gap: "6px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
     background: "var(--brand-primary-tint)",
-    borderRadius: "var(--r-pill)",
-    padding: "6px 14px",
+    borderRadius: "var(--r-md)",
+    padding: "12px 16px",
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-sm)",
+    lineHeight: 1.4,
     color: "var(--ink)",
   },
   chipChosen: {
-    fontWeight: 700,
+    fontWeight: 600,
     color: "var(--ink)",
   },
   chipOver: {
