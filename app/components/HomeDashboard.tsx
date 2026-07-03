@@ -13,6 +13,7 @@ import { useUser } from "@clerk/nextjs";
 import { STAGES, TOTAL_STAGES } from "@/lib/modules";
 import { getActiveStageNumber } from "@/lib/progress";
 import { useUserData } from "@/lib/userData";
+import { tailorCopy } from "@/lib/retirementCopy";
 import StageIntro from "./StageIntro";
 import OpeningCapture from "./OpeningCapture";
 import VitaMark from "./VitaMark";
@@ -32,6 +33,10 @@ function greetingWord(): string {
 export default function HomeDashboard() {
   const { user } = useUser();
   const userData = useUserData();
+  // The person's retirement stage, used to tailor stage-intro and module-card
+  // copy (Phase 2). null (and so a no-op) with the flag off or before the data
+  // has loaded, and for anyone still working.
+  const retirementStage = userData.getRetirementStage();
   const router = useRouter();
   const [completed, setCompleted] = useState<string[]>([]);
   const [greeting, setGreeting] = useState("Good morning");
@@ -117,9 +122,21 @@ export default function HomeDashboard() {
   if (introStage !== null) {
     const stage = STAGES.find((s) => s.number === introStage);
     if (stage) {
+      // Tailor the intro's paragraphs to the person's retirement stage (Phase 2).
+      // tailorCopy is a no-op with the flag off or for a still-working/unset
+      // stage, so the intro renders identically to today in those cases.
+      const introStageObj = stage.intro
+        ? {
+            ...stage,
+            intro: {
+              ...stage.intro,
+              body: stage.intro.body.map((p) => tailorCopy(p, retirementStage)),
+            },
+          }
+        : stage;
       return (
         <StageIntro
-          stage={stage}
+          stage={introStageObj}
           onContinue={() => {
             if (user) void userData.markStageIntroSeen(introStage);
             setIntroStage(null);
@@ -584,7 +601,9 @@ export default function HomeDashboard() {
                       <div className={`thumb ${thumb}`} aria-hidden="true"></div>
                       <div>
                         <div className="title">{m.title}</div>
-                        <div className="desc">{m.description}</div>
+                        <div className="desc">
+                          {tailorCopy(m.description, retirementStage)}
+                        </div>
                       </div>
                       <span className="chip-time">🕐 {m.durationMin} min</span>
                     </>
