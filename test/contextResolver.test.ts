@@ -79,12 +79,16 @@ describe("resolver — roles route to the right view", () => {
         data: { description: "Being present", coreFive: true, threat: "work", protectors: ["a weekly call"] },
       }),
       fact("day_picture_item", "Slow breakfast"),
+      fact("week_shape_pref", "Slow mornings"),
     ];
     const { seed, vita } = resolveViews("3.4", facts);
-    // 3.4: value is [E+V] (both), day_picture_item is [E] (seed only).
+    // 3.4: value and day_picture_item are [E+V] (both — the full self-picture
+    // reaches Vita too); week_shape_pref stays [E] (seed only).
     expect(vita.items.some((i) => i.label === "Family")).toBe(true);
-    expect(vita.items.some((i) => i.label === "Slow breakfast")).toBe(false);
+    expect(vita.items.some((i) => i.label === "Slow breakfast")).toBe(true);
     expect(seed.items.some((i) => i.label === "Slow breakfast")).toBe(true);
+    expect(vita.items.some((i) => i.label === "Slow mornings")).toBe(false);
+    expect(seed.items.some((i) => i.label === "Slow mornings")).toBe(true);
     // 3.4 asks for the verbatim description (withDescription) but not threat/protector.
     const fam34 = seed.items.find((i) => i.label === "Family");
     expect(fam34?.description).toBe("Being present");
