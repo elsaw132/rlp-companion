@@ -152,6 +152,8 @@ const ev = (category: FactCategory, extra: Partial<ManifestInput> = {}): Manifes
 // Stage 1 ids are semantic (1.day…), so Appendix A's 1.1–1.5 map across.
 export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
   // ---- Stage 1 — Imagine ----
+  // Winding-down only (Phase 3). Reads onboarding context; writes wind_down_exit.
+  "1.winddown": { moduleId: "1.winddown", inputs: [v("onboarding_fact")] },
   "1.day": { moduleId: "1.day", inputs: [v("onboarding_fact")] },
   "1.money": { moduleId: "1.money", inputs: [v("onboarding_fact")] },
   "1.roles": {

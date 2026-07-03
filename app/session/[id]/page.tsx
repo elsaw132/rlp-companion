@@ -9,6 +9,9 @@ import {
   getModulesBefore,
   sensesSessionInstructions,
   sensesClosingCommitment,
+  windDownFourOne,
+  windDownDecided,
+  type BuildResult,
 } from "@/lib/modules";
 import { getUserData } from "@/lib/db";
 import { ageFromDob } from "@/lib/planDate";
@@ -22,62 +25,18 @@ export default async function SessionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const found = getModule(id);
-
-  if (!found) {
-    return (
-      <main style={styles.notFoundPage}>
-        <p style={styles.notFoundText}>Module not found</p>
-      </main>
-    );
-  }
-
-  const {
-    module: mod,
-    stageNumber,
-    stageName,
-    totalStages,
-    modulesInStage,
-    stageModuleIds,
-  } = found;
-
-  // In-order gate: a module opens only if it's already complete (revisiting) or
-  // every module before it in programme order is done. This keeps the modules
-  // sequential even against a directly-typed URL — the dashboard already offers
-  // only the next module as a link. Fails open on a DB hiccup so a transient
-  // error never locks a legitimate user out of their next module.
   const { userId } = await auth();
-  if (userId) {
-    let completedIds: string[] | null = null;
-    try {
-      const raw = await getUserData(userId, "completed");
-      completedIds = Array.isArray(raw) ? (raw as string[]) : [];
-    } catch {
-      completedIds = null;
-    }
-    if (completedIds) {
-      const unlocked =
-        completedIds.includes(mod.id) ||
-        getModulesBefore(mod.id).every((m) => completedIds!.includes(m.id));
-      if (!unlocked) redirect("/home");
-    }
-  }
 
-  // The senses module (2.6) age-gates its hearing-check recommendation on the
-  // person's retirement horizon — the only age signal we capture at onboarding.
-  // Read it here so the conversation guidance and the closing plan step can be
-  // tailored before they reach the client. Any miss (no data, a DB hiccup) falls
-  // back to withholding the hearing nudge rather than showing it to everyone.
-  // One onboarding read serves two needs: the senses hearing gate (horizon/age)
-  // and — behind the RETIREMENT_PATHS flag — the person's retirementStage, which
-  // tailors this module's copy per cohort (Phase 2 sweep). With the flag off and
-  // a non-senses module we skip the read entirely, so the copy passes through
-  // untouched and byte-identical to today.
-  const isSenses = mod.id === "2.6";
+  // One onboarding read serves three needs (only when signed in AND either the
+  // retirement-paths flag is on or this is the senses module): the person's
+  // retirementStage — which, behind the flag, scopes which modules they see and
+  // tailors copy per cohort — and the horizon/age that drive the senses hearing
+  // gate. Flag off + non-senses skips the read, so everything below is
+  // byte-identical to today.
   let horizon: string | null = null;
   let age: number | null = null;
   let retirementStage: RetirementStage | null = null;
-  if ((isSenses || RETIREMENT_PATHS) && userId) {
+  if (userId && (RETIREMENT_PATHS || id === "2.6")) {
     try {
       const onboarding = await getUserData(userId, "onboarding");
       if (onboarding && typeof onboarding === "object") {
@@ -105,24 +64,102 @@ export default async function SessionPage({
     }
   }
 
+  // The stage that scopes module visibility — null (today's universal set) unless
+  // the flag is on. Used for module lookup, gating, and the next-module chain.
+  const effectiveRs = RETIREMENT_PATHS ? retirementStage : null;
+
+  const found = getModule(id, effectiveRs);
+  if (!found) {
+    return (
+      <main style={styles.notFoundPage}>
+        <p style={styles.notFoundText}>Module not found</p>
+      </main>
+    );
+  }
+
+  const {
+    module: mod,
+    stageNumber,
+    stageName,
+    totalStages,
+    modulesInStage,
+    stageModuleIds,
+  } = found;
+
+  // In-order gate: a module opens only if it's already complete (revisiting) or
+  // every module before it in programme order is done. This keeps the modules
+  // sequential even against a directly-typed URL — the dashboard already offers
+  // only the next module as a link. Fails open on a DB hiccup so a transient
+  // error never locks a legitimate user out of their next module. Scoped to the
+  // modules this person actually sees, so a winding-down user's extra first
+  // module gates correctly and nobody else is blocked on a module they can't see.
+  if (userId) {
+    let completedIds: string[] | null = null;
+    try {
+      const raw = await getUserData(userId, "completed");
+      completedIds = Array.isArray(raw) ? (raw as string[]) : [];
+    } catch {
+      completedIds = null;
+    }
+    if (completedIds) {
+      const unlocked =
+        completedIds.includes(mod.id) ||
+        getModulesBefore(mod.id, effectiveRs).every((m) =>
+          completedIds!.includes(m.id)
+        );
+      if (!unlocked) redirect("/home");
+    }
+  }
+
+  const isSenses = mod.id === "2.6";
+
+  // Winding-down 4.1 routing (Phase 3): if they've settled how/when they'll leave
+  // (captured in the wind-down module), 4.1 becomes an anticipatory reflection
+  // with no readiness widget; otherwise it's the readiness widget re-anchored to
+  // completing the exit they've already begun. Null for everyone else — 4.1 is
+  // unchanged.
+  let windDown: ReturnType<typeof windDownFourOne> | null = null;
+  if (effectiveRs === "winding_down" && mod.id === "4.1" && userId) {
+    let wdBuild: BuildResult | null = null;
+    try {
+      const raw = await getUserData(userId, "interaction:1.winddown");
+      if (raw && typeof raw === "object" && "type" in (raw as object)) {
+        wdBuild = raw as BuildResult;
+      }
+    } catch {
+      wdBuild = null;
+    }
+    windDown = windDownFourOne(windDownDecided(wdBuild), mod.interaction);
+  }
+
   // Tailor the user- and Vita-facing copy for this person's retirement stage.
   // tailorCopy is a no-op when the flag is off, the stage is unset, or they're
-  // still working — so those paths render the original strings unchanged.
-  const sessionDescription = tailorCopy(mod.description, retirementStage);
-  const coachOpening =
-    mod.coachOpening !== undefined
+  // still working — so those paths render the original strings unchanged. The
+  // wind-down 4.1 variants (when present) fully replace 4.1's copy and
+  // interaction, so they bypass tailorCopy.
+  const sessionDescription = windDown
+    ? windDown.description
+    : tailorCopy(mod.description, retirementStage);
+  const coachOpening = windDown
+    ? windDown.coachOpening
+    : mod.coachOpening !== undefined
       ? tailorCopy(mod.coachOpening, retirementStage)
       : undefined;
-  const primer = mod.primer.map((block) =>
-    block.type === "text"
-      ? { ...block, value: tailorCopy(block.value, retirementStage) }
-      : block
-  );
+  const primer = windDown
+    ? windDown.primer
+    : mod.primer.map((block) =>
+        block.type === "text"
+          ? { ...block, value: tailorCopy(block.value, retirementStage) }
+          : block
+      );
+  const interaction = windDown ? windDown.interaction : mod.interaction;
   const sessionInstructions = isSenses
     ? sensesSessionInstructions(horizon, age)
-    : mod.sessionInstructions !== undefined
-      ? tailorCopy(mod.sessionInstructions, retirementStage)
-      : undefined;
+    : windDown
+      ? windDown.sessionInstructions
+      : mod.sessionInstructions !== undefined
+        ? tailorCopy(mod.sessionInstructions, retirementStage)
+        : undefined;
   const closingCommitment = isSenses
     ? sensesClosingCommitment(horizon, age)
     : mod.closingCommitment;
@@ -130,11 +167,13 @@ export default async function SessionPage({
   // The next module in this stage, if there is one — offered as a secondary
   // action on completion, alongside returning to the hub. Null on the last
   // module in the stage, where only "Back to home" shows.
-  const nextId = getNextModule(mod.id);
+  const nextId = getNextModule(mod.id, effectiveRs);
   const nextHref = nextId ? `/session/${nextId}` : null;
   // The next module's title, so Vita's closing can name it correctly instead of
   // guessing. Null on the last module of the stage.
-  const nextModuleTitle = nextId ? (getModule(nextId)?.module.title ?? null) : null;
+  const nextModuleTitle = nextId
+    ? (getModule(nextId, effectiveRs)?.module.title ?? null)
+    : null;
 
   // The last module of a stage that has a stage-close reveal closes into it —
   // offered as the primary completion action so the reveal is reached on purpose
@@ -181,7 +220,7 @@ export default async function SessionPage({
         primer={primer}
         coachOpening={coachOpening}
         sessionInstructions={sessionInstructions}
-        interaction={mod.interaction}
+        interaction={interaction}
         closingCommitment={closingCommitment}
         closeInOneStep={mod.closeInOneStep ?? false}
       />

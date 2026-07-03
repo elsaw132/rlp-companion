@@ -10,7 +10,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { STAGES, TOTAL_STAGES } from "@/lib/modules";
+import { STAGES, TOTAL_STAGES, visibleModules } from "@/lib/modules";
+import { WINDING_STAGE1_INTRO_BODY } from "@/lib/modules";
+import { RETIREMENT_PATHS } from "@/lib/flags";
 import { getActiveStageNumber } from "@/lib/progress";
 import { useUserData } from "@/lib/userData";
 import { tailorCopy } from "@/lib/retirementCopy";
@@ -122,15 +124,23 @@ export default function HomeDashboard() {
   if (introStage !== null) {
     const stage = STAGES.find((s) => s.number === introStage);
     if (stage) {
-      // Tailor the intro's paragraphs to the person's retirement stage (Phase 2).
-      // tailorCopy is a no-op with the flag off or for a still-working/unset
-      // stage, so the intro renders identically to today in those cases.
+      // Stage 1 gets a present-progressive rewrite for winding-down (Phase 3):
+      // they've already started the shift, so the "before you can plan" opening
+      // reads wrong. Everyone else's Stage 1 intro is unchanged. Other stages
+      // fall through to the per-cohort copy sweep (Phase 2), which is a no-op with
+      // the flag off or for a still-working/unset stage.
+      const windingStage1 =
+        RETIREMENT_PATHS &&
+        retirementStage === "winding_down" &&
+        stage.number === 1;
       const introStageObj = stage.intro
         ? {
             ...stage,
             intro: {
               ...stage.intro,
-              body: stage.intro.body.map((p) => tailorCopy(p, retirementStage)),
+              body: windingStage1
+                ? WINDING_STAGE1_INTRO_BODY
+                : stage.intro.body.map((p) => tailorCopy(p, retirementStage)),
             },
           }
         : stage;
@@ -164,9 +174,11 @@ export default function HomeDashboard() {
     );
   }
 
-  // Every module in programme order, tagged with its stage number.
+  // Every module in programme order this person actually sees, tagged with its
+  // stage number. Cohort-scoped so a winding-down user's extra first module is
+  // counted and everyone else's programme is unchanged.
   const allModules = STAGES.flatMap((s) =>
-    s.modules.map((m) => ({ ...m, stageNumber: s.number }))
+    visibleModules(s, retirementStage).map((m) => ({ ...m, stageNumber: s.number }))
   );
 
   // The single next step: the first incomplete module in programme order.
@@ -181,14 +193,16 @@ export default function HomeDashboard() {
 
   // The stage the person is "on": the one holding the next step, or — if every
   // built module is complete — the first stage that isn't fully finished.
-  const activeStageNumber = getActiveStageNumber(completed);
+  const activeStageNumber = getActiveStageNumber(completed, retirementStage);
   const activeStage =
     STAGES.find((s) => s.number === activeStageNumber) ?? STAGES[0];
 
-  // Whether a stage is fully finished (every module in it complete). Empty
-  // future stages don't count as done.
-  const isStageDone = (s: (typeof STAGES)[number]) =>
-    s.modules.length > 0 && s.modules.every((m) => completed.includes(m.id));
+  // Whether a stage is fully finished (every module this person sees is
+  // complete). Empty future stages don't count as done.
+  const isStageDone = (s: (typeof STAGES)[number]) => {
+    const mods = visibleModules(s, retirementStage);
+    return mods.length > 0 && mods.every((m) => completed.includes(m.id));
+  };
 
   // The stage being looked at. Defaults to the current stage and stays there
   // until the person pins an earlier one. Stages past the current one are locked
@@ -201,7 +215,7 @@ export default function HomeDashboard() {
     STAGES.find((s) => s.number === viewedStageNumber) ?? activeStage;
   const isViewingCurrent = viewedStageNumber === activeStageNumber;
 
-  const stageModules = viewedStageData.modules;
+  const stageModules = visibleModules(viewedStageData, retirementStage);
   const doneInStage = stageModules.filter((m) => completed.includes(m.id)).length;
   const totalInStage = stageModules.length;
   const stagePct =
