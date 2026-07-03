@@ -185,6 +185,74 @@ export const RULES: Rule[] = [
       "grouped by when they tend to show up — life in retirement now, and the longer view."
     ),
   },
+
+  // ---- Stage 1 → Review, retired cohorts (Phase 4) ---------------------------
+  // Present-tense reframes of the Imagine modules for people already living
+  // retirement. winding_down keeps the default (future) copy — its Stage 1 stays
+  // "Imagine"; only the retired cohorts get "Review". RR and EST share the copy;
+  // the depth difference is carried by Vita via the onboarding status line.
+
+  // 1.day — a good day now (+ the "what you'd change" flag, via the opening)
+  {
+    find: "A guided picture of one ordinary day in your future — a Tuesday in October, a few years from now.",
+    variants: v(
+      "A guided picture of one ordinary day in your future — a Tuesday in October, a few years from now.",
+      "A guided picture of one ordinary good day in your retirement as it is now — a Tuesday in October."
+    ),
+  },
+  {
+    find: "Before you can plan a retirement, it helps to be able to picture one. Not the big milestones — just an ordinary day. In a moment, Vita will walk you through one: a Tuesday in October, a few years from now. There are no right answers, and nothing to work out.",
+    variants: v(
+      "Before you can plan a retirement, it helps to be able to picture one. Not the big milestones — just an ordinary day. In a moment, Vita will walk you through one: a Tuesday in October, a few years from now. There are no right answers, and nothing to work out.",
+      "A good way to take stock is to picture an ordinary day as it is now. Not the big milestones — just a normal Tuesday in October. In a moment, Vita will walk you through one, so you can see the shape of your days and notice what's working and what you'd want more or less of. There are no right answers."
+    ),
+  },
+  {
+    find: "Here's the day you've put together. Let's talk it through — looking at the whole thing, which part are you most looking forward to?",
+    variants: v(
+      "Here's the day you've put together. Let's talk it through — looking at the whole thing, which part are you most looking forward to?",
+      "Here's the day you've put together. Let's talk it through — looking at the whole thing, which part of it works best as it is? And is there anything you'd want more or less of?"
+    ),
+  },
+
+  // 1.roles — the roles you play now
+  {
+    find: "Beyond what you'll do — who you want to be. The roles that give your retirement shape and meaning.",
+    variants: v(
+      "Beyond what you'll do — who you want to be. The roles that give your retirement shape and meaning.",
+      "Beyond what you do — who you are. The roles that give your retirement its shape and meaning now, and any you'd still like to grow into."
+    ),
+  },
+  {
+    find: "This module is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.",
+    variants: v(
+      "This module is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.",
+      "This module is about the roles you play now, the ones that matter most to you, and any you'd still like to grow into."
+    ),
+  },
+
+  // 1.week — your week as it is
+  {
+    find: "A day is a snapshot; a week is a rhythm. The shape, balance, and pace you want across your time.",
+    variants: v(
+      "A day is a snapshot; a week is a rhythm. The shape, balance, and pace you want across your time.",
+      "A day is a snapshot; a week is a rhythm. The shape, balance, and pace of your time as it is now — and anything you'd like to shift."
+    ),
+  },
+  {
+    find: "This module is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.",
+    variants: v(
+      "This module is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.",
+      "This module is about the rhythm of your retirement as it is now — how much routine, variety, and rest you have across the week, what's working, and what you'd like to shift."
+    ),
+  },
+  {
+    find: "Here's the balance you've set for your ideal week. Which of these did you feel most strongly about?",
+    variants: v(
+      "Here's the balance you've set for your ideal week. Which of these did you feel most strongly about?",
+      "Here's the balance of your week as it is now. Which of these did you feel most strongly about — and is there anything you'd like to shift?"
+    ),
+  },
 ];
 
 // Rewrite one string for a person's retirement stage. A no-op — returns the input

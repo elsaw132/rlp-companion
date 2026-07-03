@@ -154,6 +154,9 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
   // ---- Stage 1 — Imagine ----
   // Winding-down only (Phase 3). Reads onboarding context; writes wind_down_exit.
   "1.winddown": { moduleId: "1.winddown", inputs: [v("onboarding_fact")] },
+  // Retired only (Phase 4). Reads onboarding; writes retirement_onset (+ any
+  // unfinished_work drawn out in conversation).
+  "1.worklife": { moduleId: "1.worklife", inputs: [v("onboarding_fact")] },
   "1.day": { moduleId: "1.day", inputs: [v("onboarding_fact")] },
   "1.money": { moduleId: "1.money", inputs: [v("onboarding_fact")] },
   "1.roles": {
