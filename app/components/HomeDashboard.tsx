@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, isRetired, titleFor } from "@/lib/modules";
+import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, stageSubtitleFor, isRetired, titleFor } from "@/lib/modules";
 import {
   WINDING_STAGE1_INTRO_BODY,
   REVIEW_STAGE1_INTRO_HEADING,
@@ -215,6 +215,7 @@ export default function HomeDashboard() {
   const stagesView = STAGES.map((s) => ({
     ...s,
     name: stageNameFor(s, retirementStage),
+    subtitle: stageSubtitleFor(s, retirementStage),
   }));
   const activeStage =
     stagesView.find((s) => s.number === activeStageNumber) ?? stagesView[0];

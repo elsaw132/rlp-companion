@@ -935,6 +935,16 @@ export function stageNameFor(stage: Stage, rs: RetirementStage | null): string {
   return stage.name;
 }
 
+// A stage's one-line subtitle for this person. Stage 1's "Picture your future"
+// reads wrong under "Review" for someone already retired (Phase 6). null /
+// flag-off keeps the base subtitle.
+export function stageSubtitleFor(stage: Stage, rs: RetirementStage | null): string {
+  if (RETIREMENT_PATHS && isRetired(rs) && stage.number === 1) {
+    return "Take stock of where you are";
+  }
+  return stage.subtitle;
+}
+
 // A module's title for this person. Most titles are universal; the few that read
 // as future-tense for someone already retired are reframed here (Phase 6), so the
 // card and session header match the reframed copy inside. Everyone else, and the
