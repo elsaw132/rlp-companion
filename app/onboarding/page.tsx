@@ -101,9 +101,15 @@ export default function OnboardingPage() {
   ];
   // The status step (when shown) only ever inserts horizon/motivation AFTER
   // itself, so advancing by one index is always safe — nothing before the current
-  // position shifts.
-  const current = steps[stepIndex];
+  // position shifts. Clamp in case a change to the status answer shrank the list
+  // (e.g. picking a retired stage removes horizon/motivation) while ahead of it.
+  const safeIndex = Math.min(stepIndex, steps.length - 1);
+  const current = steps[safeIndex];
   const goNext = () => setStepIndex((i) => i + 1);
+  // Back: step one screen earlier. Answers already given stay in state (and are
+  // saved), so the earlier step reappears with its previous choice selected and
+  // can be changed. Never goes before the welcome screen.
+  const goBack = () => setStepIndex((i) => Math.max(0, i - 1));
 
   // Once the data layer has loaded (running the one-time migration if needed),
   // anyone who has already finished onboarding is sent straight to /home — they
@@ -146,6 +152,11 @@ export default function OnboardingPage() {
       <main className="rlp-onb">
         <style>{css}</style>
         <div className="column">
+          {current !== "welcome" && (
+            <button type="button" className="onb-back" onClick={goBack}>
+              ← Back
+            </button>
+          )}
           {current === "welcome" && (
             <Welcome
               firstName={user?.firstName?.trim() || ""}
@@ -563,6 +574,9 @@ const css = `
 .rlp-onb .skip{background:none;border:none;padding:10px 6px;margin-top:14px;font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--text-muted);cursor:pointer;min-height:44px}
 .rlp-onb .skip:hover{color:var(--text);text-decoration:underline}
 .rlp-onb .skip:focus-visible{box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
+.rlp-onb .onb-back{align-self:flex-start;background:none;border:none;padding:8px 6px;margin:0 0 18px -6px;font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--text-muted);cursor:pointer;min-height:40px}
+.rlp-onb .onb-back:hover{color:var(--text)}
+.rlp-onb .onb-back:focus-visible{box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
 
 @media (max-width:560px){
   .rlp-onb{padding:32px 16px 64px}

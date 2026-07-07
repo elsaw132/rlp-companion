@@ -13,10 +13,18 @@
 // (Vita is speaking): her lockup, a serif prompt, low-friction controls.
 
 import { useState } from "react";
+import { useUserData } from "@/lib/userData";
+import { RETIREMENT_PATHS } from "@/lib/flags";
+import { isRetired } from "@/lib/modules";
 
-// Placeholder copy — pending sign-off.
+// Placeholder copy — pending sign-off. The retired cohorts are taking stock of a
+// retirement they're already living, so their prompt reflects rather than imagines
+// (Stage 1 is "Review" for them, not "Imagine").
 const PROMPT =
   "Before we start imagining in detail — what's already on your mind about retirement? Rough thoughts are fine: things you're looking forward to, ideas you've had, anything you've always said you'd do. Or skip ahead if nothing's come to you yet.";
+
+const PROMPT_RETIRED =
+  "Before we look at your retirement in detail — what's already on your mind about how it's going? Rough thoughts are fine: what's working, what you'd change, anything you keep meaning to get to. Or skip ahead if nothing's come to you yet.";
 
 const ACK = "Lovely — let's start building on that.";
 
@@ -27,6 +35,11 @@ export default function OpeningCapture({
   // skipped (or left it blank). The parent persists it and dismisses the step.
   onComplete: (text: string | null) => void;
 }) {
+  const userData = useUserData();
+  // Retired cohorts see "Review" framing here, not "Imagine" (Phase 6). null /
+  // flag-off keeps the original Imagine copy.
+  const retired = RETIREMENT_PATHS && isRetired(userData.getRetirementStage());
+  const prompt = retired ? PROMPT_RETIRED : PROMPT;
   const [text, setText] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -67,9 +80,9 @@ export default function OpeningCapture({
           </span>
           <span className="name">Vita</span>
         </div>
-        <div className="eyebrow">Stage 1 · Imagine</div>
+        <div className="eyebrow">Stage 1 · {retired ? "Review" : "Imagine"}</div>
         <h1 className="heading">Where you&rsquo;re starting from</h1>
-        <p className="prompt">{PROMPT}</p>
+        <p className="prompt">{prompt}</p>
 
         <textarea
           className="field"
