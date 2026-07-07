@@ -222,11 +222,29 @@ export type PlanCandidateGoal = { label: string; source: "change" | "unfinished"
 // shows before (or without) the generated, richer version from the plan-intro
 // call. Adds a concrete first move and a light line of why, so it reads as advice
 // drawn from their words, never as a reprint of them.
-export function frameResetAction(g: PlanCandidateGoal): string {
-  const quote = `“${g.label}”`;
-  return g.source === "unfinished"
-    ? `Pick ${quote} back up in a small way — one low-stakes first step is enough to stop it sitting unfinished, and to see whether it still matters to you.`
-    : `Give ${quote} a shape you choose — one small, regular anchor for it (a class, a standing walk, a set morning) so the week has something to lean toward rather than drift.`;
+//
+// Four scaffolds per source, rotated by the item's index, so two items that
+// share a source (e.g. two "change" picks) never render near-identically. The
+// generated version overlays this when it lands; this is what shows if it
+// doesn't. Rotation is deterministic — same inputs, same wording, every render.
+const RESET_SCAFFOLDS: Record<PlanCandidateGoal["source"], ((q: string) => string)[]> = {
+  change: [
+    (q) => `Give ${q} a shape you choose — one small, regular anchor for it (a class, a standing walk, a set morning) so the week has something to lean toward rather than drift.`,
+    (q) => `Take ${q} and change just one part of it this month — small enough to actually start, specific enough to notice once it's shifted.`,
+    (q) => `Decide what you'd want ${q} to look like instead, then set one regular thing in motion toward it — the picture is easier to follow than the problem.`,
+    (q) => `Name the part of ${q} that bothers you most and start there — a single, concrete swap does more than trying to rework the whole of it at once.`,
+  ],
+  unfinished: [
+    (q) => `Pick ${q} back up in a small way — one low-stakes first step is enough to stop it sitting unfinished, and to see whether it still matters to you.`,
+    (q) => `Give ${q} one proper try before you decide it's behind you — block out a single afternoon for it and let that be the whole goal for now.`,
+    (q) => `Return to ${q} with no pressure to finish — one small restart is all it takes to find out whether it's worth more of your time.`,
+    (q) => `Make room for ${q} again with one concrete move — a call, a sign-up, an hour set aside — enough to bring it back within reach.`,
+  ],
+};
+
+export function frameResetAction(g: PlanCandidateGoal, index = 0): string {
+  const scaffolds = RESET_SCAFFOLDS[g.source];
+  return scaffolds[index % scaffolds.length](`“${g.label}”`);
 }
 
 // §9 — the first year.
