@@ -935,6 +935,19 @@ export function stageNameFor(stage: Stage, rs: RetirementStage | null): string {
   return stage.name;
 }
 
+// A module's title for this person. Most titles are universal; the few that read
+// as future-tense for someone already retired are reframed here (Phase 6), so the
+// card and session header match the reframed copy inside. Everyone else, and the
+// flag off, keeps the base title.
+export function titleFor(mod: Module, rs: RetirementStage | null): string {
+  if (RETIREMENT_PATHS && isRetired(rs)) {
+    if (mod.id === "1.letter") return "Your retirement, in a letter";
+    if (mod.id === "1.roles") return "The roles you play";
+    if (mod.id === "1.day") return "A day in your retirement now";
+  }
+  return mod.title;
+}
+
 // Copy for a module's post-conversation commitment widget: Vita's prompt, the
 // tappable cadence options, and the optional one-line next-action field.
 export type ClosingCommitment = {

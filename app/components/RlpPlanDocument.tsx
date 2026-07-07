@@ -641,7 +641,8 @@ export default function RlpPlanDocument({
   const { meta, opening, balance, values, movingTowards, prioritisedAreas, paths, week, leavingWork, firstYear, connections, openThreads } = plan;
   // Retirement paths (Phase 5): all empty/null for working + flag-off. (The
   // "keep" items double as the week's anchors — rendered in the reset section.)
-  const { orientation, reset, windDownExit, candidateGoals, onsetGentle } = plan;
+  // resetActions is the FRAMED "Worth picking up" (never the raw change items).
+  const { orientation, reset, resetActions, windDownExit, onsetGentle } = plan;
   const heroScene = plan.scenes.find((s) => s.slot === "hero");
   const sceneFor = (id: string) => plan.scenes.find((s) => s.slot === id);
 
@@ -900,17 +901,13 @@ export default function RlpPlanDocument({
               </div>
             )}
           </div>
-          {candidateGoals.length > 0 && (
+          {resetActions.length > 0 && (
             <div className="rlp-candidates">
               <h3 className="rlp-reset-head">Worth picking up</h3>
+              <p className="rlp-reset-sub">A few ways to act on what you&rsquo;d reshape — small, concrete first moves.</p>
               <ul className="rlp-reset-list">
-                {candidateGoals.map((g, i) => (
-                  <li key={i}>
-                    {g.label}
-                    {g.source === "unfinished" && (
-                      <span className="rlp-candidate-tag"> — a thread from your working life</span>
-                    )}
-                  </li>
+                {resetActions.map((a, i) => (
+                  <li key={i}>{a}</li>
                 ))}
               </ul>
             </div>

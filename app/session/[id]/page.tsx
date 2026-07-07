@@ -10,6 +10,7 @@ import {
   sensesSessionInstructions,
   sensesClosingCommitment,
   windDownFourOne,
+  titleFor,
   windDownDecided,
   retiredLetter,
   isRetired,
@@ -234,7 +235,7 @@ export default async function SessionPage({
         nextModuleTitle={nextModuleTitle}
         revealHref={revealHref}
         revealLabel={revealLabel}
-        sessionTitle={mod.title}
+        sessionTitle={titleFor(mod, effectiveRs)}
         sessionDescription={sessionDescription}
         durationMin={mod.durationMin}
         primer={primer}

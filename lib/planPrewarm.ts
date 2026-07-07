@@ -63,6 +63,7 @@ export function buildPlanIntroRequest(
     withPartner: model.onboarding.withPartner,
     retirementStage: model.onboarding.retirementStage,
     onsetGentle: plan.onsetGentle,
+    resetItems: plan.candidateGoals,
     coreValues: introValues,
     roles: model.roles.all,
     mostAliveRoles: model.roles.mostAlive,

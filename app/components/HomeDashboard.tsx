@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, isRetired } from "@/lib/modules";
+import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, isRetired, titleFor } from "@/lib/modules";
 import {
   WINDING_STAGE1_INTRO_BODY,
   REVIEW_STAGE1_INTRO_HEADING,
@@ -636,7 +636,7 @@ export default function HomeDashboard() {
                     <>
                       <div className={`thumb ${thumb}`} aria-hidden="true"></div>
                       <div>
-                        <div className="title">{m.title}</div>
+                        <div className="title">{titleFor(m, retirementStage)}</div>
                         <div className="desc">
                           {tailorCopy(m.description, retirementStage)}
                         </div>

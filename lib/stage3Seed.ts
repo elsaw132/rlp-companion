@@ -205,22 +205,49 @@ export const PARTNER_FEARS: Set<string> = new Set([
   "Losing a partner",
 ]);
 
+// The name of the first ("transition") fear horizon, per retirement stage. The
+// default "The transition" reads as still-ahead; the retired cohorts have been
+// through it (retrospective/present) and winding-down is in it now (Phase 6).
+// null / working keep the default, so the flag-off bank is unchanged.
+function transitionHorizonName(rs: RetirementStage | null): string {
+  switch (rs) {
+    case "winding_down":
+      return "As work winds down";
+    case "recently_retired":
+      return "Since work ended";
+    case "established":
+      return "Adjusting to life after work";
+    default:
+      return "The transition";
+  }
+}
+
 // The fear bank for a given person: the full set if they have a partner,
 // otherwise the bank with the partner-only worries removed (empty horizons are
-// kept so the three horizons stay stable).
+// kept so the three horizons stay stable). The first horizon's NAME is reframed
+// per retirement stage so it doesn't read as a change still ahead of someone who
+// has already been through it (Phase 6); the later two horizons are timeless.
 export function fearHorizonsFor(
   hasPartner: boolean,
-  // Where they are with work and retirement, carried on the same rail as
-  // hasPartner for later phases (which will reframe the "transition" horizon per
-  // cohort). Accepted now so callers can thread it; nothing branches on it yet.
-  _retirementStage: RetirementStage | null = null
+  retirementStage: RetirementStage | null = null
 ): { name: string; fears: string[] }[] {
-  void _retirementStage; // reserved for later phases; nothing branches on it yet
-  if (hasPartner) return FEAR_HORIZONS;
-  return FEAR_HORIZONS.map((h) => ({
-    name: h.name,
-    fears: h.fears.filter((f) => !PARTNER_FEARS.has(f)),
+  const transitionName = transitionHorizonName(retirementStage);
+  const horizons = FEAR_HORIZONS.map((h, i) => ({
+    name: i === 0 ? transitionName : h.name,
+    fears: hasPartner ? h.fears : h.fears.filter((f) => !PARTNER_FEARS.has(f)),
   }));
+  // Established: a long-settled retiree is past any "transition", so the first
+  // horizon folds into "Life in retirement now" — leaving TWO horizons, which is
+  // what the 3.5 primer for this cohort says ("life in retirement now, and the
+  // longer view").
+  if (retirementStage === "established") {
+    const [first, second, third] = horizons;
+    return [
+      { name: "Life in retirement now", fears: [...first.fears, ...second.fears] },
+      third,
+    ];
+  }
+  return horizons;
 }
 
 // The seed shape is keyed by the interaction type it feeds, so the seeding phase

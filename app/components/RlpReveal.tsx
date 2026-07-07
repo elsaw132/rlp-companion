@@ -113,6 +113,11 @@ export default function RlpReveal() {
           : plan.leavingWork,
         connections: intro.connections,
         openThreads: intro.openThreads,
+        // "Worth picking up": the richer generated version when it landed, else
+        // the plan's deterministic framed fallback — never the raw items.
+        resetActions: intro.resetActions?.length
+          ? intro.resetActions
+          : plan.resetActions,
       }
     : plan;
 

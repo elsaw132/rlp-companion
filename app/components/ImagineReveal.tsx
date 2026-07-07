@@ -10,7 +10,8 @@
 
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { STAGES } from "@/lib/modules";
+import { STAGES, visibleModules, stageNameFor, isRetired } from "@/lib/modules";
+import { RETIREMENT_PATHS } from "@/lib/flags";
 import { useUserData } from "@/lib/userData";
 import { getArchetype } from "@/lib/archetypes";
 import {
@@ -25,6 +26,10 @@ import ArchetypeBlock from "./ArchetypeBlock";
 export default function ImagineReveal() {
   const { user } = useUser();
   const userData = useUserData();
+  // Retirement stage (Phase 6): scopes the module set/order and, for the retired
+  // cohorts, reframes this from "imagined" to "reviewed" (Stage 1 is "Review").
+  const rs = userData.getRetirementStage();
+  const retired = RETIREMENT_PATHS && isRetired(rs);
 
   const [synthesis, setSynthesis] = useState<RevealSynthesis | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -57,7 +62,9 @@ export default function ImagineReveal() {
       start && start.text.trim()
         ? [{ moduleTitle: start.moduleTitle, text: start.text.trim() }]
         : [];
-    const moduleEntries = STAGES[0].modules.flatMap((m) => {
+    // Cohort-scoped + in the person's own module order (Review re-orders Stage 1
+    // for the retired cohorts), so the synthesis reads their actual journey.
+    const moduleEntries = visibleModules(STAGES[0], rs).flatMap((m) => {
       const t = userData.getTakeaway(m.id);
       return t && t.text.trim()
         ? [{ moduleTitle: m.title, text: t.text.trim() }]
@@ -98,11 +105,14 @@ export default function ImagineReveal() {
   }
 
   const completedIds = new Set(userData.getCompletedIds());
-  const arc = STAGES.map((s) => ({
-    number: s.number,
-    name: s.name,
-    done: s.modules.length > 0 && s.modules.every((m) => completedIds.has(m.id)),
-  }));
+  const arc = STAGES.map((s) => {
+    const mods = visibleModules(s, rs);
+    return {
+      number: s.number,
+      name: stageNameFor(s, rs),
+      done: mods.length > 0 && mods.every((m) => completedIds.has(m.id)),
+    };
+  });
 
   const archetype = getArchetype(synthesis.archetypeId);
   const secondary = synthesis.secondaryId
@@ -116,16 +126,18 @@ export default function ImagineReveal() {
   // reveal lightly bookends the beginning before showing what emerged.
   const startedFromSomething = !!userData.getStartingThoughts()?.text.trim();
   const name = displayName ? `, ${displayName}` : "";
+  // Retired cohorts reviewed the retirement they're living, not imagined one.
+  const doneWord = retired ? "taking stock" : "imagining";
   const vitaIntro = startedFromSomething
-    ? `That's the imagining done${name}. You came in with a few thoughts already — here's what you kept coming back to\u00a0\u2014`
-    : `That's the imagining done${name}. Here's what you kept coming back to\u00a0\u2014`;
+    ? `That's the ${doneWord} done${name}. You came in with a few thoughts already — here's what you kept coming back to\u00a0\u2014`
+    : `That's the ${doneWord} done${name}. Here's what you kept coming back to\u00a0\u2014`;
 
   return (
     <StageReveal
       arc={arc}
       motif={<DawnMotif />}
       eyebrow="Where your plan begins"
-      title="Your retirement, imagined"
+      title={retired ? "Your retirement, reviewed" : "Your retirement, imagined"}
       vitaIntro={vitaIntro}
       threads={synthesis.threads}
       payoff={

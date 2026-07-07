@@ -212,8 +212,22 @@ export type PlanWindDownExit = {
 };
 
 // A goal the plan surfaces from the retirement-paths facts — a change the person
-// named (from the reset) or an unfinished-work thread. Offered, never imposed.
+// named (from the reset) or an unfinished-work thread. This is the INPUT to the
+// "Worth picking up" bridge; it is never rendered verbatim — the plan renders the
+// framed suggestion (resetActions) instead. Kept on the model so the generator
+// (plan-intro) can turn it into insight + a first move.
 export type PlanCandidateGoal = { label: string; source: "change" | "unfinished" };
+
+// A deterministic framed suggestion for a reset item — the fallback the plan
+// shows before (or without) the generated, richer version from the plan-intro
+// call. Adds a concrete first move and a light line of why, so it reads as advice
+// drawn from their words, never as a reprint of them.
+export function frameResetAction(g: PlanCandidateGoal): string {
+  const quote = `“${g.label}”`;
+  return g.source === "unfinished"
+    ? `Pick ${quote} back up in a small way — one low-stakes first step is enough to stop it sitting unfinished, and to see whether it still matters to you.`
+    : `Give ${quote} a shape you choose — one small, regular anchor for it (a class, a standing walk, a set morning) so the week has something to lean toward rather than drift.`;
+}
 
 // §9 — the first year.
 export type PlanFirstYearItem = {
@@ -267,8 +281,13 @@ export type RlpPlan = {
   // leavingWork, from the 4.1 readiness build).
   windDownExit: PlanWindDownExit | null;
   // Goals surfaced from the facts — reset "change" items + unfinished_work. []
-  // the default. Offered as candidates, never imposed.
+  // the default. The INPUT to "Worth picking up" (fed to the generator); never
+  // rendered verbatim.
   candidateGoals: PlanCandidateGoal[];
+  // "Worth picking up" as it's shown — one framed suggestion per candidate goal
+  // (insight + a first move), NOT the raw items. Deterministic fallback from
+  // frameResetAction; overlaid with the richer generated version at render time.
+  resetActions: string[];
   // The "keep" items the rhythm is built around (retired). [] the default.
   anchors: string[];
   // Framing tone: true when leaving work wasn't fully their own choice, so the
@@ -805,6 +824,7 @@ export function buildRlpPlan(
     reset,
     windDownExit,
     candidateGoals,
+    resetActions: candidateGoals.map(frameResetAction),
     anchors,
     onsetGentle,
     firstYear,
