@@ -184,6 +184,70 @@ export function coreValuesFromFacts(facts: StoredFact[]): ValueEntry[] {
   return entries;
 }
 
+// ---- Retirement-paths fact reads (Phase 5) ----------------------------------
+// Deterministic reads of the facts captured in Phases 3–4, for the plan model.
+// Nothing new is captured here.
+
+// The retired letter's stock-take, split by disposition. The extractor stores the
+// element in `label` and one of keep/change/leave in `description`.
+export type KeepChangeLeave = { keep: string[]; change: string[]; leaveBehind: string[] };
+
+export function keepChangeLeaveFromFacts(facts: StoredFact[]): KeepChangeLeave {
+  const out: KeepChangeLeave = { keep: [], change: [], leaveBehind: [] };
+  for (const f of facts) {
+    if (f.status !== "active" || f.category !== "keep_change_leave") continue;
+    const label = String(f.data.label ?? "").trim();
+    if (!label) continue;
+    const d = String(f.data.description ?? "").toLowerCase();
+    if (d.includes("leave")) out.leaveBehind.push(label);
+    else if (d.includes("change") || d.includes("reshape")) out.change.push(label);
+    else if (d.includes("keep")) out.keep.push(label);
+    // An unclear disposition is dropped rather than guessed at.
+  }
+  return out;
+}
+
+// The unfinished-work threads from the retired "what work gave you" module —
+// surfaced gently as things they might still want to pick back up.
+export function unfinishedWorkFromFacts(facts: StoredFact[]): string[] {
+  return facts
+    .filter((f) => f.status === "active" && f.category === "unfinished_work")
+    .map((f) => String(f.data.label ?? "").trim())
+    .filter(Boolean);
+}
+
+// Whether leaving work was NOT fully their own choice (circumstantial or a mix),
+// so the plan framing stays gentle and never celebrates a "chosen fresh start".
+// No onset fact on record → false (default to the normal, neutral framing).
+export function retirementOnsetCircumstantial(facts: StoredFact[]): boolean {
+  const f = facts.find(
+    (x) => x.status === "active" && x.category === "retirement_onset"
+  );
+  if (!f) return false;
+  return !String(f.data.label ?? "").toLowerCase().includes("own choice");
+}
+
+// The winding-down exit, when they've settled a plan (the decided path for §8).
+export type WindDownExitRead = {
+  label: string;
+  decision: string;
+  currentShape: string;
+  windingDuration: string;
+};
+
+export function windDownExitFromFacts(facts: StoredFact[]): WindDownExitRead | null {
+  const f = facts.find(
+    (x) => x.status === "active" && x.category === "wind_down_exit"
+  );
+  if (!f) return null;
+  return {
+    label: String(f.data.label ?? "").trim(),
+    decision: String(f.data.decision ?? "").trim(),
+    currentShape: String(f.data.currentShape ?? "").trim(),
+    windingDuration: String(f.data.windingDuration ?? "").trim(),
+  };
+}
+
 // 4.6 week rhythm: the person's real recurring activities, as the structured
 // seed the week-shape draft is built from — replacing the transcript scrape.
 export type RecurringSeed = { label: string; domain: string | null };

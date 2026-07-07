@@ -366,6 +366,11 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
       // What they're reaching for and what's on their mind.
       ev("hope"),
       ev("concern"),
+      // Retired only (Phase 5): what they'd reshape (from the letter) and any
+      // unfinished-work thread become candidate goals. Absent for everyone else,
+      // so their goal seed is unchanged.
+      ev("keep_change_leave"),
+      ev("unfinished_work"),
       v("onboarding_fact", { tag: "partner" }),
     ],
   },
@@ -401,6 +406,9 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
       // A week's anchors are largely people-driven (Fridays with the grandkids,
       // a partner's own routine) — the structured activity list is unaffected.
       ev("relationship"),
+      // Retired only (Phase 5): the "keep" elements from the letter are the
+      // anchors the week is built around. Absent for everyone else.
+      ev("keep_change_leave"),
       e("readiness", { tag: "work-transition", crossRef: "4.1" }),
       e("goal", { crossRef: "4.3" }),
     ],
