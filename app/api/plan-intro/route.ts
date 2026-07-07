@@ -55,6 +55,18 @@ function buildUserContent(body: PlanIntroRequest): string {
   if (body.withPartner != null) {
     sections.push(body.withPartner ? "You're planning retirement with a partner." : "You're planning retirement on your own.");
   }
+  // Cohort framing (Phase 5): keep the tense right for someone already retired or
+  // mid-exit, so the prose never reads as if retirement is still far ahead.
+  if (body.retirementStage === "recently_retired") {
+    sections.push("IMPORTANT FRAMING: You have already retired, not long ago, and are still settling in. Write in the PRESENT about the retirement you're living now — never as a future you're approaching.");
+  } else if (body.retirementStage === "established") {
+    sections.push("IMPORTANT FRAMING: You have been retired for a while. Write in the PRESENT, taking stock of the retirement you're living — never as a future you're approaching.");
+  } else if (body.retirementStage === "winding_down") {
+    sections.push("IMPORTANT FRAMING: You are winding down, with the exit from work already in motion. Write in the present-progressive — never as if retirement is still years ahead.");
+  }
+  if (body.onsetGentle) {
+    sections.push("Leaving work wasn't fully your own choice, so keep the framing gentle and never celebrate it as a chosen fresh start.");
+  }
   if (body.coreValues?.length) {
     sections.push(
       `What matters most to you, most important first:\n${body.coreValues

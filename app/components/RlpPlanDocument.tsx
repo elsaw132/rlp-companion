@@ -639,6 +639,9 @@ export default function RlpPlanDocument({
   onSaveSelfIntro?: (text: string) => void;
 }) {
   const { meta, opening, balance, values, movingTowards, prioritisedAreas, paths, week, leavingWork, firstYear, connections, openThreads } = plan;
+  // Retirement paths (Phase 5): all empty/null for working + flag-off. (The
+  // "keep" items double as the week's anchors — rendered in the reset section.)
+  const { orientation, reset, windDownExit, candidateGoals, onsetGentle } = plan;
   const heroScene = plan.scenes.find((s) => s.slot === "hero");
   const sceneFor = (id: string) => plan.scenes.find((s) => s.slot === id);
 
@@ -693,6 +696,7 @@ export default function RlpPlanDocument({
         {heroScene && <SceneImage scene={heroScene} ratio="21 / 9" src={images.hero} />}
         <p className="rlp-eyebrow">Your Retirement Life Plan</p>
         <h1 className="rlp-chapter-title">{opening.chapterTitle}</h1>
+        {orientation && <p className="rlp-overview rlp-orientation">{orientation}</p>}
         {opening.overview && <p className="rlp-overview">{opening.overview}</p>}
         {opening.insight && <p className="rlp-insight">{opening.insight}</p>}
         <SelfIntro
@@ -856,7 +860,95 @@ export default function RlpPlanDocument({
         </section>
       )}
 
-      {/* §8 — leaving work */}
+      {/* §8 — retired: the reset (carrying forward / reshaping / letting go) */}
+      {reset && (
+        <section className="rlp-section">
+          <SectionHead index={8} eyebrow="The reset" title="Carrying forward, reshaping, letting go" />
+          {onsetGentle && (
+            <p className="rlp-overview">
+              Leaving work wasn&rsquo;t entirely on your terms, so this is less
+              about a fresh start and more about making the retirement you&rsquo;re
+              in feel like your own.
+            </p>
+          )}
+          <div className="rlp-reset">
+            {reset.keep.length > 0 && (
+              <div className="rlp-reset-col">
+                <h3 className="rlp-reset-head">Carrying forward</h3>
+                <p className="rlp-reset-sub">What&rsquo;s working — the anchors of your week.</p>
+                <ul className="rlp-reset-list">
+                  {reset.keep.map((x, i) => <li key={i}>{x}</li>)}
+                </ul>
+              </div>
+            )}
+            {reset.change.length > 0 && (
+              <div className="rlp-reset-col">
+                <h3 className="rlp-reset-head">Reshaping</h3>
+                <p className="rlp-reset-sub">What you&rsquo;d like to change.</p>
+                <ul className="rlp-reset-list">
+                  {reset.change.map((x, i) => <li key={i}>{x}</li>)}
+                </ul>
+              </div>
+            )}
+            {reset.leaveBehind.length > 0 && (
+              <div className="rlp-reset-col">
+                <h3 className="rlp-reset-head">Letting go</h3>
+                <p className="rlp-reset-sub">What you&rsquo;d happily leave behind.</p>
+                <ul className="rlp-reset-list">
+                  {reset.leaveBehind.map((x, i) => <li key={i}>{x}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+          {candidateGoals.length > 0 && (
+            <div className="rlp-candidates">
+              <h3 className="rlp-reset-head">Worth picking up</h3>
+              <ul className="rlp-reset-list">
+                {candidateGoals.map((g, i) => (
+                  <li key={i}>
+                    {g.label}
+                    {g.source === "unfinished" && (
+                      <span className="rlp-candidate-tag"> — a thread from your working life</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* §8 — winding-down, decided: the settled exit (from the wind_down_exit fact) */}
+      {windDownExit && (
+        <section className="rlp-section">
+          <SectionHead index={8} eyebrow="The threshold" title="Leaving work" />
+          <dl className="rlp-facts">
+            <div>
+              <dt>Your plan</dt>
+              <dd>You&rsquo;ve settled how and when you&rsquo;ll leave work fully.</dd>
+            </div>
+            {windDownExit.currentShape && (
+              <div>
+                <dt>Where you are now</dt>
+                <dd>
+                  Still working {windDownExit.currentShape.toLowerCase()}
+                  {windDownExit.windingDuration
+                    ? `, winding down ${windDownExit.windingDuration.toLowerCase()}`
+                    : ""}.
+                </dd>
+              </div>
+            )}
+          </dl>
+          <div className="rlp-finance">
+            <p>
+              <strong>Financial confidence.</strong>{" "}
+              Worth firming up with your pension provider or a financial adviser as the natural next step.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* §8 — working + winding-undecided: leaving work (from the 4.1 readiness build) */}
       {leavingWork && (
         <section className="rlp-section">
           <SectionHead index={8} eyebrow="The threshold" title="Leaving work" />
@@ -1153,6 +1245,16 @@ const css = `
 .lvl-none{background:var(--muted-surface);color:var(--text-muted)}
 .rlp-finance{background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-md);padding:16px 18px}
 .rlp-finance p{margin:0;font-size:var(--fs-body);color:var(--text)}
+.rlp-orientation{font-style:italic;color:var(--text)}
+.rlp-reset{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:0 0 20px}
+.rlp-reset-col{background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-md);padding:16px 18px}
+.rlp-reset-head{font-family:var(--font-serif);font-size:var(--fs-section);font-weight:600;color:var(--ink);margin:0 0 4px}
+.rlp-reset-sub{font-family:var(--font-sans);font-size:var(--fs-sm);color:var(--text-muted);margin:0 0 10px}
+.rlp-reset-list{margin:0;padding:0 0 0 18px;font-size:var(--fs-body);color:var(--text);line-height:var(--lh-body)}
+.rlp-reset-list li{margin:0 0 6px}
+.rlp-candidates{border-top:1px solid var(--border);padding-top:16px}
+.rlp-candidate-tag{color:var(--text-muted);font-size:var(--fs-sm)}
+@media (max-width:620px){.rlp-reset{grid-template-columns:1fr}}
 
 /* §9 first year */
 .rlp-narrative{font-family:var(--font-serif);font-size:var(--fs-h2);line-height:1.6;color:var(--ink);margin:0 0 30px;max-width:62ch}

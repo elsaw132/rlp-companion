@@ -18,6 +18,7 @@
 import {
   STAGES,
   getModule,
+  isRetired,
   type BuildResult,
   type BalancedAreaId,
   type BalancedGoalsResult,
@@ -29,6 +30,8 @@ import {
   type FirstYearResult,
   type FirstYearInteraction,
 } from "@/lib/modules";
+import { RETIREMENT_PATHS } from "@/lib/flags";
+import type { RetirementStage } from "@/lib/userData";
 import {
   buildUserModel,
   BALANCED_AREAS,
@@ -36,7 +39,13 @@ import {
   type UserModel,
   type ValueEntry,
 } from "@/lib/userModel";
-import { coreValuesFromFacts } from "@/lib/resolverInputs";
+import {
+  coreValuesFromFacts,
+  keepChangeLeaveFromFacts,
+  unfinishedWorkFromFacts,
+  retirementOnsetCircumstantial,
+  windDownExitFromFacts,
+} from "@/lib/resolverInputs";
 import type { ConnectionsGraph } from "@/lib/planIntro";
 
 // ---- The assembled plan ----
@@ -185,6 +194,27 @@ export type PlanLeavingWork = {
   financeNote: string;
 };
 
+// §8, retired cohorts (Phase 5): the reset — carrying forward / reshaping /
+// letting go, from the retired letter's keep_change_leave. Replaces the
+// future-exit "leaving work" section, which reads wrong for someone already out.
+export type PlanReset = {
+  keep: string[];
+  change: string[];
+  leaveBehind: string[];
+};
+
+// §8, winding-down decided path (Phase 5): the settled exit, from the
+// wind_down_exit fact (rather than the 4.1 readiness widget).
+export type PlanWindDownExit = {
+  label: string;
+  currentShape: string;
+  windingDuration: string;
+};
+
+// A goal the plan surfaces from the retirement-paths facts — a change the person
+// named (from the reset) or an unfinished-work thread. Offered, never imposed.
+export type PlanCandidateGoal = { label: string; source: "change" | "unfinished" };
+
 // §9 — the first year.
 export type PlanFirstYearItem = {
   label: string;
@@ -226,6 +256,24 @@ export type RlpPlan = {
   paths: PlanPaths;
   week: PlanWeek | null;
   leavingWork: PlanLeavingWork | null;
+  // ---- Retirement paths (Phase 5). All empty/null for working + flag-off. ----
+  // A one-line orientation at the top of the plan, per cohort ("" = none).
+  orientation: string;
+  // Retired §8 replacement (keep / change / leave). null unless retired with a
+  // captured keep_change_leave.
+  reset: PlanReset | null;
+  // Winding-down §8, decided path — the settled exit from the wind_down_exit
+  // fact. null unless winding-down with a settled plan (undecided uses
+  // leavingWork, from the 4.1 readiness build).
+  windDownExit: PlanWindDownExit | null;
+  // Goals surfaced from the facts — reset "change" items + unfinished_work. []
+  // the default. Offered as candidates, never imposed.
+  candidateGoals: PlanCandidateGoal[];
+  // The "keep" items the rhythm is built around (retired). [] the default.
+  anchors: string[];
+  // Framing tone: true when leaving work wasn't fully their own choice, so the
+  // plan stays gentle and never celebrates a chosen fresh start.
+  onsetGentle: boolean;
   firstYear: PlanFirstYear | null;
   // The signature web of real links between goals, values and people. Generated;
   // null until generation runs (or when there isn't enough real linkage).
@@ -604,6 +652,23 @@ function addMonthsISO(iso: string, months: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+// The one-line orientation at the top of the plan, per retirement stage. Empty
+// for working + flag-off (the plan opens as it does today). Present-tense for the
+// retired cohorts (living it), present-progressive for winding-down (exit in
+// motion) — never the future "as you approach retirement" framing.
+function buildOrientation(rs: RetirementStage | null): string {
+  switch (rs) {
+    case "recently_retired":
+      return "You've not long retired and are still settling in. This plan is a way to shape the retirement you're already living, as it finds its feet.";
+    case "established":
+      return "You've been retired a while now. This plan is a chance to take stock and reassess — to shape the years ahead on your own terms.";
+    case "winding_down":
+      return "You're winding down, with the shift out of work already underway. This plan holds where you are now and the retirement you're moving into.";
+    default:
+      return "";
+  }
+}
+
 // ---- The assembler ----
 
 export type BuildPlanOptions = {
@@ -658,7 +723,57 @@ export function buildRlpPlan(
 
   const movingTowards = buildSeasons(board);
   const week = buildWeek(weekResult);
-  const leavingWork = buildLeavingWork(snap);
+
+  // ---- Retirement paths (Phase 5): read the Phase 3–4 facts into §8, the
+  // orientation line, candidate goals, rhythm anchors, and the framing tone.
+  // rs is null (so all of this is inert) with the flag off or for the working
+  // cohort, keeping the plan byte-identical to today for them.
+  const facts = source.getActiveFacts?.() ?? [];
+  const rs: RetirementStage | null = RETIREMENT_PATHS
+    ? (model.onboarding.retirementStage ?? null)
+    : null;
+
+  let reset: PlanReset | null = null;
+  let windDownExit: PlanWindDownExit | null = null;
+  let leavingWork: PlanLeavingWork | null = null;
+  let candidateGoals: PlanCandidateGoal[] = [];
+  let anchors: string[] = [];
+
+  if (isRetired(rs)) {
+    // §8 becomes the reset (keep / change / leave); no future-exit section.
+    const kcl = keepChangeLeaveFromFacts(facts);
+    if (kcl.keep.length || kcl.change.length || kcl.leaveBehind.length) {
+      reset = kcl;
+    }
+    anchors = kcl.keep;
+    candidateGoals = [
+      ...kcl.change.map((label) => ({ label, source: "change" as const })),
+      ...unfinishedWorkFromFacts(facts).map((label) => ({
+        label,
+        source: "unfinished" as const,
+      })),
+    ];
+  } else if (rs === "winding_down") {
+    // Two sources: a settled plan reads from the wind_down_exit fact; otherwise
+    // fall back to the 4.1 readiness build ("completing the exit").
+    const exit = windDownExitFromFacts(facts);
+    if (exit) {
+      windDownExit = {
+        label: exit.label,
+        currentShape: exit.currentShape,
+        windingDuration: exit.windingDuration,
+      };
+    } else {
+      leavingWork = buildLeavingWork(snap);
+    }
+  } else {
+    // Working + flag-off: today's §8, unchanged.
+    leavingWork = buildLeavingWork(snap);
+  }
+
+  const orientation = buildOrientation(rs);
+  const onsetGentle = retirementOnsetCircumstantial(facts);
+
   const firstYear = buildFirstYear(fyResult);
   const scenes = buildScenes(prioritised, firstYear);
 
@@ -686,6 +801,12 @@ export function buildRlpPlan(
     paths: { paths, strengths },
     week,
     leavingWork,
+    orientation,
+    reset,
+    windDownExit,
+    candidateGoals,
+    anchors,
+    onsetGentle,
     firstYear,
     connections: null,
     openThreads: [],

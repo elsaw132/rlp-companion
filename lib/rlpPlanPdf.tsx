@@ -153,6 +153,8 @@ function GoalEntry({ goal }: { goal: PlanGoal }) {
 
 export function createPlanPdfDocument(plan: RlpPlan, images: Record<string, string>) {
   const { meta, opening, balance, values, movingTowards, prioritisedAreas, paths, week, leavingWork, firstYear, connections, openThreads } = plan;
+  // Retirement paths (Phase 5): empty/null for working + flag-off.
+  const { orientation, reset, windDownExit, candidateGoals, onsetGentle } = plan;
   const heroImg = images.hero;
 
   const seasonsLanes = movingTowards.seasons.filter((x) => x.id !== "enduring");
@@ -165,6 +167,9 @@ export function createPlanPdfDocument(plan: RlpPlan, images: Record<string, stri
         {heroImg ? <Image src={heroImg} style={s.coverHero} /> : null}
         <Text style={s.eyebrow}>Your Retirement Life Plan</Text>
         <Text style={s.chapterTitle}>{opening.chapterTitle}</Text>
+        {orientation ? (
+          <Text style={{ ...s.overview, fontFamily: "Times-Italic" }}>{orientation}</Text>
+        ) : null}
 
         {opening.overview ? <Text style={s.overview}>{opening.overview}</Text> : null}
         {opening.insight ? <Text style={s.insight}>{opening.insight}</Text> : null}
@@ -351,6 +356,68 @@ export function createPlanPdfDocument(plan: RlpPlan, images: Record<string, stri
               );
             })()}
             <Text style={s.fine}>The character of an ordinary week, lived for years — not a timetable.</Text>
+          </View>
+        ) : null}
+
+        {/* §8 retired — the reset */}
+        {reset ? (
+          <View style={s.section}>
+            <SectionHead no={8} eyebrow="The reset" title="Carrying forward, reshaping, letting go" />
+            {onsetGentle ? (
+              <Text style={s.overview}>
+                Leaving work wasn&rsquo;t entirely on your terms, so this is less about a fresh start and more about making the retirement you&rsquo;re in feel like your own.
+              </Text>
+            ) : null}
+            {reset.keep.length > 0 ? (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={s.colHead}>Carrying forward</Text>
+                {reset.keep.map((x, i) => <Text key={i} style={s.colItem}>{x}</Text>)}
+              </View>
+            ) : null}
+            {reset.change.length > 0 ? (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={s.colHead}>Reshaping</Text>
+                {reset.change.map((x, i) => <Text key={i} style={s.colItem}>{x}</Text>)}
+              </View>
+            ) : null}
+            {reset.leaveBehind.length > 0 ? (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={s.colHead}>Letting go</Text>
+                {reset.leaveBehind.map((x, i) => <Text key={i} style={s.colItem}>{x}</Text>)}
+              </View>
+            ) : null}
+            {candidateGoals.length > 0 ? (
+              <View>
+                <Text style={s.colHead}>Worth picking up</Text>
+                {candidateGoals.map((g, i) => (
+                  <Text key={i} style={s.colItem}>
+                    {g.label}{g.source === "unfinished" ? " — a thread from your working life" : ""}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* §8 winding-down, decided — the settled exit */}
+        {windDownExit ? (
+          <View style={s.section}>
+            <SectionHead no={8} eyebrow="The threshold" title="Leaving work" />
+            <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 12 }}>
+              <Fact label="Your plan" value="You've settled how and when you'll leave work fully." />
+              {windDownExit.currentShape ? (
+                <Fact
+                  label="Where you are now"
+                  value={`Still working ${windDownExit.currentShape.toLowerCase()}${windDownExit.windingDuration ? `, winding down ${windDownExit.windingDuration.toLowerCase()}` : ""}.`}
+                />
+              ) : null}
+            </View>
+            <View style={s.finance}>
+              <Text>
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>Financial confidence. </Text>
+                Worth firming up with your pension provider or a financial adviser as the natural next step.
+              </Text>
+            </View>
           </View>
         ) : null}
 

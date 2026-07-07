@@ -64,10 +64,12 @@ export type PlanIntro = PlanProse;
 export type PlanIntroRequest = {
   name?: string | null;
   withPartner?: boolean | null;
-  // Where they are with work and retirement, or null when uncaptured. Carried on
-  // the same rail as withPartner for later phases; the prose writer ignores it
-  // for now.
+  // Where they are with work and retirement, or null when uncaptured. Drives the
+  // prose tense/framing per cohort (Phase 5).
   retirementStage?: RetirementStage | null;
+  // True when leaving work wasn't fully their own choice — keep the prose gentle
+  // and never celebrate a "chosen fresh start" (Phase 5).
+  onsetGentle?: boolean;
   coreValues?: { value: string; meaning?: string }[];
   roles?: string[];
   mostAliveRoles?: string[];
