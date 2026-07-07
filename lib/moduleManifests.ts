@@ -366,11 +366,10 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
       // What they're reaching for and what's on their mind.
       ev("hope"),
       ev("concern"),
-      // Retired only (Phase 5): what they'd reshape (from the letter) and any
-      // unfinished-work thread become candidate goals. Absent for everyone else,
-      // so their goal seed is unchanged.
-      ev("keep_change_leave"),
-      ev("unfinished_work"),
+      // NB (Phase 6): keep_change_leave / unfinished_work deliberately do NOT feed
+      // 4.3 — the retired "change" + unfinished items are developed once, in the
+      // plan's "Worth picking up" bridge (§8), so the same item is never grown
+      // into a goal here AND surfaced there. 4.3 stays the balanced five-area set.
       v("onboarding_fact", { tag: "partner" }),
     ],
   },

@@ -8,6 +8,7 @@ import {
   PARTNER_FEARS,
   type Stage3Seed,
 } from "@/lib/stage3Seed";
+import { useUserData } from "@/lib/userData";
 import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 // 3.5 "Hopes and fears" — the quieter half of the picture. A short read-only
@@ -79,8 +80,11 @@ export default function HopesFears({
   const hfSeed = seed && seed.type === "hopes-fears" ? seed : null;
   const hopes = initial?.hopes ?? hfSeed?.hopes ?? "";
 
-  // The bank for this person — partner-only horizons stripped if they're solo.
-  const horizons = fearHorizonsFor(hasPartner);
+  // The bank for this person — partner-only horizons stripped if they're solo,
+  // and the first horizon's name reframed for their retirement stage (Phase 6),
+  // so it doesn't read as a change still ahead of someone already through it.
+  const userData = useUserData();
+  const horizons = fearHorizonsFor(hasPartner, userData.getRetirementStage());
 
   const [cards, setCards] = useState<CardState[]>(() => {
     if (initial) {

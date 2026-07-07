@@ -42,12 +42,14 @@ Fields:
 
 - openThreads: a SHORT list (0–4) of things you're still working out — honest, live, generative, never failures or gaps. Draw each from the "open-thread signals" provided (a financial date still to firm up, an area you're undecided about, a goal not yet specific). Second person ("You haven't yet decided…", "You still want to pin down…"). [] if there's nothing real.
 
+- resetActions: ONLY when "reset items to develop" are provided below (a retired member's stock-take) — otherwise []. Turn EACH item into ONE short, second-person suggestion that EARNS its place: name what it is in a few words, add one line of insight (why it matters now, or what's underneath it), and give ONE concrete first move. NEVER just repeat the item back — that's a failure. Draw on their own words but add the analysis and the action. A "change" item becomes a way to reshape it; an "unfinished" item becomes a small way to pick it back up. E.g. item "the afternoons that drift with no shape" → "Give your afternoons one anchor a week — a class, a standing walk, a volunteering slot — so they have a shape you look toward rather than one that drifts." One string per item, same order.
+
 - connections: the web of REAL links between your goals, your values and the people who matter — only links you would recognise from what you actually said (e.g. a goal whose note names a person or a value). Return {"nodes":[{"id","label","kind"}],"edges":[{"from","to","why"}]} where kind is "value" | "goal" | "person", ids are short slugs, label is the real short name, and why is a brief second-person reason grounded in your material. Keep it legible — the meaningful connections only, not every possible one (aim for the strongest 6–14 edges). No speculative associations. null if there isn't enough real linkage.
 
 Voice rules (absolute): second person (except selfIntro); never the words reflect, explore, unpack, journey, growth, share, deep dive, genuinely; never negative-contrast or symmetrical structures ("It's not X, it's Y"); no retirement clichés (golden years, bucket lists, putting your feet up).
 
 Respond with ONLY a JSON object, no markdown, no preamble:
-{"chapterTitle":"...","overview":"...","insight":"...","selfIntro":"...","balanceShape":"...","seasonsArc":"...","weekRhythm":"...","financeNote":"...","openThreads":["..."],"connections":{"nodes":[],"edges":[]}}`;
+{"chapterTitle":"...","overview":"...","insight":"...","selfIntro":"...","balanceShape":"...","seasonsArc":"...","weekRhythm":"...","financeNote":"...","openThreads":["..."],"resetActions":["..."],"connections":{"nodes":[],"edges":[]}}`;
 
 function buildUserContent(body: PlanIntroRequest): string {
   const sections: string[] = [];
@@ -66,6 +68,13 @@ function buildUserContent(body: PlanIntroRequest): string {
   }
   if (body.onsetGentle) {
     sections.push("Leaving work wasn't fully your own choice, so keep the framing gentle and never celebrate it as a chosen fresh start.");
+  }
+  if (body.resetItems?.length) {
+    sections.push(
+      `Reset items to develop (turn each into a framed resetActions suggestion — insight + a first move, never a reprint), in order:\n${body.resetItems
+        .map((r) => `- [${r.source}] ${r.label}`)
+        .join("\n")}`
+    );
   }
   if (body.coreValues?.length) {
     sections.push(

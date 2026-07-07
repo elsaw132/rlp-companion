@@ -8,6 +8,9 @@ type SuggestionsRequest = {
   // A readable summary of what they've already imagined across Stage 1, built
   // by userData.buildPriorReflections. May be the "nothing yet" fallback.
   priorReflections: string;
+  // True for the retired letter (Phase 6): the chips reflect on retirement so
+  // far rather than a future they've imagined. Absent = the default framing.
+  retired?: boolean;
 };
 
 // One tappable starting point. `chip` is Vita's short invitation shown on the
@@ -30,9 +33,18 @@ const GENERIC_SUGGESTIONS: Suggestion[] = [
   },
 ];
 
-const SYSTEM_PROMPT = `You are Vita, a warm AI coach in a retirement life-planning programme. The person is about to write a short letter to someone in their life, set a good way into their retirement, describing what life looks like now. Your job is to beat the blank page: offer a few optional, tappable starting points drawn from what they've already imagined earlier in the programme.
+// Cohort framing (Phase 6). The retired variant reflects on the retirement they're
+// already living (present), not one they've "imagined"; everyone else keeps the
+// future-self framing.
+const DEFAULT_FRAMING = `The person is about to write a short letter to someone in their life, set a good way into their retirement, describing what life looks like now. Your job is to beat the blank page: offer a few optional, tappable starting points drawn from what they've already imagined earlier in the programme.
 
-You'll be given who they're writing to, and a summary of what they imagined in earlier modules (their day, the roles they want, their ideal week, things they'd love to do). Produce 2 to 4 starting points, each tied to something they actually said — never generic, never invented.
+You'll be given who they're writing to, and a summary of what they imagined in earlier modules (their day, the roles they want, their ideal week, things they'd love to do).`;
+
+const RETIRED_FRAMING = `The person is already retired and about to write a short letter to someone in their life, reflecting on what their retirement actually looks like now. Your job is to beat the blank page: offer a few optional, tappable starting points drawn from what they've described about their retirement so far.
+
+You'll be given who they're writing to, and a summary of what they've told you — their days as they are now, the roles they play, their week, and anything they still want to do.`;
+
+const SYSTEM_PROMPT = `You are Vita, a warm AI coach in a retirement life-planning programme. {FRAMING} Produce 2 to 4 starting points, each tied to something they actually said — never generic, never invented.
 
 Each starting point has two parts:
 - "chip": a very short label (3 to 6 words) naming the thing, in your voice, e.g. "Your slow mornings in the garden" or "A month a year in Japan".
@@ -69,12 +81,16 @@ export async function POST(request: Request) {
   }
 
   const userContent = `They're writing to: ${body.recipientLabel}\n\n${body.priorReflections.trim()}`;
+  const system = SYSTEM_PROMPT.replace(
+    "{FRAMING}",
+    body.retired ? RETIRED_FRAMING : DEFAULT_FRAMING
+  );
 
   try {
     const response = await anthropic.messages.create({
       model: HAIKU_MODEL,
       max_tokens: 500,
-      system: SYSTEM_PROMPT,
+      system,
       messages: [{ role: "user", content: userContent }],
     });
 

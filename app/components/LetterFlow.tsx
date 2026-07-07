@@ -23,6 +23,9 @@ type LetterFlowProps = {
   // Optional reframed placeholder for the writing surface (the retired
   // "retirement so far" reflection). Falls back to the future-self prompt.
   writingPlaceholder?: string;
+  // True for the retired letter (Phase 6): the starting-point chips reflect on
+  // retirement so far rather than a future they've imagined.
+  retired?: boolean;
   // Called once the letter is finalised: the result to store, plus Vita's
   // closing acknowledgement to show alongside the reveal.
   onComplete: (result: LetterResult, vitaMessage: string) => void;
@@ -38,6 +41,7 @@ export default function LetterFlow({
   priorReflections,
   initial,
   writingPlaceholder,
+  retired,
   onComplete,
 }: LetterFlowProps) {
   const [step, setStep] = useState<"recipient" | "writing">(
@@ -74,7 +78,7 @@ export default function LetterFlow({
       const res = await fetch("/api/letter-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipientLabel: label, priorReflections }),
+        body: JSON.stringify({ recipientLabel: label, priorReflections, retired }),
       });
       if (!res.ok) return;
       const data = (await res.json()) as { suggestions?: Suggestion[] };

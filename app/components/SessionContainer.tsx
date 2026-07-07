@@ -1991,6 +1991,7 @@ export default function SessionContainer({
             priorReflections={resolveSeedText(sessionId, userData.getActiveFacts())}
             initial={buildResult?.type === "letter" ? buildResult : undefined}
             writingPlaceholder={letterWritingPlaceholder}
+            retired={letterHasConversation}
             onComplete={handleLetterComplete}
           />
         )}

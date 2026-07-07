@@ -153,8 +153,9 @@ function GoalEntry({ goal }: { goal: PlanGoal }) {
 
 export function createPlanPdfDocument(plan: RlpPlan, images: Record<string, string>) {
   const { meta, opening, balance, values, movingTowards, prioritisedAreas, paths, week, leavingWork, firstYear, connections, openThreads } = plan;
-  // Retirement paths (Phase 5): empty/null for working + flag-off.
-  const { orientation, reset, windDownExit, candidateGoals, onsetGentle } = plan;
+  // Retirement paths (Phase 5): empty/null for working + flag-off. resetActions is
+  // the FRAMED "Worth picking up" (never the raw change items).
+  const { orientation, reset, windDownExit, resetActions, onsetGentle } = plan;
   const heroImg = images.hero;
 
   const seasonsLanes = movingTowards.seasons.filter((x) => x.id !== "enduring");
@@ -386,13 +387,11 @@ export function createPlanPdfDocument(plan: RlpPlan, images: Record<string, stri
                 {reset.leaveBehind.map((x, i) => <Text key={i} style={s.colItem}>{x}</Text>)}
               </View>
             ) : null}
-            {candidateGoals.length > 0 ? (
+            {resetActions.length > 0 ? (
               <View>
                 <Text style={s.colHead}>Worth picking up</Text>
-                {candidateGoals.map((g, i) => (
-                  <Text key={i} style={s.colItem}>
-                    {g.label}{g.source === "unfinished" ? " — a thread from your working life" : ""}
-                  </Text>
+                {resetActions.map((a, i) => (
+                  <Text key={i} style={s.colItem}>{a}</Text>
                 ))}
               </View>
             ) : null}

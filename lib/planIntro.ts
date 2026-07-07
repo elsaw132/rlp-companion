@@ -52,6 +52,11 @@ export type PlanProse = {
   // §10 — things still in motion: what the member hasn't resolved and wants to
   // keep working out. First-person, generative, never framed as failures. [].
   openThreads: string[];
+  // §8 "Worth picking up" (retired reset, Phase 6): one framed suggestion per
+  // reset "change" item / unfinished-work thread — Vita naming what it is, why it
+  // matters now, and a concrete first move. NOT a reprint of their words. []
+  // when there's nothing to surface. Second person.
+  resetActions: string[];
   // The signature web of real links. null when there isn't enough to draw.
   connections: ConnectionsGraph | null;
 };
@@ -70,6 +75,10 @@ export type PlanIntroRequest = {
   // True when leaving work wasn't fully their own choice — keep the prose gentle
   // and never celebrate a "chosen fresh start" (Phase 5).
   onsetGentle?: boolean;
+  // The retired reset's change items + unfinished-work threads (Phase 6). The
+  // generator turns each into a framed "Worth picking up" suggestion (insight +
+  // a first move). Empty/absent for non-retired.
+  resetItems?: { label: string; source: "change" | "unfinished" }[];
   coreValues?: { value: string; meaning?: string }[];
   roles?: string[];
   mostAliveRoles?: string[];
@@ -166,6 +175,13 @@ export function coercePlanIntro(raw: unknown): PlanProse | null {
         .filter(Boolean)
         .slice(0, 4)
     : [];
+  const resetActions = Array.isArray(o.resetActions)
+    ? o.resetActions
+        .filter((d): d is string => typeof d === "string")
+        .map((d) => d.trim())
+        .filter(Boolean)
+        .slice(0, 6)
+    : [];
   const intro: PlanProse = {
     chapterTitle: str(o, "chapterTitle"),
     overview: str(o, "overview"),
@@ -176,6 +192,7 @@ export function coercePlanIntro(raw: unknown): PlanProse | null {
     weekRhythm: str(o, "weekRhythm"),
     financeNote: str(o, "financeNote"),
     openThreads,
+    resetActions,
     connections: coerceConnections(o.connections),
   };
   // Need at least a title or the self-intro to count as a real result.

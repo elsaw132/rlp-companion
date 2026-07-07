@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildRlpPlan } from "@/lib/rlpPlan";
+import { fearHorizonsFor } from "@/lib/stage3Seed";
 import type { ModelSource } from "@/lib/userModel";
 import type { StoredFact, FactCategory, FactData } from "@/lib/contextFacts";
 import type { BuildResult } from "@/lib/modules";
@@ -59,6 +60,24 @@ const readiness: BuildResult = {
   summaryLabel: "Your readiness snapshot",
 };
 
+describe("3.5 fear horizons per cohort", () => {
+  it("relabels the transition horizon and merges to two for established", () => {
+    expect(fearHorizonsFor(true, null).map((h) => h.name)).toEqual([
+      "The transition",
+      "Life in retirement",
+      "The longer view",
+    ]);
+    expect(fearHorizonsFor(true, "recently_retired")[0].name).toBe("Since work ended");
+    expect(fearHorizonsFor(true, "winding_down")[0].name).toBe("As work winds down");
+    // Established → TWO horizons (matches its primer), the first folded in.
+    const est = fearHorizonsFor(true, "established");
+    expect(est.map((h) => h.name)).toEqual([
+      "Life in retirement now",
+      "The longer view",
+    ]);
+  });
+});
+
 describe("Reset plan — flag OFF (default test env)", () => {
   it("a retired stage but flag off gives today's plan (no reset/orientation)", () => {
     const plan = buildRlpPlan(
@@ -96,6 +115,13 @@ describe("Reset plan — flag ON, per cohort", () => {
       { label: "how I spend afternoons", source: "change" },
       { label: "the mentoring I never finished", source: "unfinished" },
     ]);
+    // "Worth picking up" is FRAMED (deterministic fallback), never a reprint: one
+    // per candidate, each longer than the bare label and carrying a first move.
+    expect(rr.resetActions.length).toBe(2);
+    rr.resetActions.forEach((a, i) => {
+      expect(a).not.toBe(rr.candidateGoals[i].label);
+      expect(a.length).toBeGreaterThan(rr.candidateGoals[i].label.length + 15);
+    });
     expect(rr.anchors).toEqual(["my slow mornings"]);
     expect(rr.onsetGentle).toBe(true); // circumstantial → gentle framing
 
