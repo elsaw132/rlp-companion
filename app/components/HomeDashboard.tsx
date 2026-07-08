@@ -7,8 +7,8 @@
 // .rlp-home so the replicated reference styles don't leak into other routes.
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, stageSubtitleFor, isRetired, titleFor } from "@/lib/modules";
 import {
@@ -44,6 +44,7 @@ export default function HomeDashboard() {
   // has loaded, and for anyone still working.
   const retirementStage = userData.getRetirementStage();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [completed, setCompleted] = useState<string[]>([]);
   const [greeting, setGreeting] = useState("Good morning");
   // The resolved name for the greeting, or null when none is known — in which
@@ -71,6 +72,20 @@ export default function HomeDashboard() {
   // intro and before module 1.1, while 1.1 isn't done yet. Set once on load.
   const [showOpeningCapture, setShowOpeningCapture] = useState(false);
 
+  // Sync the mobile app bar's "Jump to a stage" deep-link (?stage=N) into the
+  // viewed stage — reactively, so it also works when we're already on /home (a
+  // same-page Link navigation doesn't remount, so the once-on-load read below
+  // wouldn't catch it). The render logic clamps N to a stage actually reached.
+  const stageParam = searchParams.get("stage");
+  useEffect(() => {
+    if (stageParam === null) return;
+    const n = Number(stageParam);
+    // Syncing an external system (the URL) into local state — the sanctioned use
+    // of an effect, not a cascading render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (Number.isInteger(n) && n >= 1) setViewedStage(n);
+  }, [stageParam]);
+
   // Read completion once the data layer has loaded. Done during render (not an
   // effect) so the first paint after load already has the saved state. The
   // onboarding gate now lives server-side in /home, so the dashboard only waits
@@ -90,13 +105,29 @@ export default function HomeDashboard() {
     // won't suddenly see that stage's intro.
     const currentStage = getActiveStageNumber(ids);
     const stage = STAGES.find((s) => s.number === currentStage);
+    const params =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : null;
+    // Deep-link from the mobile app bar's "Jump to a stage": pin the viewed stage
+    // to ?stage=N. Only stages already reached are honoured (later stages are
+    // locked and clamp back to the current one anyway).
+    const stageParam = params ? Number(params.get("stage")) : NaN;
+    if (
+      Number.isInteger(stageParam) &&
+      stageParam >= 1 &&
+      stageParam <= currentStage
+    ) {
+      setViewedStage(stageParam);
+    }
     // A stage reveal's "Return home" links to /home?intro=skip so the person
     // lands on the dashboard itself, not straight into the next stage's intro.
+    // A stage deep-link (?stage=N) is likewise not interrupted by the intro.
     // Transient (this visit only) — the intro still shows on a later forward
     // entry, since this never records it as seen.
     const skipIntro =
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("intro") === "skip";
+      !!params &&
+      (params.get("intro") === "skip" || params.get("stage") !== null);
     if (
       stage?.intro &&
       !skipIntro &&

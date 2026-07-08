@@ -218,8 +218,10 @@ export default async function SessionPage({
         : `See your ${stageName} reveal →`;
 
   return (
-    <main style={{ minHeight: "100vh", background: "var(--bg-alt)" }}>
-      <div style={styles.navBar}>
+    <main style={{ minHeight: "100dvh", background: "var(--bg-alt)" }}>
+      {/* Desktop back/reset row. Hidden on mobile (≤880px), where the unified
+          MobileAppBar carries the back control instead. */}
+      <div className="session-nav-bar">
         <ModulesBackLink sessionId={mod.id} />
         <ResetModuleLink sessionId={mod.id} />
       </div>
@@ -251,17 +253,8 @@ export default async function SessionPage({
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  navBar: {
-    width: "100%",
-    maxWidth: "var(--content-max)",
-    margin: "0 auto",
-    padding: "20px 24px 0",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
   notFoundPage: {
-    minHeight: "100vh",
+    minHeight: "100dvh",
     background: "var(--bg-alt)",
     display: "flex",
     alignItems: "center",
