@@ -613,9 +613,6 @@ export default function SessionContainer({
   const [input, setInput] = useState("");
   // The composer is an auto-growing textarea; this lets it size to its content.
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  // A sentinel at the end of the message list, so streamed text can keep the
-  // latest words in view as they arrive.
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   // Flips true once we've read this module's saved state out of the snapshot, so
   // the persist effect can't overwrite a saved conversation with an empty one
   // before hydration.
@@ -1573,17 +1570,22 @@ export default function SessionContainer({
 
   // Keep the newest streamed text in view. Runs on each smoothed frame (messages
   // update), but only follows when the reader is already near the bottom — if
-  // they've scrolled up to re-read, we never yank them back down. The reveal
-  // grows a few characters at a time, so an instant nudge reads as a smooth,
-  // continuous scroll rather than a jump.
+  // they've scrolled up to re-read, we never yank them back down. We scroll the
+  // page to its TRUE bottom rather than scrollIntoView-ing the end-of-list
+  // sentinel: the composer (and any completion block) sit below that sentinel, so
+  // aligning the sentinel to the viewport bottom would scroll the page *up* and
+  // push the composer off-screen — the aggressive upward jump on reaching the
+  // bottom. Going to document bottom instead settles at the real bottom, and
+  // because the reveal grows a few characters per frame it reads as a smooth,
+  // continuous follow rather than a jump.
   useEffect(() => {
     if (!streamingRef.current) return;
-    const el = messagesEndRef.current;
-    if (!el) return;
     const nearBottom =
       window.innerHeight + window.scrollY >=
       document.documentElement.scrollHeight - 160;
-    if (nearBottom) el.scrollIntoView({ block: "end" });
+    if (nearBottom) {
+      window.scrollTo({ top: document.documentElement.scrollHeight });
+    }
   }, [messages]);
 
   async function handleSend() {
@@ -1899,11 +1901,6 @@ export default function SessionContainer({
             {sending && messages[messages.length - 1]?.role !== "coach" && (
               <TypingBubble />
             )}
-            <div
-              ref={messagesEndRef}
-              aria-hidden="true"
-              style={{ scrollMarginBottom: "24px" }}
-            />
           </div>
 
           {completed && pendingFactRemovals.length > 0 && (
@@ -1961,11 +1958,14 @@ export default function SessionContainer({
                   onFocus={() => {
                     // On mobile the composer sits at the end of a long scrolling
                     // page, so when the on-screen keyboard opens it can be left
-                    // off-screen. Pull it (and the Send button) into view once the
-                    // keyboard has had a moment to animate in.
+                    // off-screen. Once the keyboard has had a moment to animate in,
+                    // ensure the input is visible — but only just: block "nearest"
+                    // scrolls the minimum needed, so an already-visible composer
+                    // stays put rather than being yanked to the centre of the
+                    // viewport (which threw the page upward when tapping to type).
                     setTimeout(() => {
                       composerRef.current?.scrollIntoView({
-                        block: "center",
+                        block: "nearest",
                         behavior: "smooth",
                       });
                     }, 300);
