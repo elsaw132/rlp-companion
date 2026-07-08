@@ -140,6 +140,9 @@ export default function ProviderBand() {
 
 const bandCss = `
 .rlp-band{height:var(--header-h);background:var(--brand-band);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:10}
+/* On mobile the unified MobileAppBar replaces this band (Phase 1). Desktop keeps
+   the band exactly as-is. */
+@media (max-width:880px){.rlp-band{display:none}}
 .rlp-band .brand{display:flex;align-items:center;gap:14px;text-decoration:none;border-radius:var(--r-sm)}
 .rlp-band .brand:focus-visible{outline:none;box-shadow:var(--focus-ring)}
 .rlp-band .logo{font-family:var(--font-serif);font-weight:700;font-size:23px;color:var(--brand-on-band);letter-spacing:-.01em;line-height:1.1}

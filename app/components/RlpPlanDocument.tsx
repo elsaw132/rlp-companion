@@ -1252,6 +1252,8 @@ const css = `
 .rlp-candidates{border-top:1px solid var(--border);padding-top:16px}
 .rlp-candidate-tag{color:var(--text-muted);font-size:var(--fs-sm)}
 @media (max-width:620px){.rlp-reset{grid-template-columns:1fr}}
+/* Tighter side padding on very narrow phones so content isn't over-squeezed. */
+@media (max-width:380px){.rlp-plan{padding-left:16px;padding-right:16px}}
 
 /* §9 first year */
 .rlp-narrative{font-family:var(--font-serif);font-size:var(--fs-h2);line-height:1.6;color:var(--ink);margin:0 0 30px;max-width:62ch}

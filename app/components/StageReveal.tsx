@@ -173,4 +173,8 @@ const css = `
   .rlp-reveal .display{font-size:28px}
   .rlp-reveal .intro,.rlp-reveal .thread .quote,.rlp-reveal .hook{font-size:18px}
 }
+@media(max-width:380px){
+  .rlp-reveal{padding-left:14px;padding-right:14px}
+  .rlp-reveal .body{padding-left:16px;padding-right:16px}
+}
 `;

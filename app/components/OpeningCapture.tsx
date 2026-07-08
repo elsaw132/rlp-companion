@@ -116,7 +116,7 @@ export default function OpeningCapture({
 }
 
 const css = `
-.rlp-opening{min-height:calc(100vh - var(--header-h));background:var(--warm-surface);display:flex;align-items:center;justify-content:center;padding:64px 24px}
+.rlp-opening{min-height:calc(100dvh - var(--header-h));background:var(--warm-surface);display:flex;align-items:center;justify-content:center;padding:64px 24px}
 .rlp-opening .wrap{max-width:600px;width:100%}
 .rlp-opening .vita{display:flex;align-items:center;gap:10px;margin-bottom:22px}
 .rlp-opening .vita .sun{width:40px;height:40px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:20px;color:var(--ink)}

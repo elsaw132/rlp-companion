@@ -1958,6 +1958,18 @@ export default function SessionContainer({
                     setInput(e.target.value);
                     if (error) setError(null);
                   }}
+                  onFocus={() => {
+                    // On mobile the composer sits at the end of a long scrolling
+                    // page, so when the on-screen keyboard opens it can be left
+                    // off-screen. Pull it (and the Send button) into view once the
+                    // keyboard has had a moment to animate in.
+                    setTimeout(() => {
+                      composerRef.current?.scrollIntoView({
+                        block: "center",
+                        behavior: "smooth",
+                      });
+                    }, 300);
+                  }}
                   onKeyDown={(e) => {
                     // Enter sends; Shift+Enter starts a new line, so a longer
                     // thought can be written without firing it half-finished.

@@ -173,7 +173,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: "rgba(0, 0, 0, 0.35)",
     display: "grid",
     placeItems: "end",
-    padding: "22px",
+    // Bottom-anchored: add the safe-area inset so the panel (and its Send button)
+    // clears the home indicator on notched phones. No effect on desktop.
+    padding: "22px 22px calc(22px + env(safe-area-inset-bottom))",
     zIndex: 70,
   },
   panel: {

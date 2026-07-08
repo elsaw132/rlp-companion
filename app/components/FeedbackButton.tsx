@@ -61,4 +61,9 @@ const launchCss = `
     outline: none;
     box-shadow: var(--focus-ring);
   }
+  /* On mobile this floating pill overlapped content and collided with the chat
+     composer/keyboard, so it's hidden here — feedback is reached via the app
+     bar's Menu ("Send feedback"). Desktop keeps the pill. !important overrides
+     the inline display:flex on the button. */
+  @media (max-width: 880px) { .fb-launch { display: none !important; } }
 `;

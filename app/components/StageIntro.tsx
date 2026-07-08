@@ -47,7 +47,7 @@ export default function StageIntro({
 }
 
 const css = `
-.rlp-stage-intro{min-height:calc(100vh - var(--header-h));background:var(--warm-surface);display:flex;align-items:center;justify-content:center;padding:64px 24px}
+.rlp-stage-intro{min-height:calc(100dvh - var(--header-h));background:var(--warm-surface);display:flex;align-items:center;justify-content:center;padding:64px 24px}
 .rlp-stage-intro .wrap{max-width:600px;width:100%}
 .rlp-stage-intro .vita{display:flex;align-items:center;gap:10px;margin-bottom:22px}
 .rlp-stage-intro .vita .sun{width:40px;height:40px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:20px;color:var(--ink)}

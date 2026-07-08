@@ -15,3 +15,19 @@ body {
   background: var(--bg-alt);
   -webkit-font-smoothing: antialiased;
 }
+
+/* The module screen's desktop back/reset row (was an inline style on the
+   session page). Unchanged on desktop; hidden on mobile (≤880px), where the
+   MobileAppBar carries the back control instead. */
+.session-nav-bar {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 20px 24px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+@media (max-width: 880px) {
+  .session-nav-bar { display: none; }
+}

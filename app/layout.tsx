@@ -18,6 +18,7 @@ const sourceSerif = Source_Serif_4({
 });
 import { UserDataProvider } from "@/lib/userData";
 import FeedbackButton from "./components/FeedbackButton";
+import MobileAppBar from "./components/MobileAppBar";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -35,8 +36,14 @@ export default function RootLayout({
     <html lang="en" className={`h-full ${inter.variable} ${sourceSerif.variable}`}>
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
-          <UserDataProvider>{children}</UserDataProvider>
-          {/* Global in-app feedback panel — fixed bottom-right on every screen. */}
+          <UserDataProvider>
+            {/* Mobile-only sticky nav backbone (≤880px). display:none on desktop,
+                so the desktop chrome (ProviderBand / session nav bar) is unchanged. */}
+            <MobileAppBar />
+            {children}
+          </UserDataProvider>
+          {/* Global in-app feedback panel — fixed bottom-right on desktop; hidden
+              on mobile, where it's folded into the app bar's Menu. */}
           <FeedbackButton />
         </ClerkProvider>
         <Analytics />

@@ -525,7 +525,7 @@ function CardStep({
 }
 
 const css = `
-.rlp-onb{min-height:calc(100vh - var(--header-h));background:var(--bg-alt);display:flex;justify-content:center;padding:56px 24px 80px;font-family:var(--font-sans)}
+.rlp-onb{min-height:calc(100dvh - var(--header-h));background:var(--bg-alt);display:flex;justify-content:center;padding:56px 24px 80px;font-family:var(--font-sans)}
 .rlp-onb .column{width:100%;max-width:600px;display:flex;flex-direction:column;align-items:flex-start}
 .rlp-onb :focus-visible{outline:none}
 
@@ -583,5 +583,6 @@ const css = `
   .rlp-onb .welcome .body{padding:24px 20px 26px}
   .rlp-onb .hero-heading{font-size:28px}
   .rlp-onb .scene{height:112px}
+  .rlp-onb .onb-back{min-height:44px}
 }
 `;
