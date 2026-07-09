@@ -482,7 +482,7 @@ function ScenarioCard({
         </div>
         <input
           type="range"
-          className="trade-slider"
+          className="trade-slider rlp-slider"
           min={0}
           max={100}
           step={1}

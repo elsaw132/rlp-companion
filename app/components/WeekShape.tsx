@@ -392,7 +392,7 @@ export default function WeekShape({
           </div>
           <input
             type="range"
-            className="week-slider"
+            className="week-slider rlp-slider"
             min={0}
             max={100}
             step={1}
