@@ -605,7 +605,7 @@ function StoneRow({
         <div style={styles.stoneActions}>
           <button
             type="button"
-            className="path-arrow"
+            className="path-arrow rlp-tap"
             style={styles.arrow}
             aria-label="Move step earlier"
             disabled={index === 0}
@@ -615,7 +615,7 @@ function StoneRow({
           </button>
           <button
             type="button"
-            className="path-arrow"
+            className="path-arrow rlp-tap"
             style={styles.arrow}
             aria-label="Move step later"
             disabled={index === count - 1}
@@ -625,7 +625,7 @@ function StoneRow({
           </button>
           <button
             type="button"
-            className="path-remove"
+            className="path-remove rlp-tap"
             style={styles.removeBtn}
             aria-label="Remove step"
             onClick={onRemove}
@@ -677,7 +677,7 @@ function SupportList({
           />
           <button
             type="button"
-            className="path-remove"
+            className="path-remove rlp-tap"
             style={styles.removeBtn}
             aria-label="Remove"
             onClick={() => onRemove(item.id)}

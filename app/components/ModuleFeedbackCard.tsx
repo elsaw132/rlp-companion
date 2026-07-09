@@ -153,7 +153,7 @@ function Scale({
           <button
             key={v}
             type="button"
-            className="opt"
+            className="opt rlp-tap-h"
             aria-pressed={value === v}
             onClick={() => onPick(v)}
           >

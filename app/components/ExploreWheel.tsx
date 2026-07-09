@@ -281,5 +281,9 @@ const css = `
 @media(max-width:880px){
   .exw-wheel{width:100%;max-width:300px;height:auto;aspect-ratio:1/1}
   .exw-wheel svg{width:100%;height:auto}
+  /* Raise the prose reading lines toward the 16px minimum on phones (the
+     forward line and the research stat). Desktop type is unchanged. */
+  .exw-forward{font-size:16px}
+  .exw-claim{font-size:15.5px}
 }
 `;
