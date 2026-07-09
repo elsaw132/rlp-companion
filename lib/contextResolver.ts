@@ -35,6 +35,9 @@ export type ResolvedFact = {
   domain: RecurringDomain | null;
   label: string;
   description?: string;
+  // The person's own "why" captured in conversation (contextFacts reason path).
+  // Rides along wherever the fact renders, no manifest flag needed.
+  reason?: string;
   threat?: string;
   protectors?: string[];
   data: StoredFact["data"];
@@ -89,6 +92,10 @@ function toResolved(fact: StoredFact, input: ManifestInput): ResolvedFact {
     const desc = clean(fact.data.description);
     if (desc) out.description = desc;
   }
+  // A conversational reason travels with the fact everywhere (no manifest gate),
+  // so the "why" reaches the plan wherever the pick already does.
+  const reason = clean(fact.data.reason);
+  if (reason) out.reason = reason;
   if (input.withThreatProtector) {
     const threat = clean(fact.data.threat);
     if (threat) out.threat = threat;
@@ -165,6 +172,7 @@ const CATEGORY_LABEL: Record<FactCategory, string> = {
 function renderFact(f: ResolvedFact): string {
   let s = f.label;
   if (f.description) s += ` (${f.description})`;
+  if (f.reason) s += ` — because ${f.reason}`;
   if (f.threat) s += ` — at risk from: ${f.threat}`;
   if (f.protectors && f.protectors.length) {
     s += ` — protected by: ${f.protectors.join(", ")}`;

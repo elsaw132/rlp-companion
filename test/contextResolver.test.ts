@@ -267,3 +267,26 @@ describe("manifest population check (seed fixture user)", () => {
     expect(seed.springboards.every((s) => s.areas.length > 0)).toBe(true);
   });
 });
+
+describe("resolver — conversational reason renders inline (Pass B, Part 2)", () => {
+  it("renders a fact's reason as '— because …' so the why reaches the plan", () => {
+    const facts = [fact("day_picture_item", "Walk", { data: { reason: "it clears his head before the day" } })];
+    const text = resolveVitaText("2.1", facts);
+    expect(text).toContain("Walk — because it clears his head before the day");
+  });
+
+  it("a reason rides alongside a widget-set description, not replacing it", () => {
+    // 3.4 surfaces a value's description (withDescription); the reason renders too.
+    const facts = [
+      fact("value", "Adventure", {
+        data: { description: "Saying yes to the unfamiliar", reason: "so life doesn't shrink after work" },
+      }),
+    ];
+    const item = resolveViews("3.4", facts).seed.items.find((i) => i.label === "Adventure")!;
+    expect(item.description).toBe("Saying yes to the unfamiliar"); // widget description intact
+    expect(item.reason).toBe("so life doesn't shrink after work"); // reason additive
+    const text = resolveVitaText("3.4", facts);
+    expect(text).toContain("Saying yes to the unfamiliar");
+    expect(text).toContain("because so life doesn't shrink after work");
+  });
+});

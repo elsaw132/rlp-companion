@@ -879,9 +879,27 @@ export type FactRemovalDelta = {
   quote?: string;
 };
 
+// An annotation that attaches a REASON — the person's own "why" / the context
+// behind a pick — to an existing fact (matched by label the same way a removal
+// is). Additive only: it never removes or replaces the pick, and never touches a
+// widget-set `description`. `quote` is the member's verbatim words, required so a
+// reason can be grounded (never fabricated) before it's stored. When no on-record
+// fact matches, the reason is kept as a standalone meaning_thread addition
+// instead of being lost (see planConversationalApply).
+export type FactReasonDelta = {
+  label: string;
+  reason: string;
+  quote?: string;
+  category?: FactCategory;
+  domain?: RecurringDomain | null;
+};
+
 export type ConversationalDeltas = {
   additions: FactAdditionDelta[];
   removals: FactRemovalDelta[];
+  // Optional so existing {additions, removals} literals stay valid; normalizeDeltas
+  // always fills it, and planConversationalApply reads it defensively.
+  reasons?: FactReasonDelta[];
 };
 
 // A removal that matched an existing fact but is NOT yet confirmed — surfaced so
@@ -902,6 +920,7 @@ export function normalizeDeltas(raw: unknown): ConversationalDeltas {
   const obj = (raw ?? {}) as Record<string, unknown>;
   const additions = Array.isArray(obj.additions) ? obj.additions : [];
   const removals = Array.isArray(obj.removals) ? obj.removals : [];
+  const reasons = Array.isArray(obj.reasons) ? obj.reasons : [];
   return {
     additions: additions
       .filter((a): a is FactAdditionDelta => !!a && typeof a === "object" && typeof (a as FactAdditionDelta).label === "string")
@@ -909,6 +928,15 @@ export function normalizeDeltas(raw: unknown): ConversationalDeltas {
     removals: removals
       .filter((r): r is FactRemovalDelta => !!r && typeof r === "object" && typeof (r as FactRemovalDelta).label === "string")
       .filter((r) => clean(r.label) !== ""),
+    reasons: reasons
+      .filter(
+        (r): r is FactReasonDelta =>
+          !!r &&
+          typeof r === "object" &&
+          typeof (r as FactReasonDelta).label === "string" &&
+          typeof (r as FactReasonDelta).reason === "string"
+      )
+      .filter((r) => clean(r.label) !== "" && clean(r.reason) !== ""),
   };
 }
 
@@ -952,6 +980,35 @@ export function filterGroundedRemovals(
   return out;
 }
 
+// Ground reason annotations in the member's own words, exactly like removals: a
+// captured "why" is only trustworthy when it's the member's own statement, so the
+// delta pass returns their verbatim words as `quote` and we verify that quote
+// actually appears in what the member said. Also drops empty reasons and de-dupes
+// on (label, reason). Any reason without a grounded quote is dropped — better to
+// miss one than to fabricate a motivation the member never voiced. Pure.
+export function filterGroundedReasons(
+  reasons: unknown[],
+  memberText: string
+): FactReasonDelta[] {
+  const haystack = normalizeForMatch(memberText);
+  const seen = new Set<string>();
+  const out: FactReasonDelta[] = [];
+  for (const r of reasons) {
+    if (!r || typeof r !== "object") continue;
+    const rr = r as FactReasonDelta;
+    if (typeof rr.label !== "string" || clean(rr.label) === "") continue;
+    if (typeof rr.reason !== "string" || clean(rr.reason) === "") continue;
+    const quote = typeof rr.quote === "string" ? normalizeForMatch(rr.quote) : "";
+    if (quote.length < 4) continue;
+    if (!haystack.includes(quote)) continue;
+    const key = clean(rr.label).toLowerCase() + "|" + clean(rr.reason).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(rr);
+  }
+  return out;
+}
+
 // Decide what to apply for a set of conversational deltas, given the facts
 // currently active for the module and the set of removal identities the person
 // has confirmed. PURE — the route executes the result. Additions that duplicate
@@ -963,7 +1020,15 @@ export function planConversationalApply(
   deltas: ConversationalDeltas,
   existing: Pick<StoredFact, "id" | "category" | "domain" | "data">[],
   confirmedRemovalKeys: Set<string> = new Set()
-): { toAdd: DraftFact[]; toRejectIds: string[]; pending: PendingRemoval[] } {
+): {
+  toAdd: DraftFact[];
+  toRejectIds: string[];
+  pending: PendingRemoval[];
+  // Reason annotations to attach additively to an already-stored fact (by id).
+  // The route sets data.reason on that fact; it never overwrites the pick or a
+  // widget-set description.
+  reasonUpdates: { factId: string; reason: string }[];
+} {
   const activeByIdentity = new Map<string, Pick<StoredFact, "id" | "category" | "domain" | "data">>();
   for (const e of existing) activeByIdentity.set(factIdentity(e), e);
 
@@ -1008,7 +1073,44 @@ export function planConversationalApply(
     }
   }
 
-  return { toAdd, toRejectIds, pending };
+  // Reasons → attach to the on-record fact they explain (matched by label, and
+  // category/domain when the delta names them). Additive: never removes or
+  // changes the pick. A reason that matches nothing on record is not lost — it's
+  // kept as a standalone meaning_thread addition (the fallback), de-duped like any
+  // other addition.
+  const reasonUpdates: { factId: string; reason: string }[] = [];
+  for (const r of deltas.reasons ?? []) {
+    const reason = clean(r.reason);
+    if (!reason) continue;
+    const label = clean(r.label).toLowerCase();
+    const matches = existing.filter((e) => {
+      if ((e.data.label ?? "").trim().toLowerCase() !== label) return false;
+      if (r.category && e.category !== r.category) return false;
+      if (r.domain != null && e.domain !== r.domain) return false;
+      return true;
+    });
+    if (matches.length) {
+      for (const m of matches) reasonUpdates.push({ factId: m.id, reason });
+    } else {
+      const d = draft(
+        "meaning_thread",
+        { label: reason },
+        moduleId,
+        { source: "conversational_statement", confidence: "still_forming" }
+      );
+      if (!activeByIdentity.has(factIdentity(d))) {
+        activeByIdentity.set(factIdentity(d), {
+          id: "",
+          category: d.category,
+          domain: d.domain ?? null,
+          data: d.data,
+        });
+        toAdd.push(d);
+      }
+    }
+  }
+
+  return { toAdd, toRejectIds, pending, reasonUpdates };
 }
 
 // ---- Merge facts of the same identity --------------------------------------
