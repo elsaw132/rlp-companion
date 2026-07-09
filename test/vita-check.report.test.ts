@@ -320,6 +320,24 @@ const SCENARIOS: Scenario[] = [
     judgeNote:
       "Sailing the world, a Tuscan vineyard, and writing novels are ambitious and expansive but entirely coherent — none contradicts the others. This is aspiration, not incongruity.",
   },
+  {
+    n: 12,
+    fix: "GUARD — unconventional but valid choice must NOT be queried as a mistake",
+    moduleId: "1.day",
+    check:
+      "A main meal mid-morning and an afternoon nap are unusual but perfectly possible — NOT impossibilities. Vita should take them as genuine preferences and engage warmly, NOT flag them as a slip or 'did you mean...?' The impossibility-detector must not drift onto merely-eccentric choices.",
+    coachOpening:
+      "Here's the day you've put together. Let's talk it through — looking at the whole thing, which part are you most looking forward to?",
+    userMessage:
+      "The big one is my main meal — I have my proper cooked dinner mid-morning, around 10, always have. Then a good nap in the middle of the afternoon. Suits me down to the ground.",
+    profile: { name: "Margaret", partner: true },
+    prior: [],
+    interactionSummary:
+      "Morning: Cook a proper meal (main meal ~10am).\nAfternoon: A nap.\nEvening: Read; Music or radio.",
+    expect: "guard",
+    judgeNote:
+      "Having the main cooked meal mid-morning (~10am) and a nap in the afternoon is unconventional but entirely possible and coherent — an eccentric preference, not a mistake, impossibility, or contradiction.",
+  },
 ];
 
 // Apply the optional VITA_ONLY filter.
@@ -440,7 +458,7 @@ function judgeRubric(sc: Scenario): string {
     case "challenge":
       return `The person's input to a coach (Vita) contains a GENUINE TENSION — two things that are each valid but pull hard against each other:\n"${sc.judgeNote}"\nA good coach names the tension warmly and asks how the two hold together — soft and curious, not harsh — rather than ignoring it or smoothing it into a tidy compliment.\nDid Vita notice and gently name the tension?\nPASS = she named it or gently asked how they fit together. FAIL = she ignored it, or accepted both without noticing the pull.`;
     case "guard":
-      return `The person's input to a coach (Vita) is ambitious and expansive but entirely COHERENT — there is NO contradiction:\n"${sc.judgeNote}"\nA good coach embraces it warmly. She must NOT manufacture a contradiction, nitpick it, or reality-check whether it is affordable or realistic.\nDid Vita wrongly challenge, nitpick, or reality-check it?\nPASS = she embraced it without manufacturing a problem. FAIL = she challenged its coherence, or questioned whether it is realistic or affordable.`;
+      return `The person's input to a coach (Vita) is COHERENT — it may be ambitious, or simply unconventional, but nothing in it is impossible or self-contradictory:\n"${sc.judgeNote}"\nA good coach embraces it warmly. She must NOT manufacture a contradiction, nitpick it, treat an unusual-but-valid choice as a mistake or slip ("did you mean...?"), or reality-check whether it is affordable or realistic.\nDid Vita wrongly challenge, query it as a mistake, nitpick, or reality-check it?\nPASS = she embraced it without manufacturing a problem or treating it as an error. FAIL = she challenged its coherence, treated an unusual-but-valid choice as a slip/mistake, or questioned whether it is realistic or affordable.`;
     case "depth":
       return `The person gave a coach (Vita) a thin, surface answer:\n"${sc.judgeNote}"\nDid Vita draw them out — ask why, or ask for a specific concrete detail — rather than accepting the thin answer and moving toward closing?\nPASS = she genuinely drew out more. WARN = she stayed at the surface or moved on. (Informational only.)`;
     default:
