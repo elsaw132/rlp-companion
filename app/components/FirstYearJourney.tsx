@@ -1243,14 +1243,16 @@ const journeyCss = `
     0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
     30% { transform: translateY(-4px); opacity: 0.9; }
   }
-  /* Desktop reorders by dragging chips between the four phase columns, so the
-     touch move-arrows are hidden there. */
+  /* A mouse desktop reorders by dragging chips between the four phase columns,
+     so the touch move-arrows are hidden there. */
   .fy-move { display: none; }
   .fy-move-btn:disabled { opacity: 0.35; cursor: default; }
-  /* On a phone, drag-and-drop doesn't work: stack the four phases into one
-     column and reveal the ↑/↓ move controls so the timeline is reorderable by
-     touch. Desktop (the 4-column grid + drag) is unchanged. */
-  @media (max-width: 880px) {
+  /* Drag-and-drop doesn't work by finger, so on any TOUCH device (a phone, or a
+     landscape iPad — hence pointer:coarse as well as narrow width) stack the
+     four phases into one column and reveal the up/down move controls, making the
+     timeline reorderable by touch. A mouse desktop (pointer:fine) keeps its
+     4-column grid + drag, unchanged. */
+  @media (max-width: 880px), (pointer: coarse) {
     .fy-phases { grid-template-columns: 1fr !important; }
     .fy-move { display: inline-flex; }
   }
