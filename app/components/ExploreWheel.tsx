@@ -159,7 +159,14 @@ export default function ExploreWheel({ areas }: { areas: RevealArea[] }) {
             <span
               key={a.area}
               className="exw-ic"
-              style={{ left: x, top: y, color: `var(--area-${a.area}-fg)` }}
+              // Percentage positions (of the 300-unit coordinate system) so the
+              // icons track the wheel when it scales down on a phone. At the
+              // desktop 300px size these resolve to the same pixels as before.
+              style={{
+                left: `${(x / 300) * 100}%`,
+                top: `${(y / 300) * 100}%`,
+                color: `var(--area-${a.area}-fg)`,
+              }}
             >
               <AreaIcon area={a.area} size={21} />
             </span>
@@ -266,5 +273,13 @@ const css = `
 @media(prefers-reduced-motion:reduce){
   .exw .exw-seg{transition:none}
   .exw-card{animation:none}
+}
+/* On phones the fixed 300px wheel overflowed the content column below ~360px.
+   Let it scale to the available width (still capped at 300px, so desktop and
+   anything wider is unchanged). The SVG scales via its viewBox and the icons
+   are positioned in %, so everything tracks together. */
+@media(max-width:880px){
+  .exw-wheel{width:100%;max-width:300px;height:auto;aspect-ratio:1/1}
+  .exw-wheel svg{width:100%;height:auto}
 }
 `;

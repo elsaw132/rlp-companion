@@ -182,7 +182,7 @@ export default function ReadinessSnapshot({
         </div>
         <input
           type="range"
-          className="readiness-slider"
+          className="readiness-slider rlp-slider"
           style={styles.slider}
           min={0}
           max={100}
@@ -271,7 +271,7 @@ export default function ReadinessSnapshot({
             <span style={styles.windowControlLabel}>From</span>
             <input
               type="range"
-              className="readiness-slider"
+              className="readiness-slider rlp-slider"
               style={styles.slider}
               min={0}
               max={lastMark}
@@ -285,7 +285,7 @@ export default function ReadinessSnapshot({
             <span style={styles.windowControlLabel}>To</span>
             <input
               type="range"
-              className="readiness-slider"
+              className="readiness-slider rlp-slider"
               style={styles.slider}
               min={0}
               max={lastMark}
@@ -322,7 +322,7 @@ export default function ReadinessSnapshot({
               <div key={factor.id} style={styles.factorRow}>
                 <div style={styles.factorHead}>
                   <span style={styles.factorLabel}>{factor.label}</span>
-                  <div style={styles.levels}>
+                  <div className="readiness-levels" style={styles.levels}>
                     {factorLevels.map((level) => {
                       const selected = chosen === level;
                       return (
@@ -742,5 +742,10 @@ const readinessCss = `
   .readiness-chip:focus-visible, .readiness-level:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
+  }
+  /* On phones a factor with 3+ levels can't fit its row on one line — wrap it
+     instead of overflowing the column. Desktop (one line) is unchanged. */
+  @media (max-width: 880px) {
+    .readiness-levels { flex-wrap: wrap; }
   }
 `;

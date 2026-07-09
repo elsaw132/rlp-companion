@@ -215,7 +215,7 @@ export default function MirrorCards({
             <div style={styles.cardActions}>
               <button
                 type="button"
-                className="mc-choice"
+                className="mc-choice rlp-chip"
                 style={{
                   ...styles.choiceBtn,
                   ...(card.decision === "keep" ? styles.choiceBtnKeep : null),
@@ -227,7 +227,7 @@ export default function MirrorCards({
               </button>
               <button
                 type="button"
-                className="mc-choice"
+                className="mc-choice rlp-chip"
                 style={{
                   ...styles.choiceBtn,
                   ...(card.decision === "aside" ? styles.choiceBtnAside : null),
@@ -258,7 +258,7 @@ export default function MirrorCards({
                   <button
                     key={s}
                     type="button"
-                    className="mc-palette"
+                    className="mc-palette rlp-chip"
                     style={styles.paletteChip}
                     onClick={() => addStrength(s)}
                   >

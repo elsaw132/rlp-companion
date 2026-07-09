@@ -180,7 +180,7 @@ export default function RolePicker({
                     >
                       <button
                         type="button"
-                        className="role-chip"
+                        className="role-chip rlp-chip"
                         style={styles.chipLabel}
                         aria-pressed={isSelected}
                         onClick={() => toggleSelect(role)}
