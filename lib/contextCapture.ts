@@ -7,7 +7,7 @@ import {
   diffFacts,
   planConversationalApply,
 } from "@/lib/contextFacts";
-import { activeFacts, addFact, rejectFact } from "@/lib/db";
+import { activeFacts, addFact, rejectFact, annotateFact } from "@/lib/db";
 
 // Server-side capture orchestration. Every operation reconciles the stored facts
 // to a desired set rather than blindly appending, so the same code path serves
@@ -47,9 +47,9 @@ export async function applyConversationalDeltas(
   moduleId: string,
   deltas: ConversationalDeltas,
   confirmedRemovalKeys: string[] = []
-): Promise<{ added: number; rejected: number; pending: PendingRemoval[] }> {
+): Promise<{ added: number; rejected: number; annotated: number; pending: PendingRemoval[] }> {
   const existing = await activeFacts(userId, { provenanceModule: moduleId });
-  const { toAdd, toRejectIds, pending } = planConversationalApply(
+  const { toAdd, toRejectIds, pending, reasonUpdates } = planConversationalApply(
     moduleId,
     deltas,
     existing,
@@ -59,7 +59,15 @@ export async function applyConversationalDeltas(
   await Promise.all([
     ...toAdd.map((d) => addFact(userId, d)),
     ...toRejectIds.map((id) => rejectFact(userId, id)),
+    // Additive: attach each captured reason to the fact it explains. Never
+    // removes or overwrites the pick or a widget-set description.
+    ...reasonUpdates.map((u) => annotateFact(userId, u.factId, u.reason)),
   ]);
 
-  return { added: toAdd.length, rejected: toRejectIds.length, pending };
+  return {
+    added: toAdd.length,
+    rejected: toRejectIds.length,
+    annotated: reasonUpdates.length,
+    pending,
+  };
 }

@@ -241,6 +241,27 @@ export async function rejectFact(
   `;
 }
 
+// Attach a conversational REASON to an existing fact, additively. Merges a single
+// `reason` key into the jsonb `data` with `||`, so every other field — the label,
+// the pick, and any widget-set `description` — is left exactly as it was. Guarded
+// so it never overwrites a reason already present (e.g. a dream's own reason): it
+// only fills an empty/absent one. Scoped to the user and to active facts.
+export async function annotateFact(
+  userId: string,
+  factId: string,
+  reason: string
+): Promise<void> {
+  const r = reason.trim();
+  if (!r) return;
+  await ensureContextFactsTable();
+  await sql()`
+    UPDATE context_facts
+    SET data = data || jsonb_build_object('reason', ${r}::text)
+    WHERE id = ${factId} AND user_id = ${userId} AND status = 'active'
+      AND (data->>'reason' IS NULL OR data->>'reason' = '')
+  `;
+}
+
 // Re-affirm a still-active fact (the user reconfirmed it): bump
 // last_affirmed_at, and promote a still_forming fact to certain.
 export async function affirmFact(

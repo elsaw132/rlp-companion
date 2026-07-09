@@ -7,6 +7,8 @@ import {
   diffFacts,
   planConversationalApply,
   filterGroundedRemovals,
+  filterGroundedReasons,
+  normalizeDeltas,
   principlesAfterConversation,
   factIdentity,
   type DraftFact,
@@ -70,7 +72,7 @@ class FactStore {
     deltas: ConversationalDeltas,
     confirmedKeys: string[] = []
   ) {
-    const { toAdd, toRejectIds, pending } = planConversationalApply(
+    const { toAdd, toRejectIds, pending, reasonUpdates } = planConversationalApply(
       moduleId,
       deltas,
       this.active({ provenanceModule: moduleId }),
@@ -78,7 +80,22 @@ class FactStore {
     );
     toAdd.forEach((d) => this.add(d));
     toRejectIds.forEach((id) => this.reject(id));
-    return { added: toAdd.length, rejected: toRejectIds.length, pending };
+    // Mirror of annotateFact: additively set data.reason, only when absent, and
+    // never touch any other field (label, pick, description).
+    reasonUpdates.forEach((u) => {
+      const row = this.rows.find((r) => r.id === u.factId && r.status === "active");
+      const existing = typeof row?.data.reason === "string" ? row.data.reason.trim() : "";
+      if (row && !existing) row.data = { ...row.data, reason: u.reason };
+    });
+    return {
+      added: toAdd.length,
+      rejected: toRejectIds.length,
+      annotated: reasonUpdates.length,
+      pending,
+    };
+  }
+  row(id: string): StoredFact | undefined {
+    return this.rows.find((r) => r.id === id);
   }
 }
 
@@ -395,5 +412,134 @@ describe("stage-3 values stay walled from other kinds", () => {
     ]);
     expect(facts.every((f) => f.category === "value")).toBe(true);
     expect(facts.find((f) => f.data.label === "Calm")?.confidence).toBe("still_forming");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Conversational reason-capture (Pass B, Part 2). Additive: a reason attaches to
+// an existing fact, or falls back to a standalone thread — never overwrites a
+// widget value, never removes a pick, never changes the widget→fact mapping.
+// ---------------------------------------------------------------------------
+describe("reason-capture — grounding", () => {
+  const member =
+    "the grandkids are the bit that makes me feel useful again\nI'd keep the allotment whatever happens";
+
+  it("keeps a reason whose quote is the member's own words", () => {
+    const out = filterGroundedReasons(
+      [{ label: "time with grandkids", reason: "makes them feel useful", quote: "makes me feel useful again" }],
+      member
+    );
+    expect(out).toHaveLength(1);
+  });
+  it("drops a reason whose quote is not in the transcript (never fabricated)", () => {
+    const out = filterGroundedReasons(
+      [{ label: "time with grandkids", reason: "guilt about the past", quote: "I feel so guilty about missing their childhood" }],
+      member
+    );
+    expect(out).toHaveLength(0);
+  });
+  it("drops a reason with no reason text or no quote", () => {
+    expect(filterGroundedReasons([{ label: "x", reason: "", quote: "makes me feel useful again" }], member)).toHaveLength(0);
+    expect(filterGroundedReasons([{ label: "x", reason: "a why", quote: "" }], member)).toHaveLength(0);
+  });
+  it("de-dupes on (label, reason)", () => {
+    const dup = { label: "the allotment", reason: "want to keep it", quote: "keep the allotment whatever happens" };
+    expect(filterGroundedReasons([dup, { ...dup }], member)).toHaveLength(1);
+  });
+});
+
+describe("reason-capture — normalizeDeltas", () => {
+  it("surfaces well-formed reasons and tolerates their absence", () => {
+    const d = normalizeDeltas({
+      additions: [],
+      removals: [],
+      reasons: [
+        { label: "a", reason: "why a", quote: "q" },
+        { label: "", reason: "no label" },
+        { label: "b", reason: "" },
+      ],
+    });
+    expect(d.reasons).toEqual([{ label: "a", reason: "why a", quote: "q" }]);
+    // A legacy payload with no reasons key still yields an empty array.
+    expect(normalizeDeltas({ additions: [], removals: [] }).reasons).toEqual([]);
+  });
+});
+
+describe("reason-capture — apply is additive", () => {
+  function storeWithDayPick() {
+    const store = new FactStore();
+    // A widget pick with a widget-set description that must never be clobbered.
+    store.reconcile(
+      "1.day",
+      [
+        {
+          category: "day_picture_item",
+          data: { label: "Time with grandkids", description: "Saturday mornings" },
+          provenanceModule: "1.day",
+          provenanceSource: "widget_pick",
+          confidence: "certain",
+        },
+      ],
+      "widget_pick"
+    );
+    return store;
+  }
+
+  it("attaches a reason to the matching fact without touching its pick or description", () => {
+    const store = storeWithDayPick();
+    const id = store.active({ provenanceModule: "1.day" })[0].id;
+    const res = store.applyConversational("1.day", {
+      additions: [],
+      removals: [],
+      reasons: [{ label: "Time with grandkids", reason: "it's what makes them feel useful again" }],
+    } as ConversationalDeltas);
+
+    expect(res.annotated).toBe(1);
+    expect(res.added).toBe(0);
+    expect(res.rejected).toBe(0);
+    const row = store.row(id)!;
+    expect(row.data.reason).toBe("it's what makes them feel useful again");
+    expect(row.data.label).toBe("Time with grandkids"); // pick untouched
+    expect(row.data.description).toBe("Saturday mornings"); // widget description untouched
+    expect(store.active({ provenanceModule: "1.day" })).toHaveLength(1); // no new fact
+  });
+
+  it("never overwrites a reason already present", () => {
+    const store = storeWithDayPick();
+    const id = store.active({ provenanceModule: "1.day" })[0].id;
+    store.row(id)!.data = { ...store.row(id)!.data, reason: "the original reason" };
+    store.applyConversational("1.day", {
+      additions: [],
+      removals: [],
+      reasons: [{ label: "Time with grandkids", reason: "a different, later reason" }],
+    } as ConversationalDeltas);
+    expect(store.row(id)!.data.reason).toBe("the original reason");
+  });
+
+  it("falls back to a standalone meaning_thread when nothing on record matches", () => {
+    const store = storeWithDayPick();
+    const res = store.applyConversational("1.day", {
+      additions: [],
+      removals: [],
+      reasons: [{ label: "something not on record", reason: "a real standalone why" }],
+    } as ConversationalDeltas);
+    expect(res.annotated).toBe(0);
+    expect(res.added).toBe(1);
+    const thread = store
+      .active({ provenanceModule: "1.day" })
+      .find((f) => f.category === "meaning_thread");
+    expect(thread?.data.label).toBe("a real standalone why");
+    expect(thread?.provenanceSource).toBe("conversational_statement");
+  });
+
+  it("the reason path never produces a removal", () => {
+    const store = storeWithDayPick();
+    const res = store.applyConversational("1.day", {
+      additions: [],
+      removals: [],
+      reasons: [{ label: "Time with grandkids", reason: "a why" }],
+    } as ConversationalDeltas);
+    expect(res.rejected).toBe(0);
+    expect(store.active({ provenanceModule: "1.day" }).some((f) => f.data.label === "Time with grandkids")).toBe(true);
   });
 });
