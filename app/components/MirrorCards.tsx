@@ -192,6 +192,7 @@ export default function MirrorCards({
         {cards.map((card, i) => (
           <div
             key={`${card.label}-${i}`}
+            className="mc-card"
             style={{
               ...styles.card,
               ...(card.decision === "aside" ? styles.cardRejected : null),
@@ -283,7 +284,7 @@ export default function MirrorCards({
                 <button
                   key={card.label}
                   type="button"
-                  className="mc-star"
+                  className="mc-star rlp-tap"
                   style={{
                     ...styles.starChip,
                     ...(on ? styles.starChipOn : null),

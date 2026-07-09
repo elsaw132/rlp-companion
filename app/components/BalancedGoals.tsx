@@ -928,7 +928,7 @@ function FocusStep({
                   <div style={styles.rankControls}>
                     <button
                       type="button"
-                      className="bal-arrow"
+                      className="bal-arrow rlp-tap"
                       style={styles.arrow}
                       aria-label={`Move ${goal.label} up`}
                       disabled={index === 0}
@@ -938,7 +938,7 @@ function FocusStep({
                     </button>
                     <button
                       type="button"
-                      className="bal-arrow"
+                      className="bal-arrow rlp-tap"
                       style={styles.arrow}
                       aria-label={`Move ${goal.label} down`}
                       disabled={index === focusOrder.length - 1}
@@ -948,7 +948,7 @@ function FocusStep({
                     </button>
                     <button
                       type="button"
-                      className="bal-remove"
+                      className="bal-remove rlp-tap"
                       style={styles.removeBtn}
                       aria-label={`Remove ${goal.label} from spotlight`}
                       onClick={() => onToggle(id)}

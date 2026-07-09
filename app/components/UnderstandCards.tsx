@@ -515,4 +515,11 @@ const css = `
   .rlp-ureveal .card{transition:none}
   .rlp-ureveal .thread .node,.rlp-ureveal .thread .seg{transition:none}
 }
+/* On a phone a long card can exceed the fixed 548px stage and get clipped (the
+   reveal has overflow:hidden). Let the active card flow so the stage grows to
+   fit it — 548px stays as a floor, and only-one-card-visible keeps the layout
+   stable. Desktop keeps its fixed-height carousel. */
+@media(max-width:880px){
+  .rlp-ureveal .card.on{position:relative}
+}
 `;
