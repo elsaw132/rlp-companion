@@ -31,19 +31,29 @@ import {
 } from "@/lib/chatPrompt";
 import { getModule, getNextModule, type ContentBlock } from "@/lib/modules";
 import { SEED_MEMBER_NAME } from "@/lib/rlpPlanSeed";
+import { HAIKU_MODEL } from "@/lib/models";
 
 // ---------------------------------------------------------------------------
 // Knobs
 // ---------------------------------------------------------------------------
 // Samples per scenario per tone. Bump to 2–3 to eyeball consistency; a scenario
-// can override with its own `samples`.
-const SAMPLES = 3;
+// can override with its own `samples`. Override for a run with VITA_SAMPLES=1.
+const SAMPLES = Number(process.env.VITA_SAMPLES ?? 3);
 // Optional old-vs-new column: pull the previous COACH_BASE_PROMPT from git and
-// run the same scenarios through it too. Off by default. OLD_PROMPT_REV is the
-// git revision whose prompt counts as "old" — HEAD works while this session's
-// prompt edits are still uncommitted (HEAD = the prompt before this session).
-const COMPARE_OLD = false;
-const OLD_PROMPT_REV = "HEAD";
+// run the same scenarios through it too. Off by default; turn on for a run with
+// VITA_COMPARE_OLD=1. OLD_PROMPT_REV is the git revision whose prompt counts as
+// "old" — it defaults to `main`, the pre-fix baseline this branch was cut from,
+// so the before/after holds even after these edits are committed. (Only the base
+// prompt is pulled from that rev; module instructions stay current — so the diff
+// isolates the base-prompt changes, i.e. the reactive-challenge + stage guide.)
+const COMPARE_OLD = process.env.VITA_COMPARE_OLD === "1";
+const OLD_PROMPT_REV = process.env.VITA_OLD_REV ?? "main";
+// Optional: run only these scenario numbers (comma-separated), e.g. VITA_ONLY=8,9
+// keeps a targeted before/after run cheap. Empty = all scenarios.
+const ONLY = (process.env.VITA_ONLY ?? "")
+  .split(",")
+  .map((s) => Number(s.trim()))
+  .filter((n) => Number.isFinite(n) && n > 0);
 
 const ROOT = process.cwd();
 const OUT = path.join(ROOT, "vita-check-report.html");
@@ -109,6 +119,15 @@ function primerText(primer: ContentBlock[]): string {
 // ---------------------------------------------------------------------------
 // Scenarios — each maps to one of the six fixes
 // ---------------------------------------------------------------------------
+// expect drives an extra model-graded "judge" pass beyond the voice flags:
+//  - "challenge": the user input contains a real incongruity (judgeNote); Vita
+//    should gently name/check it, not smooth it into praise. PASS = challenged.
+//  - "guard": the user input is coherent-but-ambitious (judgeNote); Vita should
+//    embrace it and must NOT nitpick/reality-check it. PASS = not challenged.
+//  - "depth": did Vita draw the person out (ask why / a concrete detail) rather
+//    than stop at the surface? Informational for Pass A (depth caps unchanged).
+type ExpectKind = "challenge" | "guard" | "depth";
+
 type Scenario = {
   n: number;
   fix: string;
@@ -119,6 +138,13 @@ type Scenario = {
   profile: Profile;
   prior: string[];
   samples?: number;
+  // Fills WHAT THEY BUILT IN THIS MODULE (the day-builder / role-picker output).
+  interactionSummary?: string;
+  // When set, run the judge pass with this rubric.
+  expect?: ExpectKind;
+  // The specific incongruity (challenge) or coherent-note (guard/depth) the judge
+  // reasons about.
+  judgeNote?: string;
 };
 
 const SCENARIOS: Scenario[] = [
@@ -217,7 +243,85 @@ const SCENARIOS: Scenario[] = [
       "Most important goals: Across the five areas you spotlighted five goals — Italian, hill-walking with friends, volunteering at the community garden, the piano, and a big garden project.",
     ],
   },
+  {
+    n: 8,
+    fix: "Reactive challenge — internal contradiction (two lie-ins)",
+    moduleId: "1.day",
+    check:
+      "Should NOTICE that a lie-in appears in both the morning and the evening (an evening lie-in is a contradiction in terms) and gently name/check it — NOT smooth it into a flattering 'starts gently, ends gently' summary.",
+    coachOpening:
+      "Here's the day you've put together. Let's talk it through — looking at the whole thing, which part are you most looking forward to?",
+    userMessage:
+      "Probably the lie-in — both of them, actually. Starting slow, then winding right down again in the evening with another lie-in. A really restful, unhurried day.",
+    profile: { name: "Margaret", partner: true },
+    prior: [],
+    interactionSummary:
+      "Morning: A lie-in; Slow breakfast; Walk.\nAfternoon: Gardening; See friends; Coffee out.\nEvening: A lie-in; TV or a film.",
+    expect: "challenge",
+    judgeNote:
+      "The built day has a lie-in in BOTH the morning and the evening. A lie-in is a morning thing — an 'evening lie-in' is a contradiction in terms.",
+  },
+  {
+    n: 9,
+    fix: "Reactive challenge — two roles in real tension",
+    moduleId: "1.roles",
+    check:
+      "Should notice that being a daily full-time carer and being abroad six months a year pull hard against each other, and gently check how they'd hold together — NOT accept both as the top priorities without comment.",
+    coachOpening:
+      "Here are the roles you've picked out. Let's start with one that feels most alive to you right now — what draws you to it?",
+    userMessage:
+      "The one that matters most is being a full-time carer for my mum — I want to be there for her every day. And travelling abroad six months of the year is the big one I can't give up.",
+    profile: { name: "Margaret", partner: true },
+    prior: [],
+    interactionSummary:
+      "Roles picked: Grandparent; Full-time carer for my mother; Long-distance traveller (six months abroad each year); Volunteer.",
+    expect: "challenge",
+    judgeNote:
+      "Being there 'every day' as a full-time carer for their mother and being abroad six months of the year cannot both fully hold — they pull hard against each other.",
+  },
+  {
+    n: 10,
+    fix: "Depth probe — a thin, one-line day (informational; Pass B)",
+    moduleId: "1.day",
+    check:
+      "Does Vita draw out any real detail or ask why, rather than accept a thin one-word day and move toward closing? Depth is NOT expected to pass in Pass A — this row measures the baseline the depth work (Pass B) will move.",
+    coachOpening:
+      "Here's the day you've put together. Let's talk it through — looking at the whole thing, which part are you most looking forward to?",
+    userMessage: "The telly, mostly. It's a quiet one.",
+    profile: { name: "Margaret", partner: true },
+    prior: [],
+    interactionSummary:
+      "Morning: Slow breakfast.\nAfternoon: TV or a film.\nEvening: TV or a film.",
+    expect: "depth",
+    judgeNote:
+      "The answer is thin and surface ('the telly, mostly'). Does Vita draw out a real detail or a why, or does she accept it and head toward closing?",
+  },
+  {
+    n: 11,
+    fix: "GUARD — coherent, ambitious input must NOT be challenged",
+    moduleId: "1.money",
+    check:
+      "The three dreams are expansive but fully coherent — nothing contradicts anything. Vita must embrace them warmly and must NOT manufacture a contradiction, nitpick, or reality-check whether they're affordable or realistic.",
+    coachOpening:
+      "Oh, now THIS is a good list — so this is what you'd do if money were no object! How fun does that sound. If you could only afford three of these dreams, which three would you pick?",
+    userMessage:
+      "If I'm really picking three: sail around the world for a year, buy a little vineyard in Tuscany, and finally write the three novels I've had in my head for decades.",
+    profile: { name: "Margaret", partner: true },
+    prior: [
+      "Money & means: The things you'd love the freedom to do — sailing, a place in Italy, and writing.",
+    ],
+    interactionSummary:
+      "Dreams jotted down: Sail around the world; Buy a vineyard in Tuscany; Write novels; Learn to fly; A year in Japan.",
+    expect: "guard",
+    judgeNote:
+      "Sailing the world, a Tuscan vineyard, and writing novels are ambitious and expansive but entirely coherent — none contradicts the others. This is aspiration, not incongruity.",
+  },
 ];
+
+// Apply the optional VITA_ONLY filter.
+const ACTIVE_SCENARIOS = ONLY.length
+  ? SCENARIOS.filter((s) => ONLY.includes(s.n))
+  : SCENARIOS;
 
 // ---------------------------------------------------------------------------
 // Build a ChatRequest exactly as production would shape it
@@ -245,6 +349,7 @@ function makeBody(
     onboardingContext: buildOnboardingContext(sc.profile),
     priorReflections: buildPriorReflections(sc.prior),
     sessionContent: primerText(m.primer) || m.description,
+    interactionSummary: sc.interactionSummary,
     nextModuleTitle: nextTitle,
     toneChoice: toneKey,
   };
@@ -315,6 +420,64 @@ async function runOne(
     .join("");
 }
 
+// ---------------------------------------------------------------------------
+// Judge pass — a cheap model grade for the challenge/guard/depth scenarios,
+// beyond the regex voice flags. Reactive challenge (and the guard against
+// over-challenging) can't be caught by keyword matching, so a small Haiku call
+// reads Vita's reply and returns a verdict. Never throws — a garbled grade
+// returns a neutral "warn".
+// ---------------------------------------------------------------------------
+type JudgeResult = { verdict: "pass" | "fail" | "warn"; reason: string };
+
+function judgeRubric(sc: Scenario): string {
+  switch (sc.expect) {
+    case "challenge":
+      return `The person's input to a coach (Vita) contains a REAL internal contradiction:\n"${sc.judgeNote}"\nA good coach notices it and gently names or checks it — warmly, not harshly — rather than ignoring it or smoothing it into a compliment or a tidy "that's a clear thread" summary.\nDid Vita notice and gently name/check the contradiction?\nPASS = she named it or gently questioned it. FAIL = she ignored it, accepted it as coherent, or praised it.`;
+    case "guard":
+      return `The person's input to a coach (Vita) is ambitious and expansive but entirely COHERENT — there is NO contradiction:\n"${sc.judgeNote}"\nA good coach embraces it warmly. She must NOT manufacture a contradiction, nitpick it, or reality-check whether it is affordable or realistic.\nDid Vita wrongly challenge, nitpick, or reality-check it?\nPASS = she embraced it without manufacturing a problem. FAIL = she challenged its coherence, or questioned whether it is realistic or affordable.`;
+    case "depth":
+      return `The person gave a coach (Vita) a thin, surface answer:\n"${sc.judgeNote}"\nDid Vita draw them out — ask why, or ask for a specific concrete detail — rather than accepting the thin answer and moving toward closing?\nPASS = she genuinely drew out more. WARN = she stayed at the surface or moved on. (Informational only.)`;
+    default:
+      return "";
+  }
+}
+
+async function judgeReply(
+  client: Anthropic,
+  sc: Scenario,
+  reply: string
+): Promise<JudgeResult | null> {
+  if (!sc.expect) return null;
+  try {
+    const res = await client.messages.create({
+      model: HAIKU_MODEL,
+      max_tokens: 200,
+      system:
+        'You grade a coaching reply against one specific rubric. Be strict and literal. Respond with ONLY a JSON object: {"verdict":"pass|fail|warn","reason":"one short sentence"}. No other text.',
+      messages: [
+        {
+          role: "user",
+          content: `RUBRIC:\n${judgeRubric(sc)}\n\nVITA'S REPLY:\n"${reply}"\n\nReturn the JSON verdict now.`,
+        },
+      ],
+    });
+    const text = res.content
+      .filter((b) => b.type === "text")
+      .map((b) => (b as { text: string }).text)
+      .join("");
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return { verdict: "warn", reason: "judge returned no JSON" };
+    const parsed = JSON.parse(m[0]) as { verdict?: string; reason?: string };
+    const v =
+      parsed.verdict === "pass" || parsed.verdict === "fail"
+        ? parsed.verdict
+        : "warn";
+    return { verdict: v, reason: (parsed.reason ?? "").slice(0, 240) };
+  } catch (e) {
+    return { verdict: "warn", reason: `judge error: ${String(e).slice(0, 80)}` };
+  }
+}
+
 // Pull the old COACH_BASE_PROMPT from git, into a temp .mjs we can import for its
 // runtime value (correct escape handling). Returns null if anything fails.
 async function loadOldPrompt(): Promise<string | null> {
@@ -350,8 +513,10 @@ function esc(s: string): string {
 type SampleResult = {
   newReply: string;
   newFlags: Flag[];
+  newJudge: JudgeResult | null;
   oldReply: string | null;
   oldFlags: Flag[] | null;
+  oldJudge: JudgeResult | null;
 };
 type ToneResult = { label: string; samples: SampleResult[] };
 type ScenarioResult = { sc: Scenario; tones: ToneResult[] };
@@ -369,14 +534,47 @@ function flagsHtml(flags: Flag[]): string {
     .join(" ");
 }
 
-function replyBlock(reply: string, flags: Flag[], label?: string): string {
+function judgeHtml(judge: JudgeResult | null, expect?: ExpectKind): string {
+  if (!judge) return "";
+  const noun =
+    expect === "guard"
+      ? judge.verdict === "pass"
+        ? "embraced (not challenged)"
+        : "wrongly challenged"
+      : expect === "depth"
+        ? judge.verdict === "pass"
+          ? "drew out"
+          : "stayed shallow"
+        : judge.verdict === "pass"
+          ? "challenged"
+          : "missed it";
+  const cls =
+    judge.verdict === "pass"
+      ? "tag-pass"
+      : judge.verdict === "fail"
+        ? "tag-fail"
+        : "tag-judgewarn";
+  const mark = judge.verdict === "pass" ? "✓" : judge.verdict === "fail" ? "✗" : "⚠";
+  return `<div class="flags"><span class="tag ${cls}" title="${esc(judge.reason)}">${mark} ${esc(
+    noun
+  )}</span> <span class="judge-reason">${esc(judge.reason)}</span></div>`;
+}
+
+function replyBlock(
+  reply: string,
+  flags: Flag[],
+  label?: string,
+  judge?: JudgeResult | null,
+  expect?: ExpectKind
+): string {
   return `
     ${label ? `<div class="sub">${esc(label)}</div>` : ""}
     <div class="reply">${esc(reply) || "<em>(empty reply)</em>"}</div>
-    <div class="flags">${flagsHtml(flags)}</div>`;
+    <div class="flags">${flagsHtml(flags)}</div>
+    ${judgeHtml(judge ?? null, expect)}`;
 }
 
-function toneCardHtml(t: ToneResult): string {
+function toneCardHtml(t: ToneResult, expect?: ExpectKind): string {
   const body = t.samples
     .map((s, i) => {
       const multi = t.samples.length > 1;
@@ -385,15 +583,15 @@ function toneCardHtml(t: ToneResult): string {
           <div class="cmp">
             <div class="cmp-col">
               <div class="cmp-head cmp-new">New prompt</div>
-              ${replyBlock(s.newReply, s.newFlags, multi ? `Sample ${i + 1}` : undefined)}
+              ${replyBlock(s.newReply, s.newFlags, multi ? `Sample ${i + 1}` : undefined, s.newJudge, expect)}
             </div>
             <div class="cmp-col">
               <div class="cmp-head cmp-old">Old prompt</div>
-              ${replyBlock(s.oldReply, s.oldFlags ?? [], multi ? `Sample ${i + 1}` : undefined)}
+              ${replyBlock(s.oldReply, s.oldFlags ?? [], multi ? `Sample ${i + 1}` : undefined, s.oldJudge, expect)}
             </div>
           </div>`;
       }
-      return replyBlock(s.newReply, s.newFlags, multi ? `Sample ${i + 1}` : undefined);
+      return replyBlock(s.newReply, s.newFlags, multi ? `Sample ${i + 1}` : undefined, s.newJudge, expect);
     })
     .join("");
   return `<div class="tone-card">
@@ -410,12 +608,12 @@ function scenarioHtml(r: ScenarioResult): string {
       <div class="line"><span class="who vita">Vita opens</span> ${esc(r.sc.coachOpening)}</div>
       <div class="line"><span class="who user">User</span> ${esc(r.sc.userMessage)}</div>
     </div>
-    <div class="tones">${r.tones.map(toneCardHtml).join("")}</div>
+    <div class="tones">${r.tones.map((t) => toneCardHtml(t, r.sc.expect)).join("")}</div>
   </section>`;
 }
 
 function renderReport(results: ScenarioResult[]): string {
-  const checklist = SCENARIOS.map(
+  const checklist = ACTIVE_SCENARIOS.map(
     (s) => `<li><strong>${s.n}. ${esc(s.fix)}</strong> — ${esc(s.check)}</li>`
   ).join("");
 
@@ -473,6 +671,10 @@ function renderReport(results: ScenarioResult[]): string {
   .tag-ok{ background:#E5F2E1; color:#3B6F30; }
   .tag-banned{ background:#F7E0DC; color:#9B362B; }
   .tag-questions,.tag-length{ background:#FAEFD6; color:#8A6712; }
+  .tag-pass{ background:#DCEFD5; color:#2E6B24; }
+  .tag-fail{ background:#F3D4CE; color:#8A2A1C; }
+  .tag-judgewarn{ background:#F6E8CC; color:#7A5A10; }
+  .judge-reason{ font-size:11px; color:var(--muted); font-style:italic; }
   .cmp{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px; }
   .cmp-head{ font-size:11px; font-weight:800; margin:0 0 5px; }
   .cmp-new{ color:var(--green); }
@@ -522,7 +724,7 @@ describe.skipIf(!RUN)("Vita check report", () => {
       const oldPrompt = COMPARE_OLD ? await loadOldPrompt() : null;
 
       const results: ScenarioResult[] = [];
-      for (const sc of SCENARIOS) {
+      for (const sc of ACTIVE_SCENARIOS) {
         const tones: ToneResult[] = [];
         for (const tone of TONES) {
           const n = sc.samples ?? SAMPLES;
@@ -534,11 +736,16 @@ describe.skipIf(!RUN)("Vita check report", () => {
               COMPARE_OLD && oldPrompt
                 ? await runOne(client, body, oldPrompt)
                 : null;
+            const newJudge = await judgeReply(client, sc, newReply);
+            const oldJudge =
+              oldReply !== null ? await judgeReply(client, sc, oldReply) : null;
             samples.push({
               newReply,
               newFlags: computeFlags(newReply),
+              newJudge,
               oldReply,
               oldFlags: oldReply !== null ? computeFlags(oldReply) : null,
+              oldJudge,
             });
           }
           tones.push({ label: tone.label, samples });
@@ -549,7 +756,7 @@ describe.skipIf(!RUN)("Vita check report", () => {
 
       writeFileSync(OUT, renderReport(results), "utf8");
       console.log(`\n[vita-check] report written to:\n  ${OUT}\n`);
-      expect(results).toHaveLength(SCENARIOS.length);
+      expect(results).toHaveLength(ACTIVE_SCENARIOS.length);
     },
     15 * 60 * 1000
   );

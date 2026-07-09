@@ -59,7 +59,7 @@ export const STAGE2_AREA_ORDER: { area: Stage2Area; label: string }[] = [
 // the fallback never asserts a number it can't tie to a real choice.
 export const FALLBACK_STAGE2_SYNTHESIS: Stage2Synthesis = {
   intro:
-    "Here's what came through as you went area by area — the shape of the retirement you're building, one part at a time.",
+    "Here's what came through as you went area by area — the parts of a full retirement you're drawn to, one at a time.",
   areas: [
     {
       area: "active",
