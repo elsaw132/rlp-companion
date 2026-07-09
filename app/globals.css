@@ -31,3 +31,86 @@ body {
 @media (max-width: 880px) {
   .session-nav-bar { display: none; }
 }
+
+/* ---- Shared mobile touch-sizing primitives (Phase 2) ----
+   The app has no shared control primitive, so these are the reusable baseline:
+   any interactive chip gets `.rlp-chip`, any range input gets `.rlp-slider`, and
+   they meet the ~44px touch minimum on phones. All rules are mobile-only
+   (≤880px), so desktop stays byte-identical. */
+
+/* Picker chips → ≥44px tap height. Applied to the chip's interactive element;
+   because its siblings use align-self:stretch, sizing the label sizes the whole
+   chip. `!important` on min-height defends against any inline min-height. */
+@media (max-width: 880px) {
+  .rlp-chip {
+    min-height: 44px !important;
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+  }
+}
+
+/* Square icon buttons (reorder arrows, star, remove ×, the 0–10 scale) → a 44px
+   tap target in BOTH dimensions on phones. The companion to `.rlp-chip` for the
+   bespoke controls the audit flagged (Phase 3). `!important` beats inline sizes.
+   Note: apply this only where 44px width fits — for tight rows (e.g. the 11
+   0–10 buttons) use `.rlp-tap-h` (height only). */
+@media (max-width: 880px) {
+  .rlp-tap {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  .rlp-tap-h {
+    min-height: 44px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+}
+
+/* ---- Card-picker squeeze fixes (Phase 3 A2) ----
+   These two rows put two controls side-by-side; on a phone the labels get
+   crushed, so stack them. Scoped to ≤560px (phones) — they're comfortable
+   side-by-side on tablet/desktop, which stay unchanged. */
+@media (max-width: 560px) {
+  /* PriorityChoices: "A  or  B" → stacked. */
+  .pc-option-row { flex-direction: column; }
+  /* MirrorCards: label + Keep/Set-aside → label above, actions below. */
+  .mc-card { flex-direction: column; align-items: stretch !important; }
+}
+
+/* Native range sliders → 44px touch target. The thumb box is 44px (easy to
+   grab), but only a ~32px navy dot + white ring is painted, so it still looks
+   like a slider thumb. `!important` overrides each component's own thumb rule
+   (those live in injected <style> tags that otherwise win the cascade). */
+@media (max-width: 880px) {
+  input[type="range"].rlp-slider::-webkit-slider-thumb {
+    width: 44px !important;
+    height: 44px !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: radial-gradient(
+      circle,
+      var(--brand-primary) 0 11px,
+      var(--bg) 11px 15px,
+      transparent 15px
+    ) !important;
+  }
+  input[type="range"].rlp-slider::-moz-range-thumb {
+    width: 44px !important;
+    height: 44px !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: radial-gradient(
+      circle,
+      var(--brand-primary) 0 11px,
+      var(--bg) 11px 15px,
+      transparent 15px
+    ) !important;
+  }
+}

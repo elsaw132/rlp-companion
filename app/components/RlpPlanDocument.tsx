@@ -1308,7 +1308,9 @@ const css = `
   .rlp-compass,.rlp-web{margin:0 auto}
   .rlp-buckets,.rlp-factors,.rlp-week-groups{grid-template-columns:1fr}
   .rlp-seasons-track,.rlp-fy-track{grid-template-columns:1fr}
-  .rlp-balance-row{grid-template-columns:repeat(5,1fr);gap:4px}
+  /* Let the five areas wrap instead of cramming 5-across on a phone: they stay
+     5 in a row where it fits (down to ~500px) and wrap to 3+ below that. */
+  .rlp-balance-row{grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px}
   .rlp-area-label{font-size:var(--fs-eyebrow)}
   .rlp-season-arrow{display:none}
   .rlp-chapter-title{font-size:34px}

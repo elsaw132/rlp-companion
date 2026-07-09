@@ -392,7 +392,7 @@ export default function WeekShape({
           </div>
           <input
             type="range"
-            className="week-slider"
+            className="week-slider rlp-slider"
             min={0}
             max={100}
             step={1}
@@ -526,7 +526,7 @@ function ActivityCard({
               <button
                 key={freq}
                 type="button"
-                className="week-pill"
+                className="week-pill rlp-chip"
                 style={{
                   ...styles.pill,
                   ...(on ? styles.pillOn : null),
@@ -545,7 +545,7 @@ function ActivityCard({
         {!activity.fixed && (
           <button
             type="button"
-            className="week-anchor"
+            className="week-anchor rlp-chip"
             style={{
               ...styles.toggleBtn,
               ...(activity.anchor ? styles.anchorBtnOn : null),
@@ -558,7 +558,7 @@ function ActivityCard({
         )}
         <button
           type="button"
-          className="week-energy"
+          className="week-energy rlp-chip"
           style={{
             ...styles.toggleBtn,
             ...(activity.energy ? styles.energyBtnOn : null),

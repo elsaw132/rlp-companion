@@ -243,7 +243,7 @@ export default function SeasonsBoard({
 
       {/* Live board preview */}
       <div style={styles.board}>
-        <div style={styles.seasonColumns}>
+        <div className="season-columns" style={styles.seasonColumns}>
           {seasons.map((season) => {
             const placed = items.filter((i) =>
               i.seasons.includes(season.label)
@@ -592,6 +592,12 @@ const summaryStyles: Record<string, React.CSSProperties> = {
 };
 
 const seasonsCss = `
+  /* The 3-across board crushes to ~90px columns on a phone. Stack it to one
+     column so each season card is readable. Desktop keeps the 3-column grid.
+     !important overrides the inline grid-template-columns. */
+  @media (max-width: 880px) {
+    .season-columns { grid-template-columns: 1fr !important; }
+  }
   .seasons-chip:focus-visible, .seasons-add-btn:focus-visible, .seasons-remove:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);

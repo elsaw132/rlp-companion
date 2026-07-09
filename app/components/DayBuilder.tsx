@@ -162,7 +162,7 @@ export default function DayBuilder({
                     <button
                       key={activity}
                       type="button"
-                      className="day-chip"
+                      className="day-chip rlp-chip"
                       style={styles.dayChip}
                       onClick={() => removeFrom(part, activity)}
                       title="Remove"
@@ -195,7 +195,7 @@ export default function DayBuilder({
                 <button
                   key={activity}
                   type="button"
-                  className="tile"
+                  className="tile rlp-chip"
                   style={styles.tile}
                   onClick={() => setPending(activity)}
                 >

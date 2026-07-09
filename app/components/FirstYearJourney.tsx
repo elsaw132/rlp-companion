@@ -171,7 +171,16 @@ function YearTimeline({
     if (overSeason !== season) setOverSeason(season);
   }
 
+  // The ordered phase sequence, used by the mobile ↑/↓ move controls (drag-and-
+  // drop doesn't work on touch). Moving steps an item through the phases and then
+  // the all-year bucket, so a phone user can reorder the timeline without dragging.
+  const moveOrder = [...seasons.map((s) => s.id), ALL_YEAR];
+
   function chip(it: ItemRow) {
+    const idx = moveOrder.indexOf(it.season);
+    const earlier = idx > 0 ? moveOrder[idx - 1] : null;
+    const later =
+      idx >= 0 && idx < moveOrder.length - 1 ? moveOrder[idx + 1] : null;
     return (
       <div
         key={it.id}
@@ -202,6 +211,32 @@ function YearTimeline({
         </span>
         {interactive && (
           <span style={styles.chipTools}>
+            {/* Touch reorder (mobile only — hidden on desktop, where drag works).
+                Steps the item to the previous/next phase. */}
+            <span className="fy-move" style={styles.chipMove}>
+              <button
+                type="button"
+                className="fy-chip-btn fy-move-btn"
+                style={styles.chipMoveBtn}
+                disabled={!earlier}
+                aria-label="Move earlier"
+                title="Move earlier"
+                onClick={() => earlier && onMove?.(it.id, earlier)}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                className="fy-chip-btn fy-move-btn"
+                style={styles.chipMoveBtn}
+                disabled={!later}
+                aria-label="Move later"
+                title="Move later"
+                onClick={() => later && onMove?.(it.id, later)}
+              >
+                ↓
+              </button>
+            </span>
             <button
               type="button"
               className="fy-chip-btn"
@@ -234,7 +269,7 @@ function YearTimeline({
 
   return (
     <div style={styles.timeline}>
-      <div style={styles.phases}>
+      <div className="fy-phases" style={styles.phases}>
         {seasons.map((s) => {
           const its = phaseItems(s.id);
           return (
@@ -905,6 +940,28 @@ const styles: Record<string, React.CSSProperties> = {
     borderColor: "var(--accent-strong)",
     color: "var(--brand-on-primary)",
   },
+  // Mobile touch-reorder controls. Visibility is controlled entirely by the
+  // `.fy-move` CSS (none on desktop, inline-flex on mobile) — deliberately no
+  // inline `display` here, since an inline value would override that CSS and
+  // leak the arrows onto desktop.
+  chipMove: {
+    gap: "4px",
+  },
+  chipMoveBtn: {
+    width: "38px",
+    height: "38px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "none",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-sm)",
+    fontSize: "18px",
+    lineHeight: 1,
+    color: "var(--brand-primary)",
+    cursor: "pointer",
+    padding: 0,
+  },
   allYear: {
     display: "flex",
     flexDirection: "column",
@@ -1185,5 +1242,16 @@ const journeyCss = `
   @keyframes fy-bounce {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
     30% { transform: translateY(-4px); opacity: 0.9; }
+  }
+  /* Desktop reorders by dragging chips between the four phase columns, so the
+     touch move-arrows are hidden there. */
+  .fy-move { display: none; }
+  .fy-move-btn:disabled { opacity: 0.35; cursor: default; }
+  /* On a phone, drag-and-drop doesn't work: stack the four phases into one
+     column and reveal the ↑/↓ move controls so the timeline is reorderable by
+     touch. Desktop (the 4-column grid + drag) is unchanged. */
+  @media (max-width: 880px) {
+    .fy-phases { grid-template-columns: 1fr !important; }
+    .fy-move { display: inline-flex; }
   }
 `;

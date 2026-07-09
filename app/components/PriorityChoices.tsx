@@ -139,7 +139,7 @@ export default function PriorityChoices({
         <div style={styles.pairList}>
         {pairs.map((pair, i) => (
           <div key={`${pair.left}-${i}`} style={styles.pair}>
-            <div style={styles.optionRow}>
+            <div className="pc-option-row" style={styles.optionRow}>
               <button
                 type="button"
                 className="pc-option"
@@ -210,7 +210,7 @@ export default function PriorityChoices({
                 <div style={styles.rankControls}>
                   <button
                     type="button"
-                    className="pc-move"
+                    className="pc-move rlp-tap"
                     style={styles.moveBtn}
                     onClick={() => move(i, -1)}
                     disabled={i === 0}
@@ -220,7 +220,7 @@ export default function PriorityChoices({
                   </button>
                   <button
                     type="button"
-                    className="pc-move"
+                    className="pc-move rlp-tap"
                     style={styles.moveBtn}
                     onClick={() => move(i, 1)}
                     disabled={i === ranked.length - 1}

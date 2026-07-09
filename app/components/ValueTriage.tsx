@@ -161,7 +161,7 @@ export default function ValueTriage({
                   <button
                     key={t.id}
                     type="button"
-                    className="vt-tray"
+                    className="vt-tray rlp-chip"
                     style={{
                       ...styles.trayBtn,
                       ...(on ? trayOnStyle(t.id) : null),
@@ -193,7 +193,7 @@ export default function ValueTriage({
                   <button
                     key={option}
                     type="button"
-                    className="vt-palette"
+                    className="vt-palette rlp-chip"
                     style={styles.paletteChip}
                     onClick={() => addFromPalette(option)}
                   >
@@ -242,7 +242,7 @@ export default function ValueTriage({
                 <button
                   key={card.label}
                   type="button"
-                  className="vt-core"
+                  className="vt-core rlp-chip"
                   style={{
                     ...styles.coreChip,
                     ...(on ? styles.coreChipOn : null),

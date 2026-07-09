@@ -129,7 +129,7 @@ export default function Sliders({
             )}
             <input
               type="range"
-              className="week-slider"
+              className="week-slider rlp-slider"
               style={styles.slider}
               min={0}
               max={100}

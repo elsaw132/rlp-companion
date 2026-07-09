@@ -180,7 +180,7 @@ export default function RolePicker({
                     >
                       <button
                         type="button"
-                        className="role-chip"
+                        className="role-chip rlp-chip"
                         style={styles.chipLabel}
                         aria-pressed={isSelected}
                         onClick={() => toggleSelect(role)}
@@ -190,7 +190,7 @@ export default function RolePicker({
                       {starrable && isSelected && (
                         <button
                           type="button"
-                          className="star-btn"
+                          className="star-btn rlp-tap"
                           style={styles.starButton}
                           aria-pressed={isStarred}
                           aria-label={
@@ -207,7 +207,7 @@ export default function RolePicker({
                       {isCustom && (
                         <button
                           type="button"
-                          className="remove-btn"
+                          className="remove-btn rlp-tap"
                           style={styles.removeButton}
                           aria-label={`Remove ${role}`}
                           title="Remove"
