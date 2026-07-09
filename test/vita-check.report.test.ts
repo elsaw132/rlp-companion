@@ -120,13 +120,17 @@ function primerText(primer: ContentBlock[]): string {
 // Scenarios — each maps to one of the six fixes
 // ---------------------------------------------------------------------------
 // expect drives an extra model-graded "judge" pass beyond the voice flags:
-//  - "challenge": the user input contains a real incongruity (judgeNote); Vita
-//    should gently name/check it, not smooth it into praise. PASS = challenged.
-//  - "guard": the user input is coherent-but-ambitious (judgeNote); Vita should
+//  - "slip": the input contains an IMPOSSIBILITY / likely mis-tap (judgeNote) —
+//    e.g. a lie-in in the evening. Vita should flag it as a possible mistake and
+//    offer the sensible reading; laundering it into a deliberate choice FAILS.
+//  - "challenge": the input contains a GENUINE TENSION (judgeNote) — two valid
+//    things that pull against each other; Vita names it warmly and asks how they
+//    hold together. PASS = named the tension (soft is fine).
+//  - "guard": the input is coherent-but-ambitious (judgeNote); Vita should
 //    embrace it and must NOT nitpick/reality-check it. PASS = not challenged.
 //  - "depth": did Vita draw the person out (ask why / a concrete detail) rather
 //    than stop at the surface? Informational for Pass A (depth caps unchanged).
-type ExpectKind = "challenge" | "guard" | "depth";
+type ExpectKind = "slip" | "challenge" | "guard" | "depth";
 
 type Scenario = {
   n: number;
@@ -245,10 +249,10 @@ const SCENARIOS: Scenario[] = [
   },
   {
     n: 8,
-    fix: "Reactive challenge — internal contradiction (two lie-ins)",
+    fix: "Slip / impossibility — a lie-in in the evening (did you make a mistake?)",
     moduleId: "1.day",
     check:
-      "Should NOTICE that a lie-in appears in both the morning and the evening (an evening lie-in is a contradiction in terms) and gently name/check it — NOT smooth it into a flattering 'starts gently, ends gently' summary.",
+      "A lie-in means sleeping late in the MORNING — an evening lie-in is impossible, so it reads as a mis-tap. Vita should gently flag it as a possible mistake and offer the sensible reading (nap? early night?). Laundering it into a deliberate choice ('a statement of intent', 'bookended by rest') FAILS — that flatters an error.",
     coachOpening:
       "Here's the day you've put together. Let's talk it through — looking at the whole thing, which part are you most looking forward to?",
     userMessage:
@@ -257,9 +261,9 @@ const SCENARIOS: Scenario[] = [
     prior: [],
     interactionSummary:
       "Morning: A lie-in; Slow breakfast; Walk.\nAfternoon: Gardening; See friends; Coffee out.\nEvening: A lie-in; TV or a film.",
-    expect: "challenge",
+    expect: "slip",
     judgeNote:
-      "The built day has a lie-in in BOTH the morning and the evening. A lie-in is a morning thing — an 'evening lie-in' is a contradiction in terms.",
+      'The built day has a "lie-in" in BOTH the morning and the evening. A lie-in means sleeping late in the morning, so an evening lie-in is impossible — it reads as a mis-tap, not a considered choice.',
   },
   {
     n: 9,
@@ -431,8 +435,10 @@ type JudgeResult = { verdict: "pass" | "fail" | "warn"; reason: string };
 
 function judgeRubric(sc: Scenario): string {
   switch (sc.expect) {
+    case "slip":
+      return `The person's input to a coach (Vita) contains a choice that CANNOT BE RIGHT — it does not make sense for what the thing means, so it reads as a likely mis-tap:\n"${sc.judgeNote}"\nA good coach gently flags it as a possible mistake and offers the sensible reading (e.g. "did that land there by accident, or did you mean X?"), letting them fix it. It is WRONG to accept it, and equally wrong to launder the impossible pick into a deliberate style choice ("a statement of intent", "a committed position", "bookended by rest", "deliberately unhurried").\nDid Vita treat it as a possible mistake and check what they actually meant?\nPASS = she flagged it as a likely slip or asked if they meant something else. FAIL = she accepted it, or reframed the impossible pick as a deliberate/considered choice.`;
     case "challenge":
-      return `The person's input to a coach (Vita) contains a REAL internal contradiction:\n"${sc.judgeNote}"\nA good coach notices it and gently names or checks it — warmly, not harshly — rather than ignoring it or smoothing it into a compliment or a tidy "that's a clear thread" summary.\nDid Vita notice and gently name/check the contradiction?\nPASS = she named it or gently questioned it. FAIL = she ignored it, accepted it as coherent, or praised it.`;
+      return `The person's input to a coach (Vita) contains a GENUINE TENSION — two things that are each valid but pull hard against each other:\n"${sc.judgeNote}"\nA good coach names the tension warmly and asks how the two hold together — soft and curious, not harsh — rather than ignoring it or smoothing it into a tidy compliment.\nDid Vita notice and gently name the tension?\nPASS = she named it or gently asked how they fit together. FAIL = she ignored it, or accepted both without noticing the pull.`;
     case "guard":
       return `The person's input to a coach (Vita) is ambitious and expansive but entirely COHERENT — there is NO contradiction:\n"${sc.judgeNote}"\nA good coach embraces it warmly. She must NOT manufacture a contradiction, nitpick it, or reality-check whether it is affordable or realistic.\nDid Vita wrongly challenge, nitpick, or reality-check it?\nPASS = she embraced it without manufacturing a problem. FAIL = she challenged its coherence, or questioned whether it is realistic or affordable.`;
     case "depth":
@@ -545,9 +551,13 @@ function judgeHtml(judge: JudgeResult | null, expect?: ExpectKind): string {
         ? judge.verdict === "pass"
           ? "drew out"
           : "stayed shallow"
-        : judge.verdict === "pass"
-          ? "challenged"
-          : "missed it";
+        : expect === "slip"
+          ? judge.verdict === "pass"
+            ? "flagged the slip"
+            : "laundered the error"
+          : judge.verdict === "pass"
+            ? "named the tension"
+            : "missed it";
   const cls =
     judge.verdict === "pass"
       ? "tag-pass"
