@@ -25,6 +25,9 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 export const metadata: Metadata = {
   title: "Chorus Life — Your retirement coach",
   description: "Your retirement coach from Chorus Life.",
+  // The app domain stays out of search during the pilot (invite-only; the public
+  // front door is chorus-life.com). Inherited by every page unless overridden.
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
