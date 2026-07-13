@@ -23,7 +23,8 @@ import { tailorCopy } from "@/lib/retirementCopy";
 import StageIntro from "./StageIntro";
 import OpeningCapture from "./OpeningCapture";
 import VitaMark from "./VitaMark";
-import PoweredByChorus from "./PoweredByChorus";
+import { stageMarkFor, stageWashFor } from "@/lib/stageColors";
+import { stageHeroFor } from "@/lib/stageHeroes";
 
 // The soft illustrated thumbnail per module, by position within the stage —
 // matches the order in the reference (sunrise, roles, cal, keep, mtn, future).
@@ -268,6 +269,9 @@ export default function HomeDashboard() {
   const viewedStageData =
     stagesView.find((s) => s.number === viewedStageNumber) ?? activeStage;
   const isViewingCurrent = viewedStageNumber === activeStageNumber;
+  // The hero photograph (and, on a finished stage, Vita's recap) for the stage
+  // being viewed. One image per stage; see lib/stageHeroes.ts.
+  const viewedHero = stageHeroFor(viewedStageNumber);
 
   const stageModules = visibleModules(viewedStageData, retirementStage);
   const doneInStage = stageModules.filter((m) => completed.includes(m.id)).length;
@@ -332,7 +336,22 @@ export default function HomeDashboard() {
   }
 
   return (
-    <div className="rlp-home">
+    <div
+      className="rlp-home"
+      style={
+        {
+          // The viewed stage's crisp MARK colour (its own for Plan/Act, Chorus
+          // Dark Green for the pale stages) with white text, plus its light tint
+          // FILL — shared with every stage-level wayfinding element below (sidebar
+          // selection, ring, completion panel, module bar, tiles). Driven by the
+          // VIEWED stage, not the current programme stage — so revisiting Plan
+          // stays orange even when the current stage is Act.
+          ["--stage-color"]: stageMarkFor(viewedStageNumber),
+          ["--stage-fg"]: "#fff",
+          ["--stage-wash"]: stageWashFor(viewedStageNumber),
+        } as React.CSSProperties
+      }
+    >
       <style>{homeCss}</style>
 
       <div className="shell">
@@ -358,9 +377,21 @@ export default function HomeDashboard() {
               ]
                 .filter(Boolean)
                 .join(" ");
+              // Stage colour is the wayfinding cue: the stage being viewed and the
+              // current programme stage each carry their own fixed stage colour on
+              // the number/check circle. Other done/idle stages stay restrained.
+              const stageCircleStyle =
+                isViewing || isCurrent
+                  ? ({
+                      background: stageMarkFor(s.number),
+                      color: "#fff",
+                    } as React.CSSProperties)
+                  : undefined;
               const inner = (
                 <>
-                  <span className={numClass}>{isDone ? "✓" : s.number}</span>
+                  <span className={numClass} style={stageCircleStyle}>
+                    {isDone ? "✓" : s.number}
+                  </span>
                   <span>
                     <span className="t">{s.name}</span>
                     <span className="s">{s.subtitle}</span>
@@ -399,10 +430,6 @@ export default function HomeDashboard() {
             <div className="lab">Your {viewedStageData.name} progress</div>
             <div className="sub">Grows as you complete the modules in this stage.</div>
           </div>
-
-          {/* BRANDING — product-layer "Powered by Chorus Life", pinned to the
-              bottom of the sidebar so it's always present on the home screen. */}
-          <PoweredByChorus />
         </aside>
 
         {/* MAIN */}
@@ -434,9 +461,20 @@ export default function HomeDashboard() {
                 ]
                   .filter(Boolean)
                   .join(" ");
+                // Same wayfinding cue as the sidebar: the viewed and current
+                // stages fill their whole dot with the stage colour (no ring).
+                const stageDotStyle =
+                  isViewing || isCurrent
+                    ? ({
+                        background: stageMarkFor(s.number),
+                        color: "#fff",
+                      } as React.CSSProperties)
+                    : undefined;
                 const inner = (
                   <>
-                    <div className="dot">{isDone ? "✓" : s.number}</div>
+                    <div className="dot" style={stageDotStyle}>
+                      {isDone ? "✓" : s.number}
+                    </div>
                     <div className="cap">{s.name}</div>
                   </>
                 );
@@ -462,20 +500,33 @@ export default function HomeDashboard() {
                 Viewing an earlier, finished stage shows a calmer header instead. */}
             {!isViewingCurrent ? (
               <section className="done-head">
-                <h2>
-                  <span className="tick" aria-hidden="true">
-                    ✓
-                  </span>
-                  {viewedStageData.name} — complete
-                </h2>
-                <p>Revisit any module below; your answers are saved.</p>
-                <button
-                  type="button"
-                  className="link-back"
-                  onClick={() => setViewedStage(null)}
-                >
-                  Back to your current step ›
-                </button>
+                <div className="dh-body">
+                  <h2>
+                    <span className="tick" aria-hidden="true">
+                      ✓
+                    </span>
+                    {viewedStageData.name} — complete
+                  </h2>
+                  <p>
+                    {viewedHero
+                      ? viewedHero.recap
+                      : "Revisit any module below; your answers are saved."}
+                  </p>
+                  <p className="dh-hint">Revisit any module below — your answers are saved.</p>
+                  <button
+                    type="button"
+                    className="link-back"
+                    onClick={() => setViewedStage(null)}
+                  >
+                    Back to your current step ›
+                  </button>
+                </div>
+                {viewedHero && (
+                  <div className="dh-scene">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="scene-img" src={viewedHero.image} alt={viewedHero.alt} width={1000} height={1000} />
+                  </div>
+                )}
               </section>
             ) : (
             <section className="hero">
@@ -499,10 +550,17 @@ export default function HomeDashboard() {
                   </div>
                 )}
               </div>
-              <div className="scene" aria-hidden="true">
-                <div className="sun-ill"></div>
-                <div className="cloud"></div>
-                <div className="cloud two"></div>
+              <div className="scene">
+                {viewedHero ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img className="scene-img" src={viewedHero.image} alt={viewedHero.alt} width={1000} height={1000} />
+                ) : (
+                  <div aria-hidden="true">
+                    <div className="sun-ill"></div>
+                    <div className="cloud"></div>
+                    <div className="cloud two"></div>
+                  </div>
+                )}
               </div>
             </section>
             )}
@@ -761,13 +819,15 @@ const homeCss = `
 .rlp-home .navlist{display:flex;flex-direction:column;gap:4px;margin-bottom:28px}
 .rlp-home .nav{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:var(--r-sm);width:100%;text-align:left;background:none;border:none;font-family:inherit;cursor:pointer}
 .rlp-home button.nav:hover{background:var(--bg-alt)}
-.rlp-home .nav.is-viewing{background:var(--brand-primary-tint)}
-.rlp-home .nav.is-viewing:hover{background:var(--brand-primary-tint)}
+/* The selected (viewed) stage row inherits its own stage colour: a 10% tint fill
+   with a stage-colour hairline (drawn as an inset shadow so it adds no layout). */
+.rlp-home .nav.is-viewing{background:var(--stage-wash);box-shadow:inset 0 0 0 1.5px var(--stage-color)}
+.rlp-home .nav.is-viewing:hover{background:var(--stage-wash)}
 .rlp-home .nav.is-locked{opacity:.5;cursor:default}
 .rlp-home .nav.is-locked:hover{background:none}
 .rlp-home .nav .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0}
 .rlp-home .nav .n--current{background:var(--brand-primary);color:#fff}
-.rlp-home .nav .n--idle{background:#EBF1F8;color:var(--brand-primary)}
+.rlp-home .nav .n--idle{background:var(--brand-primary-tint);color:var(--brand-primary)}
 .rlp-home .nav .n--done{background:var(--brand-primary);color:#fff}
 .rlp-home .nav > span:last-child{display:flex;flex-direction:column;gap:2px;min-width:0}
 .rlp-home .nav .t{display:block;font-size:15px;font-weight:600;color:var(--ink);line-height:1.25}
@@ -776,9 +836,9 @@ const homeCss = `
 
 .rlp-home .clarity{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:18px;box-shadow:var(--shadow-sm);text-align:center}
 .rlp-home .radial-wrap{position:relative;display:inline-grid;place-items:center;margin-bottom:10px}
-.rlp-home .radial{--p:0;width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--brand-primary) calc(var(--p)*1%),var(--border) 0)}
+.rlp-home .radial{--p:0;width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--stage-color,var(--brand-primary)) calc(var(--p)*1%),var(--border) 0)}
 .rlp-home .radial::before{content:"";position:absolute;width:58px;height:58px;border-radius:50%;background:#fff}
-.rlp-home .radial span{position:relative;font-size:16px;font-weight:700;color:var(--brand-primary)}
+.rlp-home .radial span{position:relative;font-size:16px;font-weight:700;color:var(--color-text-primary)}
 .rlp-home .clarity .lab{font-size:13px;font-weight:600;color:var(--ink)}
 .rlp-home .clarity .sub{font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.45}
 
@@ -802,7 +862,6 @@ const homeCss = `
 .rlp-home button.step{cursor:pointer}
 .rlp-home .step.is-locked{opacity:.5;cursor:default}
 .rlp-home .step .dot{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;z-index:1}
-.rlp-home .step.is-viewing .dot{box-shadow:0 0 0 4px var(--brand-primary-tint)}
 .rlp-home .step.done .dot{background:var(--brand-primary);color:#fff}
 .rlp-home .step.active .dot{background:var(--accent);color:#fff}
 .rlp-home .step.todo .dot{background:var(--border);color:var(--text-faint)}
@@ -814,8 +873,8 @@ const homeCss = `
 .rlp-home .hero{display:grid;grid-template-columns:1.05fr .95fr;background:var(--warm-surface);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--warm-line);box-shadow:var(--shadow-md);margin-bottom:34px}
 .rlp-home .hero .body{padding:28px 28px 30px}
 .rlp-home .hero .vita{display:flex;align-items:center;gap:9px;margin-bottom:12px}
-.rlp-home .hero .vita .name{font-family:var(--font-serif);font-size:20px;font-weight:600;color:var(--ink)}
-.rlp-home .coachpill{display:inline-block;background:var(--coach-pill);color:var(--coach-pill-text);font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-sm);margin-bottom:16px}
+.rlp-home .hero .vita .name{font-family:var(--font-serif);font-size:20px;font-weight:600;color:var(--color-vita)}
+.rlp-home .coachpill{display:inline-block;background:var(--color-vita);color:#fff;font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-sm);margin-bottom:16px}
 .rlp-home .hero p.intro{font-size:15px;color:var(--text);line-height:1.6;margin-bottom:22px}
 .rlp-home .hero .ns-eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:3px}
 .rlp-home .hero .ns-title{font-family:var(--font-serif);font-size:23px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:18px}
@@ -825,10 +884,19 @@ const homeCss = `
 .rlp-home .hero .scene .cloud{position:absolute;width:64px;height:18px;background:rgba(255,255,255,.7);border-radius:20px;top:74px;right:54px}
 .rlp-home .hero .scene .cloud.two{width:44px;top:104px;right:120px;opacity:.6}
 
-.rlp-home .done-head{background:var(--success-surface);border:1px solid var(--success-line);border-radius:var(--r-lg);padding:24px 26px;margin-bottom:34px}
+/* Stage-completion panel — a light tint of the viewed stage, not generic success
+   green. The tick circle is the full stage colour; body text stays neutral. */
+/* Shared hero photograph fill — used in the current-stage hero and, on a finished
+   stage, the completion panel. Square source, cropped to the slot (trim is fine). */
+.rlp-home .scene-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+
+.rlp-home .done-head{background:var(--stage-wash);border:1px solid color-mix(in srgb,var(--stage-color) 42%,#fff);border-radius:var(--r-lg);margin-bottom:34px;overflow:hidden;display:grid;grid-template-columns:1fr .72fr}
+.rlp-home .done-head .dh-body{padding:24px 26px}
+.rlp-home .done-head .dh-scene{position:relative;min-height:100%}
 .rlp-home .done-head h2{font-family:var(--font-serif);font-size:24px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:8px;display:flex;align-items:center;gap:10px}
-.rlp-home .done-head .tick{width:30px;height:30px;border-radius:50%;background:var(--brand-primary);color:#fff;display:grid;place-items:center;font-size:15px;flex-shrink:0}
-.rlp-home .done-head p{font-size:15px;color:var(--text);margin-bottom:14px}
+.rlp-home .done-head .tick{width:30px;height:30px;border-radius:50%;background:var(--stage-color);color:var(--stage-fg);display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.rlp-home .done-head p{font-size:15px;color:var(--text);margin-bottom:10px}
+.rlp-home .done-head .dh-hint{font-size:13px;color:var(--text-muted);margin-bottom:14px}
 .rlp-home .link-back{background:none;border:none;cursor:pointer;font-family:inherit;font-size:15px;font-weight:600;color:var(--brand-primary);padding:8px 0;min-height:44px}
 .rlp-home .link-back:hover{text-decoration:underline}
 
@@ -841,7 +909,7 @@ const homeCss = `
 .rlp-home .sec-head{font-size:18px;font-weight:700;color:var(--ink)}
 .rlp-home .sec-prog{font-size:13px;color:var(--text-muted);white-space:nowrap}
 .rlp-home .bar{height:6px;border-radius:var(--r-pill);background:var(--border);overflow:hidden;margin:10px 0 20px}
-.rlp-home .bar i{display:block;height:100%;background:var(--brand-primary);border-radius:var(--r-pill)}
+.rlp-home .bar i{display:block;height:100%;background:var(--stage-color);border-radius:var(--r-pill)}
 
 .rlp-home .cards{display:flex;flex-direction:column;gap:12px;margin-bottom:34px}
 .rlp-home .scard{display:grid;grid-template-columns:88px minmax(0,1fr) auto auto;gap:18px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:18px;box-shadow:var(--shadow-sm)}
@@ -851,19 +919,18 @@ const homeCss = `
 .rlp-home .done-cap{display:inline-flex;align-items:center;gap:12px}
 .rlp-home .done-cap .chev{font-size:22px;line-height:1;color:var(--text-muted)}
 .rlp-home .scard > div:not(.thumb){min-width:0}
-.rlp-home .thumb{width:88px;height:72px;border-radius:var(--r-md);overflow:hidden;position:relative;flex-shrink:0}
-.rlp-home .thumb.sunrise{background:linear-gradient(var(--ill-sky-pale),var(--ill-hill) 70%)}
-.rlp-home .thumb.sunrise::after{content:"";position:absolute;top:14px;left:50%;transform:translateX(-50%);width:20px;height:20px;border-radius:50%;background:var(--sun)}
-.rlp-home .thumb.roles{background:#E7F2E2;display:grid;place-items:center}
-.rlp-home .thumb.roles::after{content:"";width:44px;height:30px;background:radial-gradient(circle at 30% 50%,var(--ill-hill) 12px,transparent 13px),radial-gradient(circle at 70% 50%,var(--ill-hill-deep) 12px,transparent 13px)}
-.rlp-home .thumb.cal{background:#FCE7B8;display:grid;place-items:center}
-.rlp-home .thumb.cal::after{content:"";width:46px;height:34px;border-radius:6px;background:var(--coach-pill);box-shadow:inset 0 8px 0 #E7B53D}
-.rlp-home .thumb.keep{background:#EFEAFB;display:grid;place-items:center}
-.rlp-home .thumb.keep::after{content:"";width:40px;height:40px;border-radius:50%;border:6px solid var(--ill-lavender);border-right-color:transparent;transform:rotate(40deg)}
-.rlp-home .thumb.mtn{background:#EEEAFB;position:relative;overflow:hidden}
-.rlp-home .thumb.mtn::after{content:"";position:absolute;bottom:0;left:50%;transform:translateX(-50%);border-left:22px solid transparent;border-right:22px solid transparent;border-bottom:34px solid var(--ill-lavender)}
-.rlp-home .thumb.future{background:linear-gradient(135deg,#DDEAF4,#C9D9CC)}
-.rlp-home .thumb.future::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 70% 30%,rgba(251,210,78,.7) 10px,transparent 11px)}
+/* All illustration tiles in a stage share one light tint of that stage's colour;
+   the line work is Chorus dark green. Modules are never coloured individually. */
+.rlp-home .thumb{width:88px;height:72px;border-radius:var(--r-md);overflow:hidden;position:relative;flex-shrink:0;background:var(--stage-wash)}
+.rlp-home .thumb.roles{display:grid;place-items:center}
+.rlp-home .thumb.roles::after{content:"";width:44px;height:30px;background:radial-gradient(circle at 30% 50%,var(--color-brand-primary) 12px,transparent 13px),radial-gradient(circle at 70% 50%,var(--color-brand-primary) 12px,transparent 13px)}
+.rlp-home .thumb.cal{display:grid;place-items:center}
+.rlp-home .thumb.cal::after{content:"";width:46px;height:34px;border-radius:6px;background:var(--color-brand-primary);box-shadow:inset 0 8px 0 color-mix(in srgb,var(--color-brand-primary) 55%,#fff)}
+.rlp-home .thumb.keep{display:grid;place-items:center}
+.rlp-home .thumb.keep::after{content:"";width:40px;height:40px;border-radius:50%;border:6px solid var(--color-brand-primary);border-right-color:transparent;transform:rotate(40deg)}
+.rlp-home .thumb.mtn::after{content:"";position:absolute;bottom:0;left:50%;transform:translateX(-50%);border-left:22px solid transparent;border-right:22px solid transparent;border-bottom:34px solid var(--color-brand-primary)}
+.rlp-home .thumb.sunrise::after{content:"";position:absolute;top:14px;left:50%;transform:translateX(-50%);width:20px;height:20px;border-radius:50%;background:var(--color-brand-primary)}
+.rlp-home .thumb.future::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 70% 30%,var(--color-brand-primary) 10px,transparent 11px)}
 .rlp-home .scard .title{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--ink);line-height:1.2}
 .rlp-home .scard .desc{font-size:14px;color:var(--text-muted);margin-top:5px;max-width:34ch}
 .rlp-home .badge{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;border-radius:var(--r-pill);padding:7px 14px;white-space:nowrap}
@@ -871,7 +938,7 @@ const homeCss = `
 .rlp-home .badge-notstarted{color:var(--text-muted);background:var(--muted-surface)}
 
 .rlp-home .info{display:flex;gap:18px;align-items:flex-start;background:var(--info-surface);border:1px solid var(--info-line);border-radius:var(--r-md);padding:22px 24px;margin-bottom:30px}
-.rlp-home .info .av{width:42px;height:42px;border-radius:50%;background:#C9D7F2;display:grid;place-items:center;font-size:18px;flex-shrink:0}
+.rlp-home .info .av{width:42px;height:42px;border-radius:50%;background:var(--brand-primary-tint);display:grid;place-items:center;font-size:18px;flex-shrink:0}
 .rlp-home .info h4{font-family:var(--font-serif);font-size:18px;font-weight:600;color:var(--info-text);margin-bottom:5px}
 .rlp-home .info p{font-size:14px;color:var(--text);max-width:52ch;line-height:1.55}
 .rlp-home .info .lk{margin-left:auto;align-self:center;font-size:15px;font-weight:600;color:var(--brand-primary);white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
@@ -891,7 +958,10 @@ const homeCss = `
   .rlp-home .sidebar{display:none}
   .rlp-home .main{padding:24px 18px 80px}
   .rlp-home .hero{grid-template-columns:1fr}
-  .rlp-home .hero .scene{min-height:120px}
+  .rlp-home .hero .scene{min-height:170px}
+  /* Completion panel stacks: recap above, photo as a banner below. */
+  .rlp-home .done-head{grid-template-columns:1fr}
+  .rlp-home .done-head .dh-scene{min-height:170px}
   .rlp-home .greeting{font-size:28px}
   .rlp-home .scard{grid-template-columns:64px minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:14px;row-gap:12px;align-items:start}
   .rlp-home .scard .thumb{grid-column:1;grid-row:1 / span 2;width:64px;height:64px}

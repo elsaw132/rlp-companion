@@ -1,12 +1,49 @@
 :root {
-  --brand-primary:#013281;--brand-primary-hover:#01275F;--brand-primary-tint:#E8EDF1;--brand-on-primary:#fff;
-  --brand-band:#FFD101;--brand-on-band:#013281;
+  /* ---- Chorus Life brand palette — exact values, never approximated ---- */
+  --chorus-dark-green:#0A322D;--chorus-green:#00645F;--chorus-purple:#322D69;--chorus-orange:#DC6437;
+  --chorus-blue:#C3F5FF;--chorus-yellow:#FFEBC8;--chorus-pink:#FFEBFF;--chorus-lime:#D7FF73;
+
+  /* ---- Semantic brand tokens (reference these, not the raw palette) ----
+     Dark green is the structural brand colour; Chorus green is the interaction
+     colour; lime is a small header accent; purple is Vita's stable identity.
+     Dark green and Chorus green are never used interchangeably. */
+  --color-brand-primary:var(--chorus-dark-green);
+  --color-brand-accent:var(--chorus-lime);
+  --color-interactive-primary:var(--chorus-green);
+  --color-interactive-hover:color-mix(in srgb, var(--chorus-green) 85%, #000);
+  --color-vita:var(--chorus-purple);
+
+  /* Stage wayfinding colours (fixed) + a readable foreground for a filled marker
+     of each (dark ink on the pale stages, white on the saturated ones). Consumed
+     through lib/stageColors.ts so no component re-declares stage colour logic. */
+  --color-stage-imagine:var(--chorus-blue);--color-stage-explore:var(--chorus-yellow);
+  --color-stage-understand:var(--chorus-pink);--color-stage-plan:var(--chorus-orange);--color-stage-act:var(--chorus-green);
+  /* Foreground for content sitting ON a stage-colour fill, per the Chorus rule
+     "use Chorus Dark Green with any of the lighter colours": dark green on the pale
+     stages, white on the two dark stages (Plan orange / Act green). */
+  --color-on-stage-imagine:var(--chorus-dark-green);--color-on-stage-explore:var(--chorus-dark-green);
+  --color-on-stage-understand:var(--chorus-dark-green);--color-on-stage-plan:#fff;--color-on-stage-act:#fff;
+
+  /* Semantic neutrals — preserve the product's existing white-space balance. */
+  --color-surface-page:#fff;--color-surface-card:#fff;--color-surface-subtle:#FAFAF8;
+  --color-border-default:#E9E9E4;--color-text-primary:var(--chorus-dark-green);
+  --color-text-secondary:#7C7F86;--color-text-on-dark:#fff;
+
+  /* ---- Product brand layer, now mapped onto Chorus semantics ----
+     --brand-primary is the interaction colour (green) behind buttons, links and
+     selected controls; the header band is the structural brand colour (dark
+     green) carrying white text. */
+  --brand-primary:var(--color-interactive-primary);--brand-primary-hover:var(--color-interactive-hover);--brand-primary-tint:color-mix(in srgb, var(--chorus-green) 12%, #fff);--brand-on-primary:#fff;
+  --brand-band:var(--color-brand-primary);--brand-on-band:var(--color-text-on-dark);
   --warm-surface:#FBF7EC;--warm-surface-2:#FCF8EF;--warm-line:#EFE6D2;--coach-pill:#FFE36B;--coach-pill-text:#5A4300;--sun:#FBD24E;
-  --accent:#E06F1F;--accent-hover:#C75F16;--accent-strong:#B85C16;--accent-surface:#FEFEF4;--accent-line:#EAD9B0;
-  --ink:#16202E;--text:#3A3D44;--text-muted:#7C7F86;--text-faint:#A6A8AE;
+  /* Orange accent = exact Chorus orange. Strong/hover are darker shades for
+     white-text contrast; surfaces are pale tints (Plan-stage washes). */
+  --accent:var(--chorus-orange);--accent-hover:color-mix(in srgb, var(--chorus-orange) 88%, #000);--accent-strong:color-mix(in srgb, var(--chorus-orange) 78%, #000);--accent-surface:color-mix(in srgb, var(--chorus-orange) 8%, #fff);--accent-line:color-mix(in srgb, var(--chorus-orange) 30%, #fff);
+  --ink:var(--color-text-primary);--text:#3A3D44;--text-muted:#7C7F86;--text-faint:#A6A8AE;
   --bg:#fff;--bg-alt:#FAFAF8;--surface:#fff;--border:#E9E9E4;--border-strong:#DCDCD6;
   --success:#2F8B4E;--success-text:#2C7A46;--success-surface:#EAF5ED;--success-line:#BFE0C4;--muted-surface:#EFEEE9;
-  --info-surface:#ECF0FB;--info-line:#D6DFF4;--info-text:#16202E;
+  /* Info callout — retinted off the old Lionsgate blue onto the Chorus green family. */
+  --info-surface:color-mix(in srgb, var(--chorus-green) 6%, #fff);--info-line:color-mix(in srgb, var(--chorus-green) 18%, #fff);--info-text:var(--color-text-primary);
   --ill-sky:#A4CCE5;--ill-sky-pale:#C9E0EE;--ill-hill:#5B9F4A;--ill-hill-deep:#3F7F36;--ill-path:#C7A53A;--ill-lavender:#D0CCEF;
   /* Stage 2 area accents — derived from the --ill illustration palette (light fill / selected fill / readable darkened foreground). No orange. */
   --area-active-base:#E7F2DA;--area-active-sel:#BFDD97;--area-active-fg:#2C5A1A;
@@ -20,7 +57,7 @@
   --reveal-values-wash:#FBEAF0;--reveal-values-fg:#8E3957;
   --reveal-protect-wash:#EAF3DE;--reveal-protect-fg:#3C6312;
   --reveal-clear-wash:#E9EFF6;--reveal-clear-fg:#2E517D;
-  --reveal-forward-wash:#E8EEF6;--reveal-forward-fg:#013281;
+  --reveal-forward-wash:#E8EEF6;--reveal-forward-fg:var(--chorus-dark-green);
   --r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-pill:999px;
   --shadow-sm:0 1px 2px rgba(16,32,46,.05),0 1px 3px rgba(16,32,46,.04);
   --shadow-md:0 2px 6px rgba(16,32,46,.05),0 10px 28px rgba(16,32,46,.06);
@@ -29,5 +66,8 @@
   --fs-display:34px;--fs-h2:22px;--fs-title:20px;--fs-section:18px;--fs-body:16px;--fs-sm:14px;--fs-label:12.5px;--fs-eyebrow:11.5px;
   --lh-body:1.6;
   --header-h:68px;--sidebar-w:280px;--content-max:720px;
-  --focus-ring:0 0 0 3px rgba(1,50,129,0.4);
+  /* Focus rings: Chorus green on light surfaces; lime (--focus-ring-accent) for
+     controls sitting on the dark-green header, where green would not show. */
+  --focus-ring:0 0 0 3px color-mix(in srgb, var(--chorus-green) 45%, transparent);
+  --focus-ring-accent:0 0 0 3px color-mix(in srgb, var(--chorus-lime) 75%, transparent);
 }

@@ -1,9 +1,10 @@
 "use client";
 
-// The provider band header (yellow --brand-band). Reusable on purpose: it lives
-// in /home for now, but will be promoted to the global layout once the session
-// screen is built so the band stays consistent across dashboard and sessions.
-// All text/icons on the band are navy (--brand-on-band).
+// The Chorus Life band header (dark-green --brand-band). Reusable on purpose: it
+// lives in /home for now, but will be promoted to the global layout once the
+// session screen is built so the band stays consistent across dashboard and
+// sessions. All text/icons on the band are white (--brand-on-band); the divider
+// between the wordmark and descriptor is Chorus lime (--color-brand-accent).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -11,9 +12,9 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { useUserData } from "@/lib/userData";
 import FeedbackPanel from "./FeedbackPanel";
 
-// The provider whose brand the band carries. This is the one piece that swaps
-// per provider; the brand colours (yellow band, navy) stay as they are.
-const PROVIDER_NAME = "Lionsgate Pensions";
+// The product wordmark carried by the band. This is a direct-to-consumer pilot,
+// so there is no pension-provider name — the brand is Chorus Life itself.
+const PROVIDER_NAME = "Chorus Life";
 
 type ClerkUser = ReturnType<typeof useUser>["user"];
 
@@ -60,12 +61,13 @@ export default function ProviderBand() {
     <header className="rlp-band">
       <style>{bandCss}</style>
 
-      {/* Wordmark + descriptor, linking back to the dashboard. The wordmark is
-          the provider's text logo — never redraw it; only the string swaps. */}
+      {/* Official Chorus Life wordmark (white asset) + descriptor, linking back to
+          the dashboard. The wordmark is supplied art — never redraw it. */}
       <Link href="/home" className="brand" aria-label={`${PROVIDER_NAME} — back to dashboard`}>
-        <span className="logo">{PROVIDER_NAME}</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="logo" src="/chorus-life-logo-white.svg" alt={PROVIDER_NAME} width={76} height={24} />
         <span className="brand-divider" aria-hidden="true" />
-        <span className="descriptor">Digital Retirement Coaching</span>
+        <span className="descriptor">Your retirement coach</span>
       </Link>
 
       <div className="right">
@@ -144,17 +146,17 @@ const bandCss = `
    the band exactly as-is. */
 @media (max-width:880px){.rlp-band{display:none}}
 .rlp-band .brand{display:flex;align-items:center;gap:14px;text-decoration:none;border-radius:var(--r-sm)}
-.rlp-band .brand:focus-visible{outline:none;box-shadow:var(--focus-ring)}
-.rlp-band .logo{font-family:var(--font-serif);font-weight:700;font-size:23px;color:var(--brand-on-band);letter-spacing:-.01em;line-height:1.1}
-.rlp-band .brand-divider{width:1px;height:26px;background:var(--brand-on-band);opacity:.32;flex:none}
-.rlp-band .descriptor{font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--brand-on-band);opacity:.85;letter-spacing:.01em;line-height:1.2}
+.rlp-band .brand:focus-visible{outline:none;box-shadow:var(--focus-ring-accent)}
+.rlp-band .logo{height:24px;width:auto;display:block}
+.rlp-band .brand-divider{width:1px;height:26px;background:var(--color-brand-accent);flex:none}
+.rlp-band .descriptor{font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--brand-on-band);letter-spacing:.01em;line-height:1.2}
 .rlp-band .right{display:flex;align-items:center;gap:20px}
 .rlp-band .support{font-family:inherit;font-size:14px;font-weight:600;color:var(--brand-on-band);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;min-height:44px}
 .rlp-band .support:hover{text-decoration:underline;text-underline-offset:3px}
-.rlp-band .support:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
+.rlp-band .support:focus-visible{outline:none;box-shadow:var(--focus-ring-accent);border-radius:var(--r-sm)}
 .rlp-band .account{position:relative}
 .rlp-band .user{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:var(--brand-on-band);background:none;border:none;cursor:pointer;font-family:inherit;min-height:44px}
-.rlp-band .user:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
+.rlp-band .user:focus-visible{outline:none;box-shadow:var(--focus-ring-accent);border-radius:var(--r-sm)}
 .rlp-band .avatar{width:34px;height:34px;border-radius:50%;background:var(--brand-primary);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700}
 .rlp-band .menu-scrim{position:fixed;inset:0;background:none;border:none;padding:0;margin:0;cursor:default;z-index:40}
 .rlp-band .menu{position:absolute;top:calc(100% + 10px);right:0;z-index:50;min-width:220px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-md);padding:8px;display:flex;flex-direction:column;gap:4px}
