@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import FeedbackPanel from "./FeedbackPanel";
 
 // The global feedback affordance: a fixed bottom-right pill that opens the
@@ -9,7 +10,12 @@ import FeedbackPanel from "./FeedbackPanel";
 // lives in FeedbackPanel, reused by the header's Support button too.
 
 export default function FeedbackButton() {
+  const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
+
+  // The public marketing home has no in-app chrome — a logged-out visitor
+  // shouldn't see the tester feedback pill. (MobileAppBar hides on "/" likewise.)
+  if (pathname === "/") return null;
 
   return (
     <>
