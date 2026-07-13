@@ -79,7 +79,7 @@ export default function ModuleFeedbackCard({
       </p>
 
       <Scale
-        label="How useful was this module?"
+        label="How useful was this session?"
         lowLabel="Not useful"
         highLabel="Very useful"
         value={useful}

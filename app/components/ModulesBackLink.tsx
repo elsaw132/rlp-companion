@@ -56,7 +56,7 @@ export function ModulesBackLink({ sessionId }: { sessionId: string }) {
         style={ghostLink}
         onClick={handleClick}
       >
-        ← Your modules
+        ← Your sessions
       </Link>
 
       {showFeedback && (
@@ -64,7 +64,7 @@ export function ModulesBackLink({ sessionId }: { sessionId: string }) {
           className="plan-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label="A quick word on this module"
+          aria-label="A quick word on this session"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowFeedback(false);
           }}

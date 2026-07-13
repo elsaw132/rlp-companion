@@ -65,7 +65,7 @@ Choose distinct values with real grounding — a smaller honest set beats a padd
 JSON shape: {"pairs":[{"left":"...","right":"..."}, ...],"values":["...", ...]}`,
   "value-definitions": `For each of this person's CORE values — use the values they marked as most core in their earlier Stage 3 work (named in what they built); if none are clear, pick 3–5 that fit them — draft:
 - "value": the value label.
-- "description": the short personal description they already gave this value in the values module, copied in THEIR terms, lower case, no full stop (e.g. "choosing your own pace, not over-committing"). If they didn't describe it, write a brief one grounded in their picture — never invent specifics about their life.
+- "description": the short personal description they already gave this value in the values session, copied in THEIR terms, lower case, no full stop (e.g. "choosing your own pace, not over-committing"). If they didn't describe it, write a brief one grounded in their picture — never invent specifics about their life.
 - "threat": the SINGLE most likely SPECIFIC thing that would get in the way of living this value on a regular basis — a real, recognisable situation from THEIR own picture (a named commitment, person, habit, place, or pull on their time), not a vague drift or abstract erosion. ONE complete sentence beginning with a capital letter, honest not softened, naming the actual thing that would crowd it out. GOOD (specific, real): "Saying yes to every babysitting request until your own week has nothing left in it." TOO VAGUE (avoid): "The reliable presence you pictured quietly becomes occasional visits."
 - "protectors": an array of exactly 3 DISTINCT candidate protectors — each a SIMPLE, concrete thing they could commit to as a regular part of their plan to keep the value alive (e.g. "Keeping one weekday morning free for the grandchildren"). Small enough to actually hold to week to week, drawn from their picture, and clearly different from each other so they're real choices. Do NOT make them grand resolutions, schedules, or multi-step plans.
 Ground everything in their own picture. JSON shape: {"values":[{"value":"...","description":"...","threat":"...","protectors":["...","...","..."]}, ...]}`,
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       `WHAT THEY'VE WORKED THROUGH:\n${body.priorReflections.trim()}`,
     body.priorBuilds &&
       body.priorBuilds.trim() &&
-      `WHAT THEY BUILT IN EARLIER UNDERSTAND MODULES:\n${body.priorBuilds.trim()}`,
+      `WHAT THEY BUILT IN EARLIER UNDERSTAND SESSIONS:\n${body.priorBuilds.trim()}`,
   ]
     .filter(Boolean)
     .join("\n\n");

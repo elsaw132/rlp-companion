@@ -133,7 +133,7 @@ export default function MobileAppBar() {
         <div className="ab-left">
           {isSession ? (
             <button type="button" className="ab-back" onClick={handleModuleBack}>
-              <span aria-hidden="true">‹</span> Your modules
+              <span aria-hidden="true">‹</span> Your sessions
             </button>
           ) : isSubScreen ? (
             <Link href="/home" className="ab-back">
@@ -242,7 +242,7 @@ export default function MobileAppBar() {
           className="ab-module-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label="A quick word on this module"
+          aria-label="A quick word on this session"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowModuleFeedback(false);
           }}

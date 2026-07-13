@@ -38,7 +38,7 @@ const GENERIC_SUGGESTIONS: Suggestion[] = [
 // future-self framing.
 const DEFAULT_FRAMING = `The person is about to write a short letter to someone in their life, set a good way into their retirement, describing what life looks like now. Your job is to beat the blank page: offer a few optional, tappable starting points drawn from what they've already imagined earlier in the programme.
 
-You'll be given who they're writing to, and a summary of what they imagined in earlier modules (their day, the roles they want, their ideal week, things they'd love to do).`;
+You'll be given who they're writing to, and a summary of what they imagined in earlier sessions (their day, the roles they want, their ideal week, things they'd love to do).`;
 
 const RETIRED_FRAMING = `The person is already retired and about to write a short letter to someone in their life, reflecting on what their retirement actually looks like now. Your job is to beat the blank page: offer a few optional, tappable starting points drawn from what they've described about their retirement so far.
 
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
   const hasMaterial =
     body.priorReflections &&
     body.priorReflections.trim() &&
-    !/no earlier modules/i.test(body.priorReflections);
+    !/no earlier sessions/i.test(body.priorReflections);
   if (!hasMaterial) {
     return Response.json({ suggestions: GENERIC_SUGGESTIONS });
   }

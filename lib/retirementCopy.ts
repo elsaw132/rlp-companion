@@ -224,10 +224,10 @@ export const RULES: Rule[] = [
     ),
   },
   {
-    find: "This module is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.",
+    find: "This session is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.",
     variants: v(
-      "This module is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.",
-      "This module is about the roles you play now, the ones that matter most to you, and any you'd still like to grow into."
+      "This session is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.",
+      "This session is about the roles you play now, the ones that matter most to you, and any you'd still like to grow into."
     ),
   },
 
@@ -240,10 +240,10 @@ export const RULES: Rule[] = [
     ),
   },
   {
-    find: "This module is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.",
+    find: "This session is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.",
     variants: v(
-      "This module is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.",
-      "This module is about the rhythm of your retirement as it is now — how much routine, variety, and rest you have across the week, what's working, and what you'd like to shift."
+      "This session is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.",
+      "This session is about the rhythm of your retirement as it is now — how much routine, variety, and rest you have across the week, what's working, and what you'd like to shift."
     ),
   },
   {

@@ -66,9 +66,9 @@ const FACT_CATEGORIES = [
   "keep_change_leave",
 ].join(", ");
 
-export const TAKEAWAY_SYSTEM_PROMPT = `You are summarising one module of a guided retirement life-planning programme. The transcript below is a conversation between a coach (Vita) and a person. The summary is used in two ways: it is carried into later modules so the coach can draw on the whole picture, and a version of it is read back to the person on their home screen. It also seeds the person's Retirement Life Plan.
+export const TAKEAWAY_SYSTEM_PROMPT = `You are summarising one session of a guided retirement life-planning programme. The transcript below is a conversation between a coach (Vita) and a person. The summary is used in two ways: it is carried into later sessions so the coach can draw on the whole picture, and a version of it is read back to the person on their home screen. It also seeds the person's Retirement Life Plan.
 
-Write 2 to 4 sentences capturing what matters to this person and what emerged in this module — the substance, not the coaching. Plain, warm, and specific to what they actually said. No preamble, no headings, no quotation marks, no advice — just the summary sentences. Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"; "It isn't this, it's that") — write directly, confidently, and entirely in the affirmative. Never use the word "genuinely".
+Write 2 to 4 sentences capturing what matters to this person and what emerged in this session — the substance, not the coaching. Plain, warm, and specific to what they actually said. No preamble, no headings, no quotation marks, no advice — just the summary sentences. Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"; "It isn't this, it's that") — write directly, confidently, and entirely in the affirmative. Never use the word "genuinely".
 
 Produce the summary in two grammatical persons. The content and tone must be identical — only the person differs:
 - "thirdPerson": written in the third person ("they"/"their").
@@ -79,7 +79,7 @@ You ALSO extract structured fact changes that emerged ONLY in the conversation (
 - "removals": ONLY when the person EXPLICITLY and UNAMBIGUOUSLY asked, in their OWN words, to drop, remove, undo, or replace something already on record (you're told what's on record). This is a HIGH bar. Every removal MUST include a "quote": the person's own verbatim words, copied exactly from a "Them:" line, that make the request. If you cannot copy such words, DO NOT emit a removal. Each: {"label": the on-record fact to drop (match its wording), "quote": the person's exact words asking to drop or change it, optionally "category", and "userConfirmedInChat": true only when that quote is a direct request from the person.
   The following do NOT count as removals — for these, emit nothing: the person simply giving a new, different, or fuller answer; you inferring they "seem to have" moved on; a change of subject; softening, hedging, or elaborating; anything you would preface with "it sounded like" or "they might have". When in any doubt, emit NO removal. A missed correction is fine — the person can edit it themselves; a wrong one is not.
   Empty array unless the person explicitly asked, in words you can quote, to drop or change something.
-- "reasons": when the conversation surfaces a genuinely meaningful REASON, "why", or piece of context behind something — most often something already on record, sometimes something you're also adding — capture it so it carries into the plan (the short summary above does NOT carry forward, so a good reason would otherwise be lost). Each: {"label": the fact this reason is about — if it is about something ALREADY ON RECORD (listed above under "Already on record"), copy that fact's label EXACTLY, verbatim and character-for-character, the same way you would for a removal, so the reason attaches to that pick rather than floating free; only when the reasoning is genuinely about something NOT on record should "label" be a short new name for it (it is then kept as a standalone thread), "reason": the person's own "why", in their words and short, "quote": the person's verbatim words, copied exactly from a "Them:" line, that carry that reasoning}. A reason is ADDITIVE — it never drops or changes the pick. Only capture substantive, meaningful reasoning that adds something the label alone doesn't: not every aside, not a restatement of the label, not small talk. If the reasoning doesn't attach to any single on-record fact, still capture it with "label" set to a short name for what it's about — it will be kept as a standalone thread rather than lost. Every reason MUST include a "quote" you can copy verbatim from a "Them:" line; if you cannot, DO NOT emit it. Empty array if nothing meaningful emerged (most modules, most of the time).
+- "reasons": when the conversation surfaces a genuinely meaningful REASON, "why", or piece of context behind something — most often something already on record, sometimes something you're also adding — capture it so it carries into the plan (the short summary above does NOT carry forward, so a good reason would otherwise be lost). Each: {"label": the fact this reason is about — if it is about something ALREADY ON RECORD (listed above under "Already on record"), copy that fact's label EXACTLY, verbatim and character-for-character, the same way you would for a removal, so the reason attaches to that pick rather than floating free; only when the reasoning is genuinely about something NOT on record should "label" be a short new name for it (it is then kept as a standalone thread), "reason": the person's own "why", in their words and short, "quote": the person's verbatim words, copied exactly from a "Them:" line, that carry that reasoning}. A reason is ADDITIVE — it never drops or changes the pick. Only capture substantive, meaningful reasoning that adds something the label alone doesn't: not every aside, not a restatement of the label, not small talk. If the reasoning doesn't attach to any single on-record fact, still capture it with "label" set to a short name for what it's about — it will be kept as a standalone thread rather than lost. Every reason MUST include a "quote" you can copy verbatim from a "Them:" line; if you cannot, DO NOT emit it. Empty array if nothing meaningful emerged (most sessions, most of the time).
 
 Put the "facts" object FIRST, before the summary, so the facts are never lost if the reply runs long. Respond with ONLY a JSON object of exactly this shape, and nothing else:
 {"facts": {"additions": [], "removals": [], "reasons": []}, "thirdPerson": "...", "secondPerson": "..."}
@@ -94,17 +94,17 @@ function buildUserContent(body: TakeawayRequest): string {
 
   const built =
     body.interactionSummary && body.interactionSummary.trim()
-      ? `What they built in this module:\n${body.interactionSummary.trim()}\n\n`
+      ? `What they built in this session:\n${body.interactionSummary.trim()}\n\n`
       : "";
 
   const known =
     body.knownFacts && body.knownFacts.length
-      ? `Already on record for this module (use these for "removals"):\n${body.knownFacts
+      ? `Already on record for this session (use these for "removals"):\n${body.knownFacts
           .map((f) => `- [${f.category}] ${f.label}`)
           .join("\n")}\n\n`
       : "";
 
-  return `Module: ${body.moduleTitle}\n\n${built}${known}Conversation transcript:\n${transcript}`;
+  return `Session: ${body.moduleTitle}\n\n${built}${known}Conversation transcript:\n${transcript}`;
 }
 
 // Pull the first {...} object out of the model's reply, in case it wraps the

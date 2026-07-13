@@ -75,7 +75,7 @@ export default async function SessionPage({
   if (!found) {
     return (
       <main style={styles.notFoundPage}>
-        <p style={styles.notFoundText}>Module not found</p>
+        <p style={styles.notFoundText}>Session not found</p>
       </main>
     );
   }

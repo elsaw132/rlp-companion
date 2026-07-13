@@ -4,7 +4,7 @@
 
 ## Project
 RLP Companion — a guided AI retirement life-planning programme. A user works
-through five stages of short modules, and an AI coach called **Vita** guides the
+through five stages of short sessions, and an AI coach called **Vita** guides the
 conversation. This is the **Phase 1 prototype**: built to test whether the
 conversation works, not a production app. Built by a non-technical founder.
 
@@ -60,9 +60,10 @@ conversation works, not a production app. Built by a non-technical founder.
 - Keep these patterns consistent — later features read from them.
 
 ## Terminology
-- The user-facing term for the short units within a stage is **"module"**, not
-  "session". (Internally the route is still `/session/[id]`, but all visible copy
-  and labels say "module".)
+- The user-facing term for the short units within a stage is **"session"**, not
+  "module". All visible copy and labels — and everything Vita says to the user —
+  say "session". (Internal code identifiers, DB columns, and the `[[MODULE_COMPLETE]]`
+  plumbing token still use "module"; only human-readable text was changed.)
 
 ## Voice (applies to all user-facing copy, and to Vita)
 - Warm, curious, specific. Plain language. Sounds like someone genuinely

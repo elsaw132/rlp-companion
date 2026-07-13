@@ -197,7 +197,7 @@ export default function OnboardingPage() {
                     </p>
                     <p>
                       At the end you&rsquo;ll be able to share it with your partner,
-                      and there&rsquo;s a module to help you work through any
+                      and there&rsquo;s a session to help you work through any
                       differences in how you each{" "}
                       {RETIREMENT_PATHS ? "see" : "imagine"} retirement.
                     </p>
@@ -332,8 +332,8 @@ function Welcome({
         <h1 className="hero-heading">{heading}</h1>
         <p className="paragraph">
           This is a five-stage programme. Each stage is made up of several short
-          modules — around 10–20 minutes each. We&apos;d suggest about one module
-          a day, so each has time to settle. Every module is an expert-designed
+          sessions — around 10–20 minutes each. We&apos;d suggest about one session
+          a day, so each has time to settle. Every session is an expert-designed
           exercise to help you think about and get clear on your next chapter.
         </p>
         <p className="paragraph">

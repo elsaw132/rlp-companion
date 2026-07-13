@@ -17,7 +17,7 @@ type DreamsRequest = {
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SYSTEM_PROMPT = `You are extracting structured data from one module of a guided retirement life-planning programme — the "If money were no object" module. The person first captured a list of money-no-object dreams, then talked them through with the coach (Vita). In that conversation Vita asked which three they'd keep if they could only afford three, why those three stand out, and whether any could actually be achievable in an adapted form.
+const SYSTEM_PROMPT = `You are extracting structured data from one session of a guided retirement life-planning programme — the "If money were no object" session. The person first captured a list of money-no-object dreams, then talked them through with the coach (Vita). In that conversation Vita asked which three they'd keep if they could only afford three, why those three stand out, and whether any could actually be achievable in an adapted form.
 
 Your job is to read their captured dream list and the transcript, and pull out four things. Use the person's OWN words wherever you can. Never invent anything they didn't say — if something isn't there, leave it empty.
 

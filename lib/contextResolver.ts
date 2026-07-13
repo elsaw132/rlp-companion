@@ -205,7 +205,7 @@ function renderLines(items: ResolvedFact[], age: number | null): string[] {
 }
 
 const VITA_PREAMBLE =
-  "Here is the relevant picture of this person built up across earlier modules — your memory of them. Open by reflecting the relevant parts back before asking anything, and draw only on what's genuinely relevant to this module:";
+  "Here is the relevant picture of this person built up across earlier sessions — your memory of them. Open by reflecting the relevant parts back before asking anything, and draw only on what's genuinely relevant to this session:";
 const SEED_PREAMBLE =
   "What this person has already said that's relevant here (ground the exercise in this; never invent beyond it):";
 

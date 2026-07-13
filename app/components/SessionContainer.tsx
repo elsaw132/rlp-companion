@@ -1729,7 +1729,7 @@ export default function SessionContainer({
         </div>
         <div style={styles.progress}>
           <div style={styles.progressLabel}>
-            {completedCount} of {modulesInStage} modules complete
+            {completedCount} of {modulesInStage} sessions complete
           </div>
           <div style={styles.progressTrack}>
             <div
@@ -2173,7 +2173,7 @@ function CompletionBlock({
   return (
     <div style={styles.completeBlock}>
       <p style={styles.completeCue}>
-        <span aria-hidden="true">✓</span> You&apos;ve finished this module
+        <span aria-hidden="true">✓</span> You&apos;ve finished this session
       </p>
       <div style={styles.completeActions}>
         {revealHref ? (
@@ -2215,7 +2215,7 @@ function CompletionBlock({
                 style={styles.nextCompleteButton}
                 onClick={() => onExit(nextHref)}
               >
-                Next module →
+                Next session →
               </button>
             )}
           </>
@@ -2247,7 +2247,7 @@ function CloseChoice({
 }) {
   return (
     <div style={styles.completeBlock}>
-      <p style={styles.closeChoicePrompt}>Are you ready to wrap this module up here, or do you want to keep talking with Vita?</p>
+      <p style={styles.closeChoicePrompt}>Are you ready to wrap this session up here, or do you want to keep talking with Vita?</p>
       <div style={styles.completeActions}>
         <button
           type="button"
@@ -2255,7 +2255,7 @@ function CloseChoice({
           style={styles.homeCompleteButton}
           onClick={onWrapUp}
         >
-          Finish this module
+          Finish this session
         </button>
         <button
           type="button"

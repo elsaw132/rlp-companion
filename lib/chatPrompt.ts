@@ -95,10 +95,10 @@ export function buildSystemBlocks(
   // Block 2 — this module's instructions (and what they built). Also identical
   // across a module's turns; it caches on top of block 1. The default 5-minute
   // TTL is enough — it's re-read on every turn of the same conversation.
-  let moduleText = "\n\nTHIS MODULE'S INSTRUCTIONS\n" + body.sessionInstructions;
+  let moduleText = "\n\nTHIS SESSION'S INSTRUCTIONS\n" + body.sessionInstructions;
   if (body.interactionSummary && body.interactionSummary.trim()) {
     moduleText +=
-      "\n\nWHAT THEY BUILT IN THIS MODULE:\n" + body.interactionSummary;
+      "\n\nWHAT THEY BUILT IN THIS SESSION:\n" + body.interactionSummary;
   }
   blocks.push({ text: moduleText, cache: "5m" });
 
@@ -110,19 +110,19 @@ export function buildSystemBlocks(
   if (body.isOpening) {
     blocks.push({
       text:
-        "\n\nThis is the very start of the conversation, and you are speaking first. Open with a short, warm first message and ask one question — no greeting, no preamble, no welcome. If this module had a build step, react to something specific in what they made (under WHAT THEY BUILT above). Otherwise, open by gently drawing on the picture they've built in earlier modules where it's relevant — following this module's own brief and tone. Engage directly; don't recap everything back to them.",
+        "\n\nThis is the very start of the conversation, and you are speaking first. Open with a short, warm first message and ask one question — no greeting, no preamble, no welcome. If this session had a build step, react to something specific in what they made (under WHAT THEY BUILT above). Otherwise, open by gently drawing on the picture they've built in earlier sessions where it's relevant — following this session's own brief and tone. Engage directly; don't recap everything back to them.",
     });
     return blocks;
   }
 
   const nextModuleGuidance =
     body.nextModuleTitle && body.nextModuleTitle.trim()
-      ? `The next module is "${body.nextModuleTitle.trim()}" — if you point ahead, name only this one and nothing else.`
-      : "This is the last module of the stage, so do not name a specific next module — close gently without pointing to a particular one.";
+      ? `The next session is "${body.nextModuleTitle.trim()}" — if you point ahead, name only this one and nothing else.`
+      : "This is the last session of the stage, so do not name a specific next session — close gently without pointing to a particular one.";
 
   const closingInstruction = body.closeInOneStep
-    ? `CLOSING THIS MODULE — ONE STEP. This was a short, practical conversation, so there is nothing to mirror back or confirm — do NOT add a wrap-up that restates their answers and asks whether it's a fair summary. That would just be noise here. Once they've given their answer (or made clear they're done), close in a single message: a brief, warm sign-off that asks nothing at all and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question.`
-    : `CLOSING THIS MODULE — TWO STEPS. When you're ready to close, first offer your wrap-up: name what matters in their words and check it feels right to them. This message asks a question (does this land? anything to add?), so it must NOT contain the marker. Then, only after they respond, send a brief final sign-off that points to the next module, asks nothing at all, and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question. Only ever include the marker in that one final sign-off.`;
+    ? `CLOSING THIS SESSION — ONE STEP. This was a short, practical conversation, so there is nothing to mirror back or confirm — do NOT add a wrap-up that restates their answers and asks whether it's a fair summary. That would just be noise here. Once they've given their answer (or made clear they're done), close in a single message: a brief, warm sign-off that asks nothing at all and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question.`
+    : `CLOSING THIS SESSION — TWO STEPS. When you're ready to close, first offer your wrap-up: name what matters in their words and check it feels right to them. This message asks a question (does this land? anything to add?), so it must NOT contain the marker. Then, only after they respond, send a brief final sign-off that points to the next session, asks nothing at all, and ends with [[MODULE_COMPLETE]] on its own line with nothing after it. ${nextModuleGuidance} Never put [[MODULE_COMPLETE]] on any message that asks a question. Only ever include the marker in that one final sign-off.`;
 
   let tail =
     "\n\n" +

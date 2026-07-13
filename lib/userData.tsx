@@ -612,7 +612,7 @@ export function useUserData() {
     moduleId: string,
     includeStartingThoughts = false
   ): string => {
-    const fallback = "No earlier modules completed yet.";
+    const fallback = "No earlier sessions completed yet.";
     const lines = getModulesBefore(moduleId, getRetirementStage()).flatMap((m) => {
       const t = getTakeaway(m.id);
       // Guard against a takeaway that was stored as raw {thirdPerson,...} JSON, so
@@ -629,7 +629,7 @@ export function useUserData() {
       }
     }
     if (lines.length === 0) return fallback;
-    return ["Here's what they've worked through in earlier modules — draw on it only where it's directly relevant to this module's topic:", ...lines].join("\n");
+    return ["Here's what they've worked through in earlier sessions — draw on it only where it's directly relevant to this session's topic:", ...lines].join("\n");
   };
 
   // ---- Preferred name / display name ----

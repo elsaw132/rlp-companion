@@ -28,7 +28,7 @@ const ACCENT: Record<string, { fg: string; wash: string }> = {
 
 // The quiet provenance line on the content cards that carry one (spec §3).
 const PROVENANCE: Record<string, string> = {
-  strengths: "From your Strengths module — the character strengths you confirmed.",
+  strengths: "From your Strengths session — the character strengths you confirmed.",
   values: "From Your values — in the wording you chose.",
   protect: "From Living your values — the protectors you set.",
 };

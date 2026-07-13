@@ -20,7 +20,7 @@ const archetypeList = Object.values(ARCHETYPES)
   .map((a) => `- ${a.id}: ${a.name} — ${a.definition}`)
   .join("\n");
 
-const SYSTEM_PROMPT = `You are synthesising the Imagine stage-close reveal for someone who has just imagined their retirement across five short modules. Work ONLY from what this person actually shared — their words, their specifics.
+const SYSTEM_PROMPT = `You are synthesising the Imagine stage-close reveal for someone who has just imagined their retirement across five short sessions. Work ONLY from what this person actually shared — their words, their specifics.
 
 Produce three things:
 
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "user",
-          content: `Here is everything this person shared across the five Imagine modules, in order:\n\n${reflections}`,
+          content: `Here is everything this person shared across the five Imagine sessions, in order:\n\n${reflections}`,
         },
       ],
     });

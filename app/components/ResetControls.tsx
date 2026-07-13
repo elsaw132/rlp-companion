@@ -47,7 +47,7 @@ export function ResetModuleLink({ sessionId }: { sessionId: string }) {
         style={linkStyle}
         onClick={handleRestart}
       >
-        Restart this module
+        Restart this session
       </button>
     </>
   );

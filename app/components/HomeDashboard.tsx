@@ -291,7 +291,7 @@ export default function HomeDashboard() {
   // it draws on the latest takeaway when there is one, else the last title.
   let heroIntro: string;
   if (!nextModule) {
-    heroIntro = `You've finished everything that's ready so far — nicely done. New modules for ${activeStage.name} are on their way.`;
+    heroIntro = `You've finished everything that's ready so far — nicely done. New sessions for ${activeStage.name} are on their way.`;
   } else if (!lastCompleted) {
     heroIntro =
       "We'll start by picturing a single ordinary day in your retirement — not the big questions yet, just what the day actually feels like.";
@@ -428,7 +428,7 @@ export default function HomeDashboard() {
               </div>
             </div>
             <div className="lab">Your {viewedStageData.name} progress</div>
-            <div className="sub">Grows as you complete the modules in this stage.</div>
+            <div className="sub">Grows as you complete the sessions in this stage.</div>
           </div>
         </aside>
 
@@ -510,9 +510,9 @@ export default function HomeDashboard() {
                   <p>
                     {viewedHero
                       ? viewedHero.recap
-                      : "Revisit any module below; your answers are saved."}
+                      : "Revisit any session below; your answers are saved."}
                   </p>
-                  <p className="dh-hint">Revisit any module below — your answers are saved.</p>
+                  <p className="dh-hint">Revisit any session below — your answers are saved.</p>
                   <button
                     type="button"
                     className="link-back"
@@ -693,7 +693,7 @@ export default function HomeDashboard() {
 
             {/* STAGE SESSIONS */}
             <div className="sec-row">
-              <div className="sec-head">Your modules in {viewedStageData.name}</div>
+              <div className="sec-head">Your sessions in {viewedStageData.name}</div>
               <div className="sec-prog">
                 {doneInStage} of {totalInStage} modules complete
               </div>
@@ -710,7 +710,7 @@ export default function HomeDashboard() {
                 <div>
                   <h4>This stage is on its way</h4>
                   <p>
-                    The modules for {viewedStageData.name}{" "}
+                    The sessions for {viewedStageData.name}{" "}
                     are still being prepared. You can revisit anything you&apos;ve
                     already done in the meantime.
                   </p>
@@ -780,10 +780,10 @@ export default function HomeDashboard() {
               <div>
                 <h4>There&apos;s no wrong way to do this</h4>
                 <p>
-                  Take your time. Each module is designed to be fun and
+                  Take your time. Each session is designed to be fun and
                   reflective, not hard or fast. We suggest setting aside 20
-                  minutes each day to do one module at a time, and giving each
-                  module time to settle before moving on to the next.
+                  minutes each day to do one session at a time, and giving each
+                  session time to settle before moving on to the next.
                 </p>
               </div>
               <a href="#" className="lk">
