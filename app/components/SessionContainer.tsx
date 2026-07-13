@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuleFeedbackCard from "./ModuleFeedbackCard";
+import VitaMark from "./VitaMark";
 import { todayISODate } from "@/lib/planDate";
 import DayBuilder, {
   DayBuilderSummary,
@@ -1820,9 +1821,7 @@ export default function SessionContainer({
       {phase === "seeding" && (
         <section style={styles.seedingStep} role="status" aria-live="polite">
           <div style={styles.vitaLockup}>
-            <span style={styles.sun} aria-hidden="true">
-              ☀️
-            </span>
+            <VitaMark size={34} />
             <span style={styles.vitaName}>Vita</span>
           </div>
           <span className="seeding-dots" aria-hidden="true">
@@ -1880,9 +1879,7 @@ export default function SessionContainer({
       {phase === "conversation" && (
         <section style={styles.conversationZone}>
           <div style={styles.vitaLockup}>
-            <span style={styles.sun} aria-hidden="true">
-              ☀️
-            </span>
+            <VitaMark size={34} />
             <span style={styles.vitaName}>Vita</span>
             <span style={styles.coachPill}>Your retirement coach</span>
           </div>
@@ -2014,9 +2011,7 @@ export default function SessionContainer({
       {isLetter && completed && !letterHasConversation && (
         <section style={styles.conversationZone}>
           <div style={styles.vitaLockup}>
-            <span style={styles.sun} aria-hidden="true">
-              ☀️
-            </span>
+            <VitaMark size={34} />
             <span style={styles.vitaName}>Vita</span>
             <span style={styles.coachPill}>Your retirement coach</span>
           </div>
@@ -2065,9 +2060,7 @@ export default function SessionContainer({
           )}
 
           <div style={styles.vitaLockup}>
-            <span style={styles.sun} aria-hidden="true">
-              ☀️
-            </span>
+            <VitaMark size={34} />
             <span style={styles.vitaName}>Vita</span>
             <span style={styles.coachPill}>Your retirement coach</span>
           </div>
@@ -3049,25 +3042,15 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: "9px",
   },
-  sun: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "50%",
-    background: "var(--sun)",
-    display: "grid",
-    placeItems: "center",
-    fontSize: "17px",
-    flexShrink: 0,
-  },
   vitaName: {
     fontFamily: "var(--font-serif)",
     fontSize: "19px",
     fontWeight: 600,
-    color: "var(--ink)",
+    color: "var(--color-vita)",
   },
   coachPill: {
-    background: "var(--coach-pill)",
-    color: "var(--coach-pill-text)",
+    background: "var(--color-vita)",
+    color: "#fff",
     fontFamily: "var(--font-sans)",
     fontSize: "12px",
     fontWeight: 700,

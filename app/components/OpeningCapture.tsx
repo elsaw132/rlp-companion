@@ -13,6 +13,7 @@
 // (Vita is speaking): her lockup, a serif prompt, low-friction controls.
 
 import { useState } from "react";
+import VitaMark from "./VitaMark";
 import { useUserData } from "@/lib/userData";
 import { RETIREMENT_PATHS } from "@/lib/flags";
 import { isRetired } from "@/lib/modules";
@@ -52,9 +53,7 @@ export default function OpeningCapture({
         <style>{css}</style>
         <div className="wrap">
           <div className="vita">
-            <span className="sun" aria-hidden="true">
-              ☀
-            </span>
+            <VitaMark size={40} />
             <span className="name">Vita</span>
           </div>
           <p className="ack">{ACK}</p>
@@ -75,9 +74,7 @@ export default function OpeningCapture({
       <style>{css}</style>
       <div className="wrap">
         <div className="vita">
-          <span className="sun" aria-hidden="true">
-            ☀
-          </span>
+          <VitaMark size={40} />
           <span className="name">Vita</span>
         </div>
         <div className="eyebrow">Stage 1 · {retired ? "Review" : "Imagine"}</div>
@@ -119,8 +116,7 @@ const css = `
 .rlp-opening{min-height:calc(100dvh - var(--header-h));background:var(--warm-surface);display:flex;align-items:center;justify-content:center;padding:64px 24px}
 .rlp-opening .wrap{max-width:600px;width:100%}
 .rlp-opening .vita{display:flex;align-items:center;gap:10px;margin-bottom:22px}
-.rlp-opening .vita .sun{width:40px;height:40px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:20px;color:var(--ink)}
-.rlp-opening .vita .name{font-family:var(--font-serif);font-size:22px;font-weight:600;color:var(--ink)}
+.rlp-opening .vita .name{font-family:var(--font-serif);font-size:22px;font-weight:600;color:var(--color-vita)}
 .rlp-opening .eyebrow{font-family:var(--font-sans);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin-bottom:14px}
 .rlp-opening .heading{font-family:var(--font-serif);font-size:32px;font-weight:600;color:var(--ink);line-height:1.18;margin:0 0 18px}
 .rlp-opening .prompt{font-family:var(--font-serif);font-size:19px;line-height:1.6;color:var(--text);margin:0 0 24px;max-width:56ch}

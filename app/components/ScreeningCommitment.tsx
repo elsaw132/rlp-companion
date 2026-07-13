@@ -100,7 +100,7 @@ const css = `
   width:100%;max-width:420px;margin:0 auto;
 }
 .rlp-commit .vita{display:flex;align-items:center;gap:9px}
-.rlp-commit .vita .name{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--ink)}
+.rlp-commit .vita .name{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--color-vita)}
 .rlp-commit .prompt{
   font-family:var(--font-serif);
   font-size:var(--fs-h2);
