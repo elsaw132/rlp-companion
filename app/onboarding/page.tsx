@@ -20,8 +20,8 @@ import { RETIREMENT_PATHS } from "@/lib/flags";
 const STATUS_OPTIONS: { label: string; value: RetirementStage }[] = [
   { label: "Still working, planning ahead", value: "working" },
   { label: "Winding down / phasing out of work", value: "winding_down" },
-  { label: "Retired in the last 18 months or so", value: "recently_retired" },
-  { label: "Retired longer than that", value: "established" },
+  { label: "Retired in the last 2 years", value: "recently_retired" },
+  { label: "Retired more than 2 years ago", value: "established" },
 ];
 
 const HORIZON_OPTIONS = [
@@ -36,7 +36,7 @@ const PARTNER_OPTIONS = ["Yes", "No"];
 
 const MOTIVATION_OPTIONS = [
   "A big birthday or milestone",
-  "Thinking about when to stop working",
+  "Wanting to make the most of this time",
   "A change at work or in life",
   "Just curious for now",
 ];
@@ -74,12 +74,14 @@ export default function OnboardingPage() {
   // Pre-select "Warm and friendly" — it's the default, not the only proper choice.
   const [tone, setTone] = useState<CoachTone>("warm");
 
-  // Horizon + motivation are only relevant to someone not yet retired. With the
-  // flag off they're always shown (today's flow); with it on they're gated to the
-  // two not-yet-retired stages. Retired stages skip both entirely.
+  // The horizon question ("how far from retirement") only makes sense for someone
+  // not yet retired. With the flag off it's always shown (today's flow); with it
+  // on it's gated to the two not-yet-retired stages, so the retired cohorts skip
+  // it. The motivation question ("what's brought you here") is stage-neutral and
+  // is always shown, whatever stage they're in.
   const notYetRetired =
     retirementStage === "working" || retirementStage === "winding_down";
-  const showHorizonMotivation = !RETIREMENT_PATHS || notYetRetired;
+  const showHorizon = !RETIREMENT_PATHS || notYetRetired;
 
   type StepKey =
     | "welcome"
@@ -97,13 +99,14 @@ export default function OnboardingPage() {
     "partner",
     "dob",
     ...(RETIREMENT_PATHS ? (["status"] as StepKey[]) : []),
-    ...(showHorizonMotivation ? (["horizon", "motivation"] as StepKey[]) : []),
+    ...(showHorizon ? (["horizon"] as StepKey[]) : []),
+    "motivation",
     "tone",
   ];
-  // The status step (when shown) only ever inserts horizon/motivation AFTER
-  // itself, so advancing by one index is always safe — nothing before the current
-  // position shifts. Clamp in case a change to the status answer shrank the list
-  // (e.g. picking a retired stage removes horizon/motivation) while ahead of it.
+  // The status step (when shown) only ever inserts the horizon step AFTER itself,
+  // so advancing by one index is always safe — nothing before the current position
+  // shifts. Clamp in case a change to the status answer shrank the list (e.g.
+  // picking a retired stage removes the horizon step) while ahead of it.
   const safeIndex = Math.min(stepIndex, steps.length - 1);
   const current = steps[safeIndex];
   const goNext = () => setStepIndex((i) => i + 1);
@@ -257,7 +260,7 @@ export default function OnboardingPage() {
 
           {current === "motivation" && (
             <CardStep
-              heading="What's prompted you to start thinking about retirement?"
+              heading="What's brought you here?"
               options={MOTIVATION_OPTIONS}
               selected={motivation}
               onSelect={setMotivation}
