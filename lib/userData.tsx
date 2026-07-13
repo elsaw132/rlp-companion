@@ -62,8 +62,8 @@ export type CoachTone = "warm" | "professional" | "playful";
 // later phases can adapt content per cohort; nothing branches on it yet.
 //   working          — still working, planning ahead
 //   winding_down     — phasing out of work now
-//   recently_retired — retired within about the last 18 months
-//   established      — retired longer than that
+//   recently_retired — retired within about the last 2 years
+//   established      — retired more than 2 years ago
 export type RetirementStage =
   | "working"
   | "winding_down"
@@ -743,7 +743,7 @@ export function useUserData() {
         case "winding_down":
           return "They're winding down — phasing out of work now.";
         case "recently_retired":
-          return "They retired recently, within about the last 18 months, and are still settling into it.";
+          return "They retired recently, within about the last 2 years, and are still settling into it.";
         case "established":
           return "They've been retired for a good while now.";
         default:
@@ -767,7 +767,7 @@ export function useUserData() {
 
     let sentence = parts.length ? parts.join(", ") + "." : "";
     if (answers.motivation) {
-      sentence += `${sentence ? " " : ""}What prompted them to start: ${answers.motivation.toLowerCase()}.`;
+      sentence += `${sentence ? " " : ""}What brought them here: ${answers.motivation.toLowerCase()}.`;
     }
     const combined = [nameSentence, statusSentence, sentence.trim()]
       .filter(Boolean)

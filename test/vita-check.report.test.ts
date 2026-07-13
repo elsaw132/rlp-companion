@@ -93,7 +93,7 @@ function buildOnboardingContext(p: Profile): string {
   if (p.horizon) parts.push(`retirement is roughly ${p.horizon} away`);
   let sentence = parts.length ? parts.join(", ") + "." : "";
   if (p.motivation)
-    sentence += `${sentence ? " " : ""}What prompted them to start: ${p.motivation.toLowerCase()}.`;
+    sentence += `${sentence ? " " : ""}What brought them here: ${p.motivation.toLowerCase()}.`;
   return (
     [nameSentence, sentence.trim()].filter(Boolean).join(" ") ||
     "Nothing recorded yet."
