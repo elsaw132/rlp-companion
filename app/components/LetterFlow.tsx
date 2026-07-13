@@ -10,6 +10,7 @@
 // to the parent, which records completion and shows the reveal.
 
 import { useState } from "react";
+import VitaMark from "./VitaMark";
 import type { LetterInteraction, LetterResult } from "@/lib/modules";
 
 type Suggestion = { chip: string; seed: string };
@@ -225,9 +226,7 @@ export default function LetterFlow({
 
       {nudge && (
         <div style={styles.vitaLockup}>
-          <span style={styles.sun} aria-hidden="true">
-            ☀️
-          </span>
+          <VitaMark size={34} />
           <span style={styles.vitaName}>Vita</span>
         </div>
       )}
@@ -362,21 +361,11 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: "9px",
   },
-  sun: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "50%",
-    background: "var(--sun)",
-    display: "grid",
-    placeItems: "center",
-    fontSize: "17px",
-    flexShrink: 0,
-  },
   vitaName: {
     fontFamily: "var(--font-serif)",
     fontSize: "19px",
     fontWeight: 600,
-    color: "var(--ink)",
+    color: "var(--color-vita)",
   },
   coachRow: {
     display: "flex",

@@ -136,8 +136,8 @@ const css = `
 
 /* Vita lockup */
 .rlp-reveal .vita{display:flex;align-items:center;justify-content:center;gap:10px;margin:22px 0 18px}
-.rlp-reveal .vita .name{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--ink)}
-.rlp-reveal .vita .pill{font-size:var(--fs-label);font-weight:600;color:var(--coach-pill-text);background:var(--coach-pill);border-radius:var(--r-pill);padding:4px 11px}
+.rlp-reveal .vita .name{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--color-vita)}
+.rlp-reveal .vita .pill{font-size:var(--fs-label);font-weight:600;color:#fff;background:var(--color-vita);border-radius:var(--r-pill);padding:4px 11px}
 
 .rlp-reveal .intro{font-family:var(--font-serif);font-size:var(--fs-h2);line-height:1.5;color:var(--text);text-align:center;max-width:54ch;margin:0 auto 34px}
 

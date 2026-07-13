@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import ProviderBand from "../components/ProviderBand";
+import VitaMark from "../components/VitaMark";
 import {
   useUserData,
   type CoachTone,
@@ -322,9 +323,7 @@ function Welcome({
       </div>
       <div className="body">
         <div className="vita">
-          <span className="sun" aria-hidden="true">
-            ☀
-          </span>
+          <VitaMark size={38} />
           <span className="name">Vita</span>
         </div>
         <h1 className="hero-heading">{heading}</h1>
@@ -537,8 +536,7 @@ const css = `
 .rlp-onb .welcome .body{padding:30px 32px 32px}
 
 .rlp-onb .vita{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.rlp-onb .vita .sun{width:38px;height:38px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:18px;color:var(--brand-primary)}
-.rlp-onb .vita .name{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--ink)}
+.rlp-onb .vita .name{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--color-vita)}
 
 .rlp-onb .hero-heading{font-family:var(--font-serif);font-size:var(--fs-display);font-weight:600;color:var(--ink);line-height:1.2;margin:0 0 18px}
 .rlp-onb .step-heading{font-family:var(--font-serif);font-size:var(--fs-h2);font-weight:600;color:var(--ink);line-height:1.3;margin:0 0 26px}

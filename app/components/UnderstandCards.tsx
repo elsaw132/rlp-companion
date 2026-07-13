@@ -451,7 +451,7 @@ const css = `
 
 .rlp-ureveal .med{width:46px;height:46px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:var(--accbg);color:var(--acc)}
 .rlp-ureveal .vita{display:flex;align-items:center;gap:9px;margin-bottom:14px}
-.rlp-ureveal .vita-lbl{font-size:11.5px;color:var(--coach-pill-text);font-weight:600}
+.rlp-ureveal .vita-lbl{font-size:11.5px;color:var(--color-vita);font-weight:600}
 
 .rlp-ureveal .eyebrow{font-size:var(--fs-eyebrow);font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin-bottom:10px}
 .rlp-ureveal .card.cream .eyebrow{color:var(--coach-pill-text)}
