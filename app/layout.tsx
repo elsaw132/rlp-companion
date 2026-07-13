@@ -23,8 +23,8 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
-  title: "Chorus Life — Digital Retirement Coaching",
-  description: "Digital retirement coaching from Chorus Life.",
+  title: "Chorus Life — Your retirement coach",
+  description: "Your retirement coach from Chorus Life.",
 };
 
 export default function RootLayout({

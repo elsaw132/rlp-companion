@@ -8,6 +8,7 @@
 // single navy button to continue into the stage.
 
 import type { Stage } from "@/lib/modules";
+import VitaMark from "./VitaMark";
 
 export default function StageIntro({
   stage,
@@ -24,9 +25,7 @@ export default function StageIntro({
       <style>{css}</style>
       <div className="wrap">
         <div className="vita">
-          <span className="sun" aria-hidden="true">
-            ☀
-          </span>
+          <VitaMark size={40} />
           <span className="name">Vita</span>
         </div>
         <div className="eyebrow">
@@ -50,8 +49,7 @@ const css = `
 .rlp-stage-intro{min-height:calc(100dvh - var(--header-h));background:var(--warm-surface);display:flex;align-items:center;justify-content:center;padding:64px 24px}
 .rlp-stage-intro .wrap{max-width:600px;width:100%}
 .rlp-stage-intro .vita{display:flex;align-items:center;gap:10px;margin-bottom:22px}
-.rlp-stage-intro .vita .sun{width:40px;height:40px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:20px;color:var(--ink)}
-.rlp-stage-intro .vita .name{font-family:var(--font-serif);font-size:22px;font-weight:600;color:var(--ink)}
+.rlp-stage-intro .vita .name{font-family:var(--font-serif);font-size:22px;font-weight:600;color:var(--color-vita)}
 .rlp-stage-intro .eyebrow{font-family:var(--font-sans);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin-bottom:14px}
 .rlp-stage-intro .heading{font-family:var(--font-serif);font-size:32px;font-weight:600;color:var(--ink);line-height:1.18;margin:0 0 22px}
 .rlp-stage-intro .body{font-family:var(--font-sans);font-size:17px;line-height:1.7;color:var(--text);margin:0 0 18px;max-width:56ch}

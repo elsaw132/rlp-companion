@@ -22,10 +22,10 @@ import { STAGES } from "@/lib/modules";
 import FeedbackPanel from "./FeedbackPanel";
 import ModuleFeedbackCard from "./ModuleFeedbackCard";
 
-// The provider wordmark — the same string ProviderBand carries; only this swaps
-// per provider. On the compact bar we show the wordmark alone (no descriptor),
-// which is the mobile "compaction" of the band that wrapped to three lines.
-const PROVIDER_NAME = "Lionsgate Pensions";
+// The product wordmark — the same string ProviderBand carries. On the compact
+// bar we show the wordmark alone (no descriptor), which is the mobile
+// "compaction" of the band that wrapped to three lines.
+const PROVIDER_NAME = "Chorus Life";
 
 type ClerkUser = ReturnType<typeof useUser>["user"];
 
@@ -141,7 +141,8 @@ export default function MobileAppBar() {
             </Link>
           ) : (
             <Link href="/home" className="ab-word" aria-label={`${PROVIDER_NAME} — dashboard`}>
-              {PROVIDER_NAME}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/chorus-life-logo-white.svg" alt={PROVIDER_NAME} width={63} height={20} />
             </Link>
           )}
         </div>
@@ -273,7 +274,8 @@ const appBarCss = `
     box-sizing:border-box;
   }
   .rlp-appbar a{text-decoration:none}
-  .rlp-appbar :focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
+  /* Controls sit on the dark-green band, so their focus ring is lime. */
+  .rlp-appbar :focus-visible{outline:none;box-shadow:var(--focus-ring-accent);border-radius:var(--r-sm)}
 
   .rlp-appbar .ab-left{min-width:0;display:flex;align-items:center}
   .rlp-appbar .ab-back{
@@ -285,11 +287,9 @@ const appBarCss = `
   }
   .rlp-appbar .ab-back span[aria-hidden]{font-size:22px;line-height:1}
   .rlp-appbar .ab-word{
-    font-family:var(--font-serif);font-weight:700;font-size:19px;
-    color:var(--brand-on-band);letter-spacing:-.01em;line-height:1.1;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     display:inline-flex;align-items:center;min-height:44px;
   }
+  .rlp-appbar .ab-word img{height:20px;width:auto;display:block}
   .rlp-appbar .ab-menu-btn{
     flex:none;display:inline-flex;align-items:center;gap:8px;
     background:none;border:none;cursor:pointer;font-family:var(--font-sans);

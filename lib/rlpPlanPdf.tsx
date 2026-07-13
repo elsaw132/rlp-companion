@@ -19,17 +19,19 @@ import type { RlpPlan, PlanArea, PlanGoal } from "@/lib/rlpPlan";
 import { seasonLabel43 } from "@/lib/rlpPlan";
 import type { BalancedAreaId } from "@/lib/modules";
 
+// React-PDF can't read CSS variables, so the Chorus palette is mirrored here as
+// literal hex. Keep these in step with the semantic tokens in app/tokens.css:
+// ink = --color-text-primary, brand = --color-brand-primary, accent = --accent.
 const C = {
-  ink: "#16202E",
+  ink: "#0A322D",
   text: "#3A3D44",
   muted: "#7C7F86",
   faint: "#A6A8AE",
-  accent: "#E06F1F",
-  navy: "#013281",
+  accent: "#DC6437",
+  navy: "#0A322D",
   warm: "#FBF7EC",
   warmLine: "#EFE6D2",
   line: "#E9E9E4",
-  band: "#FFD101",
 };
 
 const AREA_FG: Record<BalancedAreaId, string> = {
@@ -96,7 +98,7 @@ const s = StyleSheet.create({
   ladderMark: { width: 16, color: "#2C7A46", fontFamily: "Helvetica-Bold" },
   firstSteps: { backgroundColor: C.navy, borderRadius: 10, padding: 28, marginTop: 30 },
   firstStepsTitle: { fontFamily: "Times-Bold", fontSize: 20, color: "#FFFFFF", marginBottom: 8 },
-  firstStepsBody: { fontSize: 10.5, color: "#D9E1F0", maxWidth: 380 },
+  firstStepsBody: { fontSize: 10.5, color: "#CFE1DB", maxWidth: 380 },
   fine: { fontSize: 9, color: C.faint, fontFamily: "Times-Italic", marginTop: 8 },
 });
 
