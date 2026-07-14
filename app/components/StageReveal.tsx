@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import VitaMark from "./VitaMark";
+import BloomMotif from "./BloomMotif";
 import type { RevealThread } from "@/lib/stageReveal";
 
 export type StageRevealProps = {
@@ -66,7 +67,7 @@ export default function StageReveal({
       </div>
 
       <section className="reveal">
-        {motif}
+        {motif ?? <BloomMotif />}
 
         <div className="body">
           <div className="eyebrow rise d2">{eyebrow}</div>
@@ -145,7 +146,7 @@ const css = `
 .rlp-reveal .threads{display:flex;flex-direction:column;gap:22px;margin:0 auto;max-width:54ch}
 .rlp-reveal .thread{border-left:2px solid var(--warm-line);padding:2px 0 2px 20px}
 .rlp-reveal .thread .lab{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--ink);display:flex;align-items:baseline;gap:9px}
-.rlp-reveal .thread .lab::before{content:"";flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--sun);transform:translateY(-3px)}
+.rlp-reveal .thread .lab::before{content:"";flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--color-vita);transform:translateY(-3px)}
 .rlp-reveal .thread .quote{font-family:var(--font-serif);font-style:italic;font-size:var(--fs-h2);line-height:1.45;color:var(--text);margin-top:5px}
 
 .rlp-reveal .hook{font-family:var(--font-serif);font-size:var(--fs-h2);color:var(--text);text-align:center;max-width:50ch;margin:36px auto 28px}

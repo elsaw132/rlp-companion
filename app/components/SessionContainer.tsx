@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuleFeedbackCard from "./ModuleFeedbackCard";
 import VitaMark from "./VitaMark";
+import { ModuleIconChip } from "./module/ModuleIconChip";
+import { STAGE_KEYS } from "@/lib/stageColors";
 import { todayISODate } from "@/lib/planDate";
 import DayBuilder, {
   DayBuilderSummary,
@@ -1744,7 +1746,14 @@ export default function SessionContainer({
             />
           </div>
         </div>
-        <h1 style={styles.title}>{sessionTitle}</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <ModuleIconChip
+            stageKey={STAGE_KEYS[stageNumber - 1]}
+            moduleId={sessionId}
+            size="lg"
+          />
+          <h1 style={styles.title}>{sessionTitle}</h1>
+        </div>
         {sessionDescription && (
           <p style={styles.description}>{sessionDescription}</p>
         )}

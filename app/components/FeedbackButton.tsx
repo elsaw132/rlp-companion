@@ -62,7 +62,7 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 const launchCss = `
-  .fb-launch:hover { background: #000; }
+  .fb-launch:hover { background: var(--brand-primary); color: #fff; border-color: var(--brand-primary); }
   .fb-launch:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);

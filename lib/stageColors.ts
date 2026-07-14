@@ -18,6 +18,23 @@ export const stageColors = {
 // Chorus Dark Green — the partner the brand book pairs with the lighter colours —
 // because blue/yellow/pink are too pale to read as marks against white. White text
 // sits on every mark.
+// Readable content (number / check) sitting on a solid stage-colour fill: dark
+// green on the pale stages, white on the dark stages (Plan orange / Act green).
+export const stageForegroundColors = {
+  imagine: "var(--color-on-stage-imagine)",
+  explore: "var(--color-on-stage-explore)",
+  understand: "var(--color-on-stage-understand)",
+  plan: "var(--color-on-stage-plan)",
+  act: "var(--color-on-stage-act)",
+} as const;
+
+export function stageForegroundFor(stageNumber: number): string {
+  const key = ["imagine", "explore", "understand", "plan", "act"][stageNumber - 1] as
+    | keyof typeof stageForegroundColors
+    | undefined;
+  return key ? stageForegroundColors[key] : "#fff";
+}
+
 const stageMarks = {
   imagine: "var(--chorus-dark-green)",
   explore: "var(--chorus-dark-green)",
@@ -41,7 +58,7 @@ const stageWashes = {
 
 // Stages are addressed by their 1–5 number across the app (see STAGES in
 // lib/modules.ts); this maps that number to the colour keys above.
-const STAGE_KEYS = ["imagine", "explore", "understand", "plan", "act"] as const;
+export const STAGE_KEYS = ["imagine", "explore", "understand", "plan", "act"] as const;
 
 export function stageColorFor(stageNumber: number): string {
   const key = STAGE_KEYS[stageNumber - 1];
@@ -56,4 +73,37 @@ export function stageMarkFor(stageNumber: number): string {
 export function stageWashFor(stageNumber: number): string {
   const key = STAGE_KEYS[stageNumber - 1];
   return key ? stageWashes[key] : "color-mix(in srgb, var(--brand-primary) 10%, #fff)";
+}
+
+// The dashboard HERO colourway per stage — a full colour FIELD with the Chorus
+// vector graphic cropped behind Vita's white card. These are the deliberate brand
+// pairings ("the best applications of the colours"), chosen by hand rather than
+// derived from the wash system: the three pale stages sit on their own colour with
+// a Dark Green graphic; Explore sits on Dark Green with a Lime graphic; Plan and
+// Act sit on the Chorus cream (Yellow) with their own Orange / Green graphic. The
+// cream is the exact brand Chorus Yellow (#FFEBC8).
+const stageHeroGrounds = {
+  imagine: "var(--chorus-blue)",
+  explore: "var(--chorus-dark-green)",
+  understand: "var(--chorus-pink)",
+  plan: "var(--chorus-yellow)",
+  act: "var(--chorus-yellow)",
+} as const;
+
+const stageHeroGraphics = {
+  imagine: "var(--chorus-dark-green)",
+  explore: "var(--chorus-lime)",
+  understand: "var(--chorus-dark-green)",
+  plan: "var(--chorus-orange)",
+  act: "var(--chorus-green)",
+} as const;
+
+export function stageHeroGroundFor(stageNumber: number): string {
+  const key = STAGE_KEYS[stageNumber - 1];
+  return key ? stageHeroGrounds[key] : "var(--chorus-yellow)";
+}
+
+export function stageHeroGraphicFor(stageNumber: number): string {
+  const key = STAGE_KEYS[stageNumber - 1];
+  return key ? stageHeroGraphics[key] : "var(--chorus-dark-green)";
 }

@@ -867,6 +867,15 @@ export type Module = {
   // instead. Unlike audience, a hideFrom module stays universal with the flag off,
   // so today's behaviour is unchanged.
   hideFrom?: RetirementStage[];
+  // A not-yet-built module shown on the dashboard only as a "coming soon"
+  // placeholder (with its icon and title). Excluded from the real programme —
+  // no session, no progress, no count, not found by getModule — via
+  // moduleVisibleFor below. To ship it for real, fill in the content and remove
+  // this flag.
+  comingSoon?: boolean;
+  // Shown only to people who said they have a partner (e.g. "Plan with your
+  // partner"). Honoured by the dashboard's coming-soon placeholder rendering.
+  requiresPartner?: boolean;
 };
 
 // The two already-retired cohorts. Stage 1 becomes "Review" for them, re-ordered
@@ -885,6 +894,9 @@ export function moduleVisibleFor(
   m: Module,
   rs: RetirementStage | null
 ): boolean {
+  // Coming-soon placeholders never enter the real programme (no session, no
+  // progress, no count). The dashboard renders them separately from stage.modules.
+  if (m.comingSoon) return false;
   if (m.audience) {
     if (!RETIREMENT_PATHS) return false;
     return rs !== null && m.audience.includes(rs);
@@ -3330,7 +3342,18 @@ A short, warm sign-off — one or two sentences. Note that this first-year pictu
     number: 5,
     name: "Act",
     subtitle: "Turn it into next steps",
-    modules: [],
+    modules: [
+      {
+        id: "5.1",
+        title: "Plan with your partner",
+        description:
+          "Bring your plan and your partner's together — where your hopes for these years overlap, and how you'll shape them side by side.",
+        durationMin: 20,
+        primer: [],
+        comingSoon: true,
+        requiresPartner: true,
+      },
+    ],
   },
 ];
 

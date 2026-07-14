@@ -54,7 +54,7 @@ export async function sendFeedbackEmail(
   ].join("\n");
 
   const html = `
-    <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#16202E">
+    <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#0A322D">
       <p style="margin:0 0 12px"><strong>New feedback from the RLP Companion</strong></p>
       <p style="white-space:pre-wrap;margin:0 0 16px">${escapeHtml(
         input.message

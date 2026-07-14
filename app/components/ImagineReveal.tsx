@@ -20,7 +20,6 @@ import {
   type RevealSynthesis,
 } from "@/lib/stageReveal";
 import StageReveal from "./StageReveal";
-import DawnMotif from "./DawnMotif";
 import ArchetypeBlock from "./ArchetypeBlock";
 
 export default function ImagineReveal() {
@@ -135,7 +134,6 @@ export default function ImagineReveal() {
   return (
     <StageReveal
       arc={arc}
-      motif={<DawnMotif />}
       eyebrow="Where your plan begins"
       title={retired ? "Your retirement, reviewed" : "Your retirement, imagined"}
       vitaIntro={vitaIntro}
