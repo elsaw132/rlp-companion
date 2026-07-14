@@ -1,10 +1,10 @@
 "use client";
 
-// The Chorus Life band header (dark-green --brand-band). Reusable on purpose: it
-// lives in /home for now, but will be promoted to the global layout once the
-// session screen is built so the band stays consistent across dashboard and
-// sessions. All text/icons on the band are white (--brand-on-band); the divider
-// between the wordmark and descriptor is Chorus lime (--color-brand-accent).
+// The Chorus Life header. A light, frosted bar (near-white --bg-alt at 90% with
+// a blur and a hairline underline) matching the marketing site's nav, so the app
+// reads as bright and open rather than capped by a heavy band. Dark green is held
+// back as a deliberate accent (the avatar, the RLP card) rather than the chrome.
+// The full-colour wordmark sits on the light bar; text/icons are dark (--ink).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -61,11 +61,12 @@ export default function ProviderBand() {
     <header className="rlp-band">
       <style>{bandCss}</style>
 
-      {/* Official Chorus Life wordmark (white asset) + descriptor, linking back to
-          the dashboard. The wordmark is supplied art — never redraw it. */}
+      {/* Official Chorus Life wordmark (full-colour asset) + descriptor, linking
+          back to the dashboard. The band is light now, so the coloured logo is
+          used — the white variant is reserved for dark surfaces. Never redraw it. */}
       <Link href="/home" className="brand" aria-label={`${PROVIDER_NAME} — back to dashboard`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="logo" src="/chorus-life-logo-white.svg" alt={PROVIDER_NAME} width={76} height={24} />
+        <img className="logo" src="/chorus-life-logo.svg" alt={PROVIDER_NAME} width={76} height={24} />
         <span className="brand-divider" aria-hidden="true" />
         <span className="descriptor">Your retirement coach</span>
       </Link>
@@ -141,23 +142,23 @@ export default function ProviderBand() {
 }
 
 const bandCss = `
-.rlp-band{height:var(--header-h);background:var(--brand-band);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:10}
+.rlp-band{height:var(--header-h);background:color-mix(in srgb, var(--bg-alt) 90%, transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:10}
 /* On mobile the unified MobileAppBar replaces this band (Phase 1). Desktop keeps
    the band exactly as-is. */
 @media (max-width:880px){.rlp-band{display:none}}
 .rlp-band .brand{display:flex;align-items:center;gap:14px;text-decoration:none;border-radius:var(--r-sm)}
 .rlp-band .brand:focus-visible{outline:none;box-shadow:var(--focus-ring-accent)}
 .rlp-band .logo{height:24px;width:auto;display:block}
-.rlp-band .brand-divider{width:1px;height:26px;background:var(--color-brand-accent);flex:none}
-.rlp-band .descriptor{font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--brand-on-band);letter-spacing:.01em;line-height:1.2}
+.rlp-band .brand-divider{width:1px;height:24px;background:var(--border-strong);flex:none}
+.rlp-band .descriptor{font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--ink);letter-spacing:.01em;line-height:1.2}
 .rlp-band .right{display:flex;align-items:center;gap:20px}
-.rlp-band .support{font-family:inherit;font-size:14px;font-weight:600;color:var(--brand-on-band);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;min-height:44px}
+.rlp-band .support{font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;min-height:44px}
 .rlp-band .support:hover{text-decoration:underline;text-underline-offset:3px}
 .rlp-band .support:focus-visible{outline:none;box-shadow:var(--focus-ring-accent);border-radius:var(--r-sm)}
 .rlp-band .account{position:relative}
-.rlp-band .user{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:var(--brand-on-band);background:none;border:none;cursor:pointer;font-family:inherit;min-height:44px}
+.rlp-band .user{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:var(--ink);background:none;border:none;cursor:pointer;font-family:inherit;min-height:44px}
 .rlp-band .user:focus-visible{outline:none;box-shadow:var(--focus-ring-accent);border-radius:var(--r-sm)}
-.rlp-band .avatar{width:34px;height:34px;border-radius:50%;background:var(--brand-primary);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700}
+.rlp-band .avatar{width:34px;height:34px;border-radius:50%;background:var(--brand-band);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700}
 .rlp-band .menu-scrim{position:fixed;inset:0;background:none;border:none;padding:0;margin:0;cursor:default;z-index:40}
 .rlp-band .menu{position:absolute;top:calc(100% + 10px);right:0;z-index:50;min-width:220px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-md);padding:8px;display:flex;flex-direction:column;gap:4px}
 .rlp-band .menu-identity{display:flex;flex-direction:column;gap:2px;padding:8px 10px 10px;border-bottom:1px solid var(--border)}

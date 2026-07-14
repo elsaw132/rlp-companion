@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 
 // The shared feedback/support panel: a small in-app dialog that POSTs to
 // /api/feedback (which records the message and emails it). Controlled by the
@@ -111,6 +112,23 @@ export default function FeedbackPanel({
             </div>
 
             <p style={styles.intro}>{intro}</p>
+
+            {/* Support only: point people at the help page first — many questions
+                are answered there, so they can self-serve before messaging. */}
+            {kind === "support" && (
+              <p style={styles.helpHint}>
+                You might find your answer in{" "}
+                <Link
+                  href="/how-it-works"
+                  className="fb-help"
+                  style={styles.helpLink}
+                  onClick={onClose}
+                >
+                  Help &amp; guidance
+                </Link>
+                .
+              </p>
+            )}
 
             <label htmlFor="fb-message" style={styles.label}>
               Your message
@@ -222,6 +240,18 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text)",
     margin: "0 0 4px",
   },
+  helpHint: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    color: "var(--text-muted)",
+    lineHeight: "var(--lh-body)",
+    margin: "0 0 4px",
+  },
+  helpLink: {
+    color: "var(--brand-primary)",
+    fontWeight: 600,
+    textDecoration: "underline",
+  },
   label: {
     fontFamily: "var(--font-sans)",
     fontSize: "var(--fs-label)",
@@ -318,6 +348,7 @@ const fbStyles = `
   }
   .fb-field:focus { border-color: var(--brand-primary); }
   .fb-field::placeholder { color: var(--text-faint); }
+  .fb-help:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--r-xs); }
   .fb-close:hover { background: var(--bg-alt); color: var(--ink); }
   .fb-send:hover:not(:disabled) { background: var(--brand-primary-hover); }
   .fb-send:disabled { opacity: 0.55; cursor: default; }

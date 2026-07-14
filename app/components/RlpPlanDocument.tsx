@@ -1270,7 +1270,7 @@ const css = `
 .rlp-work-list li{font-size:var(--fs-body);color:var(--ink);font-weight:600;background:var(--surface);border:1px solid var(--border-strong);border-left:3px solid var(--accent);border-radius:var(--r-sm);padding:9px 13px}
 
 /* §10 first steps */
-.rlp-firststeps{text-align:center;background:var(--brand-primary);color:var(--brand-on-primary);border-radius:var(--r-lg);padding:48px 28px;margin-top:56px}
+.rlp-firststeps{text-align:center;background:var(--color-brand-primary);color:var(--brand-on-primary);border-radius:var(--r-lg);padding:48px 28px;margin-top:56px}
 .rlp-firststeps .rlp-eyebrow{color:rgba(255,255,255,.7)}
 .rlp-firststeps-title{font-family:var(--font-serif);font-size:var(--fs-display);font-weight:600;margin:0 0 14px}
 .rlp-firststeps .rlp-lede{color:rgba(255,255,255,.85);margin:0 auto 26px;max-width:46ch}

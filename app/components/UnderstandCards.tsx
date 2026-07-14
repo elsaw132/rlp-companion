@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import VitaMark from "./VitaMark";
+import BloomMotif from "./BloomMotif";
 import type { RevealCard } from "@/lib/stage3Reveal";
 
 type ArcStage = { number: number; name: string; done: boolean };
@@ -399,10 +400,8 @@ function CardBody({
             ) : (
               <p className="hero h-lg">{card.meaning}</p>
             )}
-            <div className="scene" aria-hidden="true">
-              <div className="sky" />
-              <div className="sun" />
-              <div className="hills" />
+            <div className="scene">
+              <BloomMotif />
             </div>
           </div>
         </>
@@ -454,7 +453,7 @@ const css = `
 .rlp-ureveal .vita-lbl{font-size:11.5px;color:var(--color-vita);font-weight:600}
 
 .rlp-ureveal .eyebrow{font-size:var(--fs-eyebrow);font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin-bottom:10px}
-.rlp-ureveal .card.cream .eyebrow{color:var(--coach-pill-text)}
+.rlp-ureveal .card.cream .eyebrow{color:var(--color-brand-primary)}
 .rlp-ureveal .profile-tag{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);margin-bottom:8px}
 
 .rlp-ureveal .body-mid{flex:1;display:flex;flex-direction:column;justify-content:center}
@@ -484,11 +483,8 @@ const css = `
 .rlp-ureveal .arc-name.now{color:var(--brand-primary);font-weight:700}
 .rlp-ureveal .arc-tick{color:var(--success-text);font-size:11px}
 
-/* finale landscape — home scene with a HIGH sun (a bright day ahead) */
-.rlp-ureveal .scene{margin-top:18px;height:108px;border-radius:var(--r-md);overflow:hidden;position:relative;border:1px solid var(--warm-line)}
-.rlp-ureveal .scene .sky{position:absolute;inset:0;background:linear-gradient(180deg,var(--ill-sky-pale) 0%,var(--ill-sky) 46%,var(--ill-hill) 64%,var(--ill-hill-deep) 100%)}
-.rlp-ureveal .scene .sun{position:absolute;left:50%;top:10px;width:40px;height:40px;border-radius:50%;background:radial-gradient(circle,#FFF3CF,var(--sun));transform:translateX(-50%);box-shadow:0 0 24px rgba(251,210,78,.55)}
-.rlp-ureveal .scene .hills{position:absolute;left:0;right:0;bottom:0;height:46px;background:radial-gradient(150% 130% at 20% 100%,var(--ill-hill) 0%,var(--ill-hill) 58%,transparent 59%),radial-gradient(160% 140% at 80% 100%,var(--ill-hill-deep) 0%,var(--ill-hill-deep) 52%,transparent 53%)}
+/* finale — the Chorus gradient + bloom (a fresh chapter ahead) */
+.rlp-ureveal .scene{margin-top:18px;border-radius:var(--r-md);overflow:hidden}
 
 /* actions on the forward card */
 .rlp-ureveal .actions{margin-top:16px}

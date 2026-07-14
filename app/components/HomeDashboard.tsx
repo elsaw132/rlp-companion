@@ -23,12 +23,12 @@ import { tailorCopy } from "@/lib/retirementCopy";
 import StageIntro from "./StageIntro";
 import OpeningCapture from "./OpeningCapture";
 import VitaMark from "./VitaMark";
-import { stageMarkFor, stageWashFor } from "@/lib/stageColors";
+import { stageColorFor, stageForegroundFor, stageWashFor, stageHeroGroundFor, stageHeroGraphicFor, STAGE_KEYS } from "@/lib/stageColors";
 import { stageHeroFor } from "@/lib/stageHeroes";
+import { ModuleIconChip } from "./module/ModuleIconChip";
+import ChorusBloom from "./ChorusBloom";
+import ChorusVectorGraphic from "./ChorusVectorGraphic";
 
-// The soft illustrated thumbnail per module, by position within the stage —
-// matches the order in the reference (sunrise, roles, cal, keep, mtn, future).
-const THUMBS = ["sunrise", "roles", "cal", "keep", "mtn", "future"];
 
 function greetingWord(): string {
   const h = new Date().getHours();
@@ -276,6 +276,12 @@ export default function HomeDashboard() {
   const stageModules = visibleModules(viewedStageData, retirementStage);
   const doneInStage = stageModules.filter((m) => completed.includes(m.id)).length;
   const totalInStage = stageModules.length;
+  // Coming-soon placeholders live on the stage but outside the real programme
+  // (see moduleVisibleFor). Shown on the dashboard only, and only to people the
+  // module is for (e.g. partner-gated modules need a partner).
+  const comingSoonModules = viewedStageData.modules.filter(
+    (m) => m.comingSoon && (!m.requiresPartner || userData.hasPartner())
+  );
   const stagePct =
     totalInStage > 0 ? Math.round((doneInStage / totalInStage) * 100) : 0;
 
@@ -346,8 +352,8 @@ export default function HomeDashboard() {
           // selection, ring, completion panel, module bar, tiles). Driven by the
           // VIEWED stage, not the current programme stage — so revisiting Plan
           // stays orange even when the current stage is Act.
-          ["--stage-color"]: stageMarkFor(viewedStageNumber),
-          ["--stage-fg"]: "#fff",
+          ["--stage-color"]: stageColorFor(viewedStageNumber),
+          ["--stage-fg"]: stageForegroundFor(viewedStageNumber),
           ["--stage-wash"]: stageWashFor(viewedStageNumber),
         } as React.CSSProperties
       }
@@ -380,11 +386,13 @@ export default function HomeDashboard() {
               // Stage colour is the wayfinding cue: the stage being viewed and the
               // current programme stage each carry their own fixed stage colour on
               // the number/check circle. Other done/idle stages stay restrained.
+              // Every reached stage (done, current, or viewed) shows its own
+              // stage-mark colour; only not-yet-reached stages stay muted.
               const stageCircleStyle =
-                isViewing || isCurrent
+                isViewing || isCurrent || isDone
                   ? ({
-                      background: stageMarkFor(s.number),
-                      color: "#fff",
+                      background: stageColorFor(s.number),
+                      color: stageForegroundFor(s.number),
                     } as React.CSSProperties)
                   : undefined;
               const inner = (
@@ -464,10 +472,10 @@ export default function HomeDashboard() {
                 // Same wayfinding cue as the sidebar: the viewed and current
                 // stages fill their whole dot with the stage colour (no ring).
                 const stageDotStyle =
-                  isViewing || isCurrent
+                  isViewing || isCurrent || isDone
                     ? ({
-                        background: stageMarkFor(s.number),
-                        color: "#fff",
+                        background: stageColorFor(s.number),
+                        color: stageForegroundFor(s.number),
                       } as React.CSSProperties)
                     : undefined;
                 const inner = (
@@ -499,8 +507,18 @@ export default function HomeDashboard() {
             {/* COACH NEXT-STEP HERO — only when looking at the current stage.
                 Viewing an earlier, finished stage shows a calmer header instead. */}
             {!isViewingCurrent ? (
-              <section className="done-head">
-                <div className="dh-body">
+              <section
+                className="done-head"
+                style={{ background: stageHeroGroundFor(viewedStageNumber) }}
+              >
+                <div
+                  className="hero-gfx"
+                  style={{ color: stageHeroGraphicFor(viewedStageNumber) }}
+                  aria-hidden="true"
+                >
+                  <ChorusVectorGraphic className="hero-gfx-svg" />
+                </div>
+                <div className="hero-card">
                   <h2>
                     <span className="tick" aria-hidden="true">
                       ✓
@@ -521,16 +539,20 @@ export default function HomeDashboard() {
                     Back to your current step ›
                   </button>
                 </div>
-                {viewedHero && (
-                  <div className="dh-scene">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="scene-img" src={viewedHero.image} alt={viewedHero.alt} width={1000} height={1000} />
-                  </div>
-                )}
               </section>
             ) : (
-            <section className="hero">
-              <div className="body">
+            <section
+              className="hero"
+              style={{ background: stageHeroGroundFor(viewedStageNumber) }}
+            >
+              <div
+                className="hero-gfx"
+                style={{ color: stageHeroGraphicFor(viewedStageNumber) }}
+                aria-hidden="true"
+              >
+                <ChorusVectorGraphic className="hero-gfx-svg" />
+              </div>
+              <div className="hero-card">
                 <div className="vita">
                   <VitaMark size={36} />
                   <span className="name">Vita</span>
@@ -550,24 +572,12 @@ export default function HomeDashboard() {
                   </div>
                 )}
               </div>
-              <div className="scene">
-                {viewedHero ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img className="scene-img" src={viewedHero.image} alt={viewedHero.alt} width={1000} height={1000} />
-                ) : (
-                  <div aria-hidden="true">
-                    <div className="sun-ill"></div>
-                    <div className="cloud"></div>
-                    <div className="cloud two"></div>
-                  </div>
-                )}
-              </div>
             </section>
             )}
 
             {/* STAGE 1 PICTURE — only within the Imagine view, once all five
-                Imagine modules are done. A loud "is ready" prompt until the
-                picture is confirmed, then a calmer persistent entry. */}
+                Imagine modules are done. A louder card until the reveal is opened,
+                then a calmer persistent entry — same "View" wording in both. */}
             {viewedStageNumber === 1 && isStageDone(STAGES[0]) && (
               hasStage1Reveal ? (
                 <Link className="picture-card is-calm" href="/stage/1">
@@ -587,11 +597,7 @@ export default function HomeDashboard() {
                     ✦
                   </span>
                   <span className="pc-body">
-                    <span className="pc-title">Your Imagine reveal is ready</span>
-                    <span className="pc-sub">
-                      The threads of what you imagined — and the retirement type
-                      that&apos;s emerged. Yours to shape as you go.
-                    </span>
+                    <span className="pc-title">View your Imagine reveal</span>
                   </span>
                   <span className="pc-chev" aria-hidden="true">
                     ›
@@ -601,8 +607,8 @@ export default function HomeDashboard() {
             )}
 
             {/* STAGE 2 PICTURE — only within the Explore view, once all six
-                Explore modules are done. Loud "is ready" prompt until viewed,
-                then a calmer persistent entry. */}
+                Explore modules are done. A louder card until the reveal is opened,
+                then a calmer persistent entry — same "View" wording in both. */}
             {viewedStageNumber === 2 && isStageDone(STAGES[1]) && (
               hasStage2Reveal ? (
                 <Link className="picture-card is-calm" href="/stage/2">
@@ -622,11 +628,7 @@ export default function HomeDashboard() {
                     ✦
                   </span>
                   <span className="pc-body">
-                    <span className="pc-title">Your Explore reveal is ready</span>
-                    <span className="pc-sub">
-                      A fuller picture across the six areas of a balanced
-                      retirement — and a few things worth knowing along the way.
-                    </span>
+                    <span className="pc-title">View your Explore reveal</span>
                   </span>
                   <span className="pc-chev" aria-hidden="true">
                     ›
@@ -636,8 +638,8 @@ export default function HomeDashboard() {
             )}
 
             {/* STAGE 3 PICTURE — only within the Understand view, once all six
-                Understand modules are done. Loud "is ready" prompt until viewed,
-                then a calmer persistent entry. */}
+                Understand modules are done. A louder card until the reveal is opened,
+                then a calmer persistent entry — same "View" wording in both. */}
             {viewedStageNumber === 3 && isStageDone(STAGES[2]) && (
               hasStage3Reveal ? (
                 <Link className="picture-card is-calm" href="/stage/3">
@@ -657,11 +659,7 @@ export default function HomeDashboard() {
                     ✦
                   </span>
                   <span className="pc-body">
-                    <span className="pc-title">Your Understand reveal is ready</span>
-                    <span className="pc-sub">
-                      The person inside the picture — your strengths, your values,
-                      and what these years are for, in your own words.
-                    </span>
+                    <span className="pc-title">View your Understand reveal</span>
                   </span>
                   <span className="pc-chev" aria-hidden="true">
                     ›
@@ -674,9 +672,9 @@ export default function HomeDashboard() {
                 Plan modules are done. A calm, persistent entry to the document
                 they keep and return to. */}
             {viewedStageNumber === 4 && isStageDone(STAGES[3]) && (
-              <Link className="picture-card is-calm" href="/plan">
+              <Link className="picture-card is-calm is-rlp" href="/plan">
                 <span className="pc-icon" aria-hidden="true">
-                  ✦
+                  <ChorusBloom className="pc-bloom" fill="var(--color-brand-primary)" />
                 </span>
                 <span className="pc-body">
                   <span className="pc-title">View your Retirement Life Plan</span>
@@ -694,15 +692,19 @@ export default function HomeDashboard() {
             {/* STAGE SESSIONS */}
             <div className="sec-row">
               <div className="sec-head">Your sessions in {viewedStageData.name}</div>
-              <div className="sec-prog">
-                {doneInStage} of {totalInStage} modules complete
+              {totalInStage > 0 && (
+                <div className="sec-prog">
+                  {doneInStage} of {totalInStage} sessions complete
+                </div>
+              )}
+            </div>
+            {totalInStage > 0 && (
+              <div className="bar">
+                <i style={{ width: `${stagePct}%` }}></i>
               </div>
-            </div>
-            <div className="bar">
-              <i style={{ width: `${stagePct}%` }}></i>
-            </div>
+            )}
 
-            {totalInStage === 0 ? (
+            {totalInStage === 0 && comingSoonModules.length === 0 ? (
               <div className="info" style={{ marginBottom: "34px" }}>
                 <div className="av" aria-hidden="true">
                   🌱
@@ -718,13 +720,17 @@ export default function HomeDashboard() {
               </div>
             ) : (
               <div className="cards">
-                {stageModules.map((m, i) => {
+                {stageModules.map((m) => {
                   const isComplete = completed.includes(m.id);
                   const isActiveStep = isViewingCurrent && nextModule?.id === m.id;
-                  const thumb = THUMBS[i] ?? "future";
                   const body = (
                     <>
-                      <div className={`thumb ${thumb}`} aria-hidden="true"></div>
+                      <ModuleIconChip
+                        className="thumb"
+                        stageKey={STAGE_KEYS[viewedStageData.number - 1]}
+                        moduleId={m.id}
+                        size="md"
+                      />
                       <div>
                         <div className="title">{titleFor(m, retirementStage)}</div>
                         <div className="desc">
@@ -769,26 +775,36 @@ export default function HomeDashboard() {
                     </div>
                   );
                 })}
+                {comingSoonModules.map((m) => (
+                  <div key={m.id} className="scard scard-soon" aria-disabled="true">
+                    <ModuleIconChip
+                      className="thumb"
+                      stageKey={STAGE_KEYS[viewedStageData.number - 1]}
+                      moduleId={m.id}
+                      size="md"
+                    />
+                    <div>
+                      <div className="title">{m.title}</div>
+                      <div className="desc">{m.description}</div>
+                    </div>
+                    <span className="badge badge-soon">Coming soon</span>
+                  </div>
+                ))}
               </div>
             )}
 
             {/* ENCOURAGEMENT */}
             <div className="info">
-              <div className="av" aria-hidden="true">
-                🌱
-              </div>
               <div>
-                <h4>There&apos;s no wrong way to do this</h4>
                 <p>
-                  Take your time. Each session is designed to be fun and
-                  reflective, not hard or fast. We suggest setting aside 20
-                  minutes each day to do one session at a time, and giving each
-                  session time to settle before moving on to the next.
+                  Take your time — each session is meant to be enjoyable and
+                  reflective. Do a couple at a time at most, and leave a little
+                  space between them so each has room to settle.
                 </p>
               </div>
-              <a href="#" className="lk">
-                How it works ›
-              </a>
+              <Link href="/how-it-works" className="lk">
+                Help &amp; guidance ›
+              </Link>
             </div>
 
             {/* RESET */}
@@ -808,11 +824,14 @@ const homeCss = `
 .rlp-home a{color:inherit;text-decoration:none}
 .rlp-home button{font-family:inherit}
 .rlp-home :focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
+/* Editorial warmth: a richer cream ground at the top settles into the app's warm
+   base (--bg-alt is now warm app-wide, so nothing feels grey). */
+.rlp-home{background:linear-gradient(180deg,var(--ground-cream) 0,var(--bg-alt) 560px)}
 
 .rlp-home .shell{display:flex;align-items:flex-start;max-width:1180px;margin:0 auto}
-.rlp-home .sidebar{width:var(--sidebar-w);flex-shrink:0;padding:28px 20px 40px;border-right:1px solid var(--border);min-height:calc(100vh - var(--header-h));position:sticky;top:var(--header-h);display:flex;flex-direction:column}
+.rlp-home .sidebar{width:var(--sidebar-w);flex-shrink:0;padding:34px 22px 44px;border-right:1px solid color-mix(in srgb,var(--border) 55%,transparent);min-height:calc(100vh - var(--header-h));position:sticky;top:var(--header-h);display:flex;flex-direction:column}
 .rlp-home .sidebar .rlp-poweredby{margin-top:auto;padding-top:24px;justify-content:flex-start}
-.rlp-home .main{flex:1;min-width:0;padding:34px 40px 80px;display:flex;justify-content:center}
+.rlp-home .main{flex:1;min-width:0;padding:46px 48px 96px;display:flex;justify-content:center}
 .rlp-home .col{width:100%;max-width:var(--content-max)}
 
 .rlp-home .side-eyebrow{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:600;padding:0 12px;margin-bottom:10px}
@@ -825,7 +844,7 @@ const homeCss = `
 .rlp-home .nav.is-viewing:hover{background:var(--stage-wash)}
 .rlp-home .nav.is-locked{opacity:.5;cursor:default}
 .rlp-home .nav.is-locked:hover{background:none}
-.rlp-home .nav .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0}
+.rlp-home .nav .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-brand-primary) 55%,transparent)}
 .rlp-home .nav .n--current{background:var(--brand-primary);color:#fff}
 .rlp-home .nav .n--idle{background:var(--brand-primary-tint);color:var(--brand-primary)}
 .rlp-home .nav .n--done{background:var(--brand-primary);color:#fff}
@@ -834,7 +853,7 @@ const homeCss = `
 .rlp-home .nav.is-idle .t{color:var(--text)}
 .rlp-home .nav .s{display:block;font-size:12px;color:var(--text-muted);line-height:1.35}
 
-.rlp-home .clarity{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:18px;box-shadow:var(--shadow-sm);text-align:center}
+.rlp-home .clarity{background:#fff;border:1px solid color-mix(in srgb,var(--border) 45%,transparent);border-radius:var(--r-lg);padding:24px 22px;box-shadow:var(--shadow-md);text-align:center}
 .rlp-home .radial-wrap{position:relative;display:inline-grid;place-items:center;margin-bottom:10px}
 .rlp-home .radial{--p:0;width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--stage-color,var(--brand-primary)) calc(var(--p)*1%),var(--border) 0)}
 .rlp-home .radial::before{content:"";position:absolute;width:58px;height:58px;border-radius:50%;background:#fff}
@@ -842,26 +861,38 @@ const homeCss = `
 .rlp-home .clarity .lab{font-size:13px;font-weight:600;color:var(--ink)}
 .rlp-home .clarity .sub{font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.45}
 
-.rlp-home .greeting{font-family:var(--font-serif);font-size:34px;font-weight:600;color:var(--ink);line-height:1.15;margin-bottom:6px}
-.rlp-home .greet-sub{font-size:14px;color:var(--text-muted);margin-bottom:28px}
+.rlp-home .greeting{font-family:var(--font-serif);font-size:40px;font-weight:600;color:var(--ink);line-height:1.12;letter-spacing:-.01em;margin-bottom:8px}
+.rlp-home .greet-sub{font-size:15px;color:var(--text-muted);margin-bottom:30px}
 
-.rlp-home .picture-card{display:flex;align-items:center;gap:16px;background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-lg);box-shadow:var(--shadow-md);padding:20px 22px;margin-bottom:28px;cursor:pointer;transition:box-shadow .15s ease,border-color .15s ease}
-.rlp-home .picture-card:hover{box-shadow:var(--shadow-lg,var(--shadow-md));border-color:var(--brand-primary)}
-.rlp-home .picture-card .pc-icon{width:42px;height:42px;border-radius:50%;background:var(--sun);display:grid;place-items:center;font-size:19px;flex-shrink:0;color:var(--ink)}
+/* Stage reveal cards — one consistent, neutral treatment for every stage, in both
+   the "ready" and "viewed" states, so no single stage stands out. The distinctive
+   Vita-purple bloom treatment is reserved for the RLP card (.is-rlp) below. */
+.rlp-home .picture-card{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid color-mix(in srgb,var(--border) 45%,transparent);border-radius:var(--r-lg);box-shadow:var(--shadow-md);padding:22px 24px;margin-bottom:32px;cursor:pointer;transition:box-shadow .15s ease,transform .15s ease}
+.rlp-home .picture-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+.rlp-home .picture-card .pc-icon{width:42px;height:42px;border-radius:50%;background:var(--bg-alt);display:grid;place-items:center;font-size:19px;flex-shrink:0;color:var(--color-brand-primary)}
 .rlp-home .picture-card .pc-body{display:flex;flex-direction:column;gap:4px;min-width:0}
 .rlp-home .picture-card .pc-title{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--ink);line-height:1.2}
 .rlp-home .picture-card .pc-sub{font-size:14px;color:var(--text-muted);line-height:1.5}
 .rlp-home .picture-card .pc-chev{margin-left:auto;font-size:24px;line-height:1;color:var(--text-muted);flex-shrink:0}
-.rlp-home .picture-card.is-calm{background:#fff;border-color:var(--border);box-shadow:var(--shadow-sm);padding:16px 20px}
-.rlp-home .picture-card.is-calm:hover{border-color:var(--border-strong);box-shadow:var(--shadow-md)}
-.rlp-home .picture-card.is-calm .pc-icon{width:34px;height:34px;font-size:16px;background:var(--bg-alt)}
+.rlp-home .picture-card.is-calm{background:#fff;padding:18px 22px}
+.rlp-home .picture-card.is-calm:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+.rlp-home .picture-card.is-calm .pc-icon{width:34px;height:34px;font-size:16px}
 .rlp-home .picture-card.is-calm .pc-title{font-family:var(--font-sans);font-size:15px;font-weight:600;color:var(--brand-primary)}
+/* RLP card only — the flagship. A bold, high-contrast dark-green card with a
+   Chorus-lime accent so it stands out as the most important thing on the page. */
+.rlp-home .picture-card.is-rlp{background:var(--color-brand-primary);border-color:var(--color-brand-primary);box-shadow:var(--shadow-lg);padding:22px 24px}
+.rlp-home .picture-card.is-rlp:hover{border-color:var(--color-brand-primary);box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+.rlp-home .picture-card.is-rlp .pc-icon{width:46px;height:46px;background:var(--chorus-lime);color:var(--color-brand-primary)}
+.rlp-home .picture-card.is-rlp .pc-bloom{width:24px;height:auto;display:block}
+.rlp-home .picture-card.is-rlp .pc-title{font-family:var(--font-serif);font-size:21px;font-weight:600;color:#fff}
+.rlp-home .picture-card.is-rlp .pc-sub{color:rgba(255,255,255,.74)}
+.rlp-home .picture-card.is-rlp .pc-chev{color:rgba(255,255,255,.62)}
 
-.rlp-home .steps{display:flex;align-items:flex-start;gap:0;margin-bottom:32px}
+.rlp-home .steps{display:flex;align-items:flex-start;gap:0;margin:8px 0 42px}
 .rlp-home .step{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;flex:1;position:relative;background:none;border:none;font-family:inherit;padding:0}
 .rlp-home button.step{cursor:pointer}
 .rlp-home .step.is-locked{opacity:.5;cursor:default}
-.rlp-home .step .dot{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;z-index:1}
+.rlp-home .step .dot{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;z-index:1;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-brand-primary) 55%,transparent)}
 .rlp-home .step.done .dot{background:var(--brand-primary);color:#fff}
 .rlp-home .step.active .dot{background:var(--accent);color:#fff}
 .rlp-home .step.todo .dot{background:var(--border);color:var(--text-faint)}
@@ -870,8 +901,15 @@ const homeCss = `
 .rlp-home .step:not(:last-child)::after{content:"";position:absolute;top:20px;left:50%;width:100%;height:2px;background:var(--border)}
 .rlp-home .step.done:not(:last-child)::after{background:var(--brand-primary)}
 
-.rlp-home .hero{display:grid;grid-template-columns:1.05fr .95fr;background:var(--warm-surface);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--warm-line);box-shadow:var(--shadow-md);margin-bottom:34px}
-.rlp-home .hero .body{padding:28px 28px 30px}
+/* Hero + finished-stage panel share one shape: a solid stage-colour FIELD with the
+   Chorus vector graphic cropped behind a white card (the card carries Vita / the
+   completion note). The graphic position is set once here (tuned in the positioner)
+   and recolours per stage via an inline color on .hero-gfx. The card is in normal
+   flow so it always grows to fit its text — nothing can spill. */
+.rlp-home .hero,.rlp-home .done-head{position:relative;overflow:hidden;border-radius:var(--r-lg);box-shadow:var(--shadow-lg);margin-bottom:34px}
+.rlp-home .hero-gfx{position:absolute;inset:0;pointer-events:none}
+.rlp-home .hero-gfx-svg{position:absolute;height:280%;width:auto;left:79%;top:95%;transform:translate(-50%,-50%)}
+.rlp-home .hero-card{position:relative;z-index:1;width:52%;margin:24px;background:#fff;border-radius:var(--r-lg);box-shadow:var(--shadow-md);padding:28px 30px}
 .rlp-home .hero .vita{display:flex;align-items:center;gap:9px;margin-bottom:12px}
 .rlp-home .hero .vita .name{font-family:var(--font-serif);font-size:20px;font-weight:600;color:var(--color-vita)}
 .rlp-home .coachpill{display:inline-block;background:var(--color-vita);color:#fff;font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-sm);margin-bottom:16px}
@@ -879,20 +917,9 @@ const homeCss = `
 .rlp-home .hero .ns-eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:3px}
 .rlp-home .hero .ns-title{font-family:var(--font-serif);font-size:23px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:18px}
 .rlp-home .hero .ctarow{display:flex;align-items:center;gap:14px}
-.rlp-home .hero .scene{background:linear-gradient(var(--ill-sky-pale),var(--ill-sky) 42%,var(--ill-hill) 60%,var(--ill-hill-deep));position:relative}
-.rlp-home .hero .scene .sun-ill{position:absolute;right:30px;top:34px;width:42px;height:42px;border-radius:50%;background:radial-gradient(circle,#FFF3CF,var(--sun));box-shadow:0 0 30px rgba(251,210,78,.6)}
-.rlp-home .hero .scene .cloud{position:absolute;width:64px;height:18px;background:rgba(255,255,255,.7);border-radius:20px;top:74px;right:54px}
-.rlp-home .hero .scene .cloud.two{width:44px;top:104px;right:120px;opacity:.6}
 
 /* Stage-completion panel — a light tint of the viewed stage, not generic success
    green. The tick circle is the full stage colour; body text stays neutral. */
-/* Shared hero photograph fill — used in the current-stage hero and, on a finished
-   stage, the completion panel. Square source, cropped to the slot (trim is fine). */
-.rlp-home .scene-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-
-.rlp-home .done-head{background:var(--stage-wash);border:1px solid color-mix(in srgb,var(--stage-color) 42%,#fff);border-radius:var(--r-lg);margin-bottom:34px;overflow:hidden;display:grid;grid-template-columns:1fr .72fr}
-.rlp-home .done-head .dh-body{padding:24px 26px}
-.rlp-home .done-head .dh-scene{position:relative;min-height:100%}
 .rlp-home .done-head h2{font-family:var(--font-serif);font-size:24px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:8px;display:flex;align-items:center;gap:10px}
 .rlp-home .done-head .tick{width:30px;height:30px;border-radius:50%;background:var(--stage-color);color:var(--stage-fg);display:grid;place-items:center;font-size:15px;flex-shrink:0}
 .rlp-home .done-head p{font-size:15px;color:var(--text);margin-bottom:10px}
@@ -905,17 +932,17 @@ const homeCss = `
 .rlp-home .btn-navy:hover{background:var(--brand-primary-hover)}
 .rlp-home .chip-time{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-muted);background:#fff;border:1px solid var(--border);border-radius:var(--r-pill);padding:5px 12px;font-weight:500;white-space:nowrap}
 
-.rlp-home .sec-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:4px}
-.rlp-home .sec-head{font-size:18px;font-weight:700;color:var(--ink)}
+.rlp-home .sec-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:8px}
+.rlp-home .sec-head{font-size:19px;font-weight:600;color:var(--ink)}
 .rlp-home .sec-prog{font-size:13px;color:var(--text-muted);white-space:nowrap}
-.rlp-home .bar{height:6px;border-radius:var(--r-pill);background:var(--border);overflow:hidden;margin:10px 0 20px}
+.rlp-home .bar{height:5px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--border) 70%,transparent);overflow:hidden;margin:12px 0 26px}
 .rlp-home .bar i{display:block;height:100%;background:var(--stage-color);border-radius:var(--r-pill)}
 
-.rlp-home .cards{display:flex;flex-direction:column;gap:12px;margin-bottom:34px}
-.rlp-home .scard{display:grid;grid-template-columns:88px minmax(0,1fr) auto auto;gap:18px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:18px;box-shadow:var(--shadow-sm)}
+.rlp-home .cards{display:flex;flex-direction:column;gap:14px;margin-bottom:40px}
+.rlp-home .scard{display:grid;grid-template-columns:56px minmax(0,1fr) auto auto;gap:18px;align-items:center;background:#fff;border:1px solid color-mix(in srgb,var(--border) 45%,transparent);border-radius:var(--r-lg);padding:20px 22px;box-shadow:var(--shadow-md)}
 .rlp-home .scard.is-active{background:var(--accent-surface);border-color:var(--accent-line);box-shadow:var(--shadow-md)}
-.rlp-home .scard-done{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease}
-.rlp-home .scard-done:hover{border-color:var(--border-strong);box-shadow:var(--shadow-md)}
+.rlp-home .scard-done{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.rlp-home .scard-done:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
 .rlp-home .done-cap{display:inline-flex;align-items:center;gap:12px}
 .rlp-home .done-cap .chev{font-size:22px;line-height:1;color:var(--text-muted)}
 .rlp-home .scard > div:not(.thumb){min-width:0}
@@ -936,12 +963,21 @@ const homeCss = `
 .rlp-home .badge{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;border-radius:var(--r-pill);padding:7px 14px;white-space:nowrap}
 .rlp-home .badge-complete{color:var(--success-text);background:#fff;border:1.5px solid var(--success-line)}
 .rlp-home .badge-notstarted{color:var(--text-muted);background:var(--muted-surface)}
+.rlp-home .badge-soon{color:var(--text-muted);background:var(--muted-surface)}
+/* Coming-soon placeholder card: a real-looking module card that isn't clickable. */
+.rlp-home .scard-soon{cursor:default}
+.rlp-home .scard-soon .badge-soon{grid-column:3 / -1;justify-self:end}
 
-.rlp-home .info{display:flex;gap:18px;align-items:flex-start;background:var(--info-surface);border:1px solid var(--info-line);border-radius:var(--r-md);padding:22px 24px;margin-bottom:30px}
+.rlp-home .info{display:flex;gap:18px;align-items:flex-start;background:var(--info-surface);border:1px solid color-mix(in srgb,var(--info-line) 60%,transparent);border-radius:var(--r-lg);padding:24px 26px;margin-bottom:32px}
 .rlp-home .info .av{width:42px;height:42px;border-radius:50%;background:var(--brand-primary-tint);display:grid;place-items:center;font-size:18px;flex-shrink:0}
 .rlp-home .info h4{font-family:var(--font-serif);font-size:18px;font-weight:600;color:var(--info-text);margin-bottom:5px}
 .rlp-home .info p{font-size:14px;color:var(--text);max-width:52ch;line-height:1.55}
-.rlp-home .info .lk{margin-left:auto;align-self:center;font-size:15px;font-weight:600;color:var(--brand-primary);white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+/* The help/guidance shortcut: an outlined pill in Chorus green so it reads as a
+   clear, tappable door to the guide (and meets the 44px touch minimum). Fills on
+   hover/focus. */
+.rlp-home .info .lk{margin-left:auto;align-self:center;font-size:15px;font-weight:600;color:var(--brand-primary);white-space:nowrap;display:inline-flex;gap:6px;align-items:center;justify-content:center;border:1.5px solid var(--brand-primary);border-radius:var(--r-pill);padding:11px 18px;min-height:44px;background:transparent;transition:background .15s ease,color .15s ease}
+.rlp-home .info .lk:hover{background:var(--brand-primary);color:var(--brand-on-primary);text-decoration:none}
+.rlp-home .info .lk:focus-visible{outline:none;box-shadow:var(--focus-ring)}
 
 .rlp-home .reset{text-align:center;font-size:13px;color:var(--text-faint)}
 .rlp-home .reset button{background:none;border:none;color:var(--text-muted);font-size:13px;text-decoration:underline;cursor:pointer;padding:8px 12px;min-height:44px}
@@ -957,20 +993,20 @@ const homeCss = `
 @media (max-width:880px){
   .rlp-home .sidebar{display:none}
   .rlp-home .main{padding:24px 18px 80px}
-  .rlp-home .hero{grid-template-columns:1fr}
-  .rlp-home .hero .scene{min-height:170px}
-  /* Completion panel stacks: recap above, photo as a banner below. */
-  .rlp-home .done-head{grid-template-columns:1fr}
-  .rlp-home .done-head .dh-scene{min-height:170px}
+  /* On phones the hero goes square-ish: the card spans nearly full width with the
+     graphic reduced to hints peeking behind it (positioned in the mobile tab of the
+     positioner). The card still sizes to its text, so it grows rather than clips. */
+  .rlp-home .hero-card{width:auto;margin:16px}
+  .rlp-home .hero-gfx-svg{height:223%;left:42%;top:94%}
   .rlp-home .greeting{font-size:28px}
-  .rlp-home .scard{grid-template-columns:64px minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:14px;row-gap:12px;align-items:start}
+  .rlp-home .scard{grid-template-columns:56px minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:14px;row-gap:12px;align-items:start}
   .rlp-home .scard .thumb{grid-column:1;grid-row:1 / span 2;width:64px;height:64px}
   .rlp-home .scard > div:not(.thumb){grid-column:2 / -1;grid-row:1}
   .rlp-home .scard .chip-time{grid-column:2;grid-row:2;align-self:center}
   .rlp-home .scard .badge,.rlp-home .scard .btn,.rlp-home .scard .done-cap{grid-column:3;grid-row:2;justify-self:end;align-self:center}
 }
 @media (max-width:440px){
-  .rlp-home .scard{grid-template-columns:64px minmax(0,1fr);grid-template-rows:auto auto auto}
+  .rlp-home .scard{grid-template-columns:56px minmax(0,1fr);grid-template-rows:auto auto auto}
   .rlp-home .scard .chip-time{grid-column:2;grid-row:2;justify-self:start}
   .rlp-home .scard .badge,.rlp-home .scard .btn,.rlp-home .scard .done-cap{grid-column:2;grid-row:3;justify-self:start}
 }

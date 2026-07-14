@@ -142,7 +142,7 @@ export default function MobileAppBar() {
           ) : (
             <Link href="/home" className="ab-word" aria-label={`${PROVIDER_NAME} — dashboard`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/chorus-life-logo-white.svg" alt={PROVIDER_NAME} width={63} height={20} />
+              <img src="/chorus-life-logo.svg" alt={PROVIDER_NAME} width={63} height={20} />
             </Link>
           )}
         </div>
@@ -267,21 +267,23 @@ const appBarCss = `
   .rlp-appbar{
     display:flex;align-items:center;justify-content:space-between;gap:12px;
     position:sticky;top:0;z-index:100;
-    background:var(--brand-band);
+    background:color-mix(in srgb, var(--bg-alt) 90%, transparent);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
     padding:0 16px;
     padding-top:env(safe-area-inset-top);
     min-height:calc(54px + env(safe-area-inset-top));
     box-sizing:border-box;
   }
   .rlp-appbar a{text-decoration:none}
-  /* Controls sit on the dark-green band, so their focus ring is lime. */
-  .rlp-appbar :focus-visible{outline:none;box-shadow:var(--focus-ring-accent);border-radius:var(--r-sm)}
+  /* Controls sit on the light band now, so their focus ring is the standard one. */
+  .rlp-appbar :focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
 
   .rlp-appbar .ab-left{min-width:0;display:flex;align-items:center}
   .rlp-appbar .ab-back{
     display:inline-flex;align-items:center;gap:6px;
     background:none;border:none;cursor:pointer;font-family:var(--font-sans);
-    font-size:var(--fs-body);font-weight:600;color:var(--brand-on-band);
+    font-size:var(--fs-body);font-weight:600;color:var(--ink);
     padding:8px 6px 8px 0;min-height:44px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
@@ -293,11 +295,11 @@ const appBarCss = `
   .rlp-appbar .ab-menu-btn{
     flex:none;display:inline-flex;align-items:center;gap:8px;
     background:none;border:none;cursor:pointer;font-family:var(--font-sans);
-    font-size:var(--fs-body);font-weight:600;color:var(--brand-on-band);
+    font-size:var(--fs-body);font-weight:600;color:var(--ink);
     padding:8px 4px;min-height:44px;
   }
   .rlp-appbar .ab-menu-lines{display:inline-flex;flex-direction:column;gap:3px;width:18px}
-  .rlp-appbar .ab-menu-lines span{display:block;height:2px;border-radius:2px;background:var(--brand-on-band)}
+  .rlp-appbar .ab-menu-lines span{display:block;height:2px;border-radius:2px;background:var(--ink)}
 
   /* The sheet + scrim — only reachable when the bar (mobile-only) is tapped. */
   .ab-scrim{
