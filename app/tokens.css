@@ -69,8 +69,17 @@
   --font-serif:var(--font-source-serif),"Source Serif 4","Lora",Georgia,serif;
   --font-sans:var(--font-inter),"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --fs-display:34px;--fs-h2:22px;--fs-title:20px;--fs-section:18px;--fs-body:16px;--fs-sm:14px;--fs-label:12.5px;--fs-eyebrow:11.5px;
+  /* Long-form reading passages (a session's primer) — larger than --fs-body,
+     which is the size of functional body copy. Set in serif: this is content
+     the reader is meant to feel, not a control or a label. */
+  --fs-reading:19px;
   --lh-body:1.6;
   --header-h:68px;--sidebar-w:280px;--content-max:720px;
+  /* The comfortable line length for reading text. --content-max bounds the
+     column; this bounds the words inside it, which is a different job — a
+     720px-wide paragraph runs to ~85 characters a line, well past the ~45-75
+     the eye tracks comfortably. */
+  --reading-measure:32em;
   /* Focus rings: Chorus green on light surfaces; lime (--focus-ring-accent) for
      controls sitting on the dark-green header, where green would not show. */
   --focus-ring:0 0 0 3px color-mix(in srgb, var(--chorus-green) 45%, transparent);

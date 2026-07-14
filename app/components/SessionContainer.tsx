@@ -2873,12 +2873,19 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "13px",
     color: "var(--text-muted)",
   },
+  // The primer's reading passage. Serif, and larger than functional body copy:
+  // this is the writing the session wants the reader to sit with, which is the
+  // system's own test for serif ("if the user is meant to feel it, it's
+  // serif"). The measure is capped because the 720px column runs a 16px line to
+  // ~85 characters — far enough for the eye to lose its place on the way back,
+  // which read as the text being small when the fix was really its width.
   bodyText: {
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-body)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-reading)",
     lineHeight: "var(--lh-body)",
     color: "var(--text)",
     margin: 0,
+    maxWidth: "var(--reading-measure)",
   },
   videoFrame: {
     position: "relative",

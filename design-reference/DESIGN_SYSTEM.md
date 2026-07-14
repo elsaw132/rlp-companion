@@ -52,12 +52,13 @@ Two families, never blurred:
 | Hero next-step title | serif | `--fs-h2` 22 | 600 | "Your ideal week" inside the hero |
 | Module card title | serif | `--fs-title` 20 | 600 | every module/stage title |
 | Section heading | **sans** | `--fs-section` 18 | 700 | "Your modules in this stage" |
-| Body / reading | sans | `--fs-body` 16 | 400 | module content, paragraphs |
+| Reading passage | **serif** | `--fs-reading` 19 | 400 | a module's primer — the writing the reader sits with |
+| Body / functional | sans | `--fs-body` 16 | 400 | descriptions, summaries, UI paragraphs |
 | Secondary / description | sans | `--fs-sm` 14 | 500 | card descriptions, dates |
 | Nav subtitle / small label | sans | `--fs-label` 12.5 | 500 | "Picture your future" |
 | Overline / eyebrow | sans | `--fs-eyebrow` 11.5 | 600 | UPPERCASE, letter-spacing .1em, muted |
 
-**Rule:** if the user is meant to *feel* it, it's serif. If it's a control, label, or status, it's sans.
+**Rule:** if the user is meant to *feel* it, it's serif. If it's a control, label, or status, it's sans. A module's primer is reading, not interface, so it follows the rule into serif — and its measure is capped at `--reading-measure` (~32em), because the 720px column runs a line to ~85 characters and the eye tracks ~45–75 comfortably.
 
 ---
 

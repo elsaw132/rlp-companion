@@ -61,12 +61,15 @@ function Panel({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+// Mirrors SessionContainer's bodyText so this page stays a truthful preview of
+// what a primer actually looks like.
 const body: React.CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--fs-body)",
+  fontFamily: "var(--font-serif)",
+  fontSize: "var(--fs-reading)",
   lineHeight: "var(--lh-body)",
   color: "var(--text)",
   margin: 0,
+  maxWidth: "var(--reading-measure)",
 };
 
 export default function PrimerMediaPreview() {
