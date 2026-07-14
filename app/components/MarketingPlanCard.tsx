@@ -39,6 +39,15 @@ const PLANS: { name: string; vision: string; chips: Chip[] }[] = [
     ],
   },
   {
+    name: "Margaret’s plan",
+    vision: "“Get the shape back into my week — something to look forward to, and people to share it with.”",
+    chips: [
+      ["Join a choir", ""],
+      ["Volunteer locally", "y"],
+      ["See friends more", "p"],
+    ],
+  },
+  {
     name: "Jason’s plan",
     vision: "“Wind down slowly, mentor the apprentices, and finally get the band back on stage.”",
     chips: [
@@ -48,12 +57,30 @@ const PLANS: { name: string; vision: string; chips: Chip[] }[] = [
     ],
   },
   {
+    name: "Priya’s plan",
+    vision: "“Treat these years like a second start — learn to sail, walk Hadrian’s Wall, somewhere new each year.”",
+    chips: [
+      ["Learn to sail", ""],
+      ["Hadrian’s Wall", "y"],
+      ["Somewhere new", "p"],
+    ],
+  },
+  {
     name: "Alex’s plan",
     vision: "“Learn Spanish, hike a new trail each spring, and cook at the community kitchen.”",
     chips: [
       ["Long-distance hikes", ""],
       ["Learn Spanish", "y"],
       ["Community kitchen", "p"],
+    ],
+  },
+  {
+    name: "Trevor’s plan",
+    vision: "“Put my hands to good use — help out at the Men’s Shed, get into woodturning, keep the walking group going.”",
+    chips: [
+      ["Men’s Shed", ""],
+      ["Woodturning", "y"],
+      ["Weekly walks", "p"],
     ],
   },
 ];
