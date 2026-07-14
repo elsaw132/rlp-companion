@@ -822,11 +822,33 @@ export type ScreeningCommitment = {
 
 // A single block in a module's primer — the content shown before the
 // conversation. Primers are an ordered list, so any mix is possible:
-// text→video, video→text, text→video→text, and so on. A plain text-only or
-// video-only primer is just a one-block list.
+// image→text, text→video→text, image→text→audio, and so on. A plain text-only
+// or video-only primer is just a one-block list.
+//
+// Media assets live in public/primers/ and are addressed by their public URL —
+// "/primers/1-money.jpg", not "public/primers/1-money.jpg". Every media block
+// fails soft in the renderer: a missing or broken asset removes its own block
+// and leaves the rest of the primer standing.
 export type ContentBlock =
+  // A reading passage.
   | { type: "text"; value: string }
+  // An embedded YouTube video, by watch/share/embed URL.
   | { type: "video"; url: string }
+  // A single hero image, shown at its own proportions. `alt` describes it for
+  // screen readers; omit it when the image is decorative and the text carries
+  // the meaning.
+  | { type: "image"; src: string; alt?: string }
+  // An ordered set the reader pages through by hand. Order is the array's
+  // order; there's no autoplay.
+  | { type: "image-slideshow"; images: { src: string; alt?: string }[] }
+  // A self-hosted audio file with a minimal play/pause player. `title` is the
+  // label shown beside the control.
+  | { type: "audio"; src: string; title?: string }
+  // A self-hosted video file with the browser's standard controls. `poster` is
+  // an optional still shown before play.
+  | { type: "self-hosted-video"; src: string; poster?: string }
+  // One or more buttons opening a file or page in a new tab (e.g. a PDF in
+  // public/primers/).
   | { type: "links"; links: { label: string; url: string }[] };
 
 export type Module = {
