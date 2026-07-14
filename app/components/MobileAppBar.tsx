@@ -142,7 +142,7 @@ export default function MobileAppBar() {
           ) : (
             <Link href="/home" className="ab-word" aria-label={`${PROVIDER_NAME} — dashboard`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/chorus-life-logo.svg" alt={PROVIDER_NAME} width={63} height={20} />
+              <img src="/chorus-life-logo.svg" alt={PROVIDER_NAME} width={82} height={26} />
             </Link>
           )}
         </div>
@@ -291,7 +291,7 @@ const appBarCss = `
   .rlp-appbar .ab-word{
     display:inline-flex;align-items:center;min-height:44px;
   }
-  .rlp-appbar .ab-word img{height:20px;width:auto;display:block}
+  .rlp-appbar .ab-word img{height:26px;width:auto;display:block}
   .rlp-appbar .ab-menu-btn{
     flex:none;display:inline-flex;align-items:center;gap:8px;
     background:none;border:none;cursor:pointer;font-family:var(--font-sans);

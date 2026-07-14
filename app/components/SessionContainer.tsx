@@ -1729,6 +1729,14 @@ export default function SessionContainer({
         <div style={styles.stageLine}>
           Stage {stageNumber} of {totalStages} · {stageName}
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <ModuleIconChip
+            stageKey={STAGE_KEYS[stageNumber - 1]}
+            moduleId={sessionId}
+            size="lg"
+          />
+          <h1 style={styles.title}>{sessionTitle}</h1>
+        </div>
         <div style={styles.progress}>
           <div style={styles.progressLabel}>
             {completedCount} of {modulesInStage} sessions complete
@@ -1746,14 +1754,6 @@ export default function SessionContainer({
             />
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <ModuleIconChip
-            stageKey={STAGE_KEYS[stageNumber - 1]}
-            moduleId={sessionId}
-            size="lg"
-          />
-          <h1 style={styles.title}>{sessionTitle}</h1>
-        </div>
         {sessionDescription && (
           <p style={styles.description}>{sessionDescription}</p>
         )}
@@ -1767,7 +1767,20 @@ export default function SessionContainer({
             {labelText}
           </span>
           <span style={styles.durationChip}>
-            <span aria-hidden="true">🕐</span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
             {durationMin} min
           </span>
         </div>
@@ -2772,7 +2785,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressFill: {
     height: "100%",
-    background: "var(--brand-primary)",
+    background: "var(--ink)",
     borderRadius: "var(--r-pill)",
   },
   title: {
@@ -2793,9 +2806,11 @@ const styles: Record<string, React.CSSProperties> = {
 
   // ZONE 2 — content card
   contentCard: {
-    background: "var(--bg)",
-    border: "0.5px solid var(--border)",
-    borderRadius: "var(--r-lg)",
+    // A warm off-white (a hint of Chorus Yellow), softer corners and a lighter
+    // hairline than the old flat-white form card — reads editorial, not clinical.
+    background: "color-mix(in srgb, var(--chorus-yellow) 8%, #fff)",
+    border: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)",
+    borderRadius: "var(--r-xl)",
     padding: "24px",
     boxShadow: "var(--shadow-sm)",
     display: "flex",
@@ -2822,7 +2837,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: "6px",
     background: "var(--bg)",
-    border: "1px solid var(--border)",
+    border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)",
     borderRadius: "var(--r-pill)",
     padding: "4px 11px",
     fontFamily: "var(--font-sans)",
@@ -2978,7 +2993,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "20px",
     paddingTop: "36px",
     marginTop: "8px",
-    borderTop: "1px solid var(--border)",
+    borderTop: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)",
   },
   pendingWrap: {
     display: "flex",

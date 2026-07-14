@@ -46,9 +46,9 @@ export default function ArchetypeBlock({
 }
 
 const css = `
-.rlp-archetype{position:relative;margin:38px auto 0;max-width:50ch;text-align:center;background:var(--warm-surface-2);border:1px solid var(--warm-line);border-radius:var(--r-md);padding:34px 30px 28px}
-.rlp-archetype .crown{position:absolute;top:-17px;left:50%;transform:translateX(-50%);box-shadow:0 0 0 6px var(--warm-surface-2)}
-.rlp-archetype .a-eyebrow{font-size:var(--fs-eyebrow);letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:600;margin-top:6px}
+.rlp-archetype{position:relative;margin:44px auto 0;max-width:50ch;text-align:center;background:#fff;border:1px solid color-mix(in srgb, var(--color-vita) 22%, transparent);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);padding:36px 32px 30px}
+.rlp-archetype .crown{position:absolute;top:-17px;left:50%;transform:translateX(-50%);box-shadow:0 0 0 6px #fff}
+.rlp-archetype .a-eyebrow{font-size:var(--fs-eyebrow);letter-spacing:.12em;text-transform:uppercase;color:var(--color-vita);font-weight:700;margin-top:6px}
 .rlp-archetype .a-lead{font-size:var(--fs-sm);color:var(--text-muted);margin-top:10px}
 .rlp-archetype .a-name{font-family:var(--font-serif);font-size:31px;font-weight:600;color:var(--ink);line-height:1.15;margin:4px 0 6px;letter-spacing:-.01em}
 .rlp-archetype .a-blend{font-family:var(--font-serif);font-style:italic;font-size:var(--fs-sm);color:var(--text-muted);margin:0 0 14px}

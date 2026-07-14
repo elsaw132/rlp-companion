@@ -47,7 +47,7 @@ You write ONLY the connective and characterising copy listed below. The person's
 
 Write these fields, all in the second person ("you"/"your"), warm, specific, plain, British English:
 
-- opener: one or two sentences framing this as getting to the person inside the picture. You may greet them by name. Do not summarise the stage or list what's coming.
+- opener: ONE sentence framing what follows — name in broad terms what they worked out across this stage (the strengths they will carry forward, the values they want to live by, and what matters most to them in this chapter) and lead into what they're about to see. Do NOT greet them and do NOT use their name: the system adds "That's the understanding done, [name]." in front of your sentence, so yours must read on naturally from that. End on an em dash. Do not list the cards or give away the findings.
 - strengthsProfile: ONE short line naming the SHAPE their signature strengths make together (for example, energy + people + steady judgement becomes "Energy and people, with a steady head underneath"). Recognition of who they are, never a ranking, never a score. Do not simply list the strengths.
 - strengthsCarry: one sentence on how those strengths carry into retirement, grounded in what they told you.
 - valuesProfile: ONE short line naming the shape their core values make together (closeness, openness, and so on). Recognition, not ranking.

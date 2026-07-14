@@ -12,10 +12,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import VitaMark from "./VitaMark";
-import BloomMotif from "./BloomMotif";
+import { stageColorFor } from "@/lib/stageColors";
 import type { RevealCard } from "@/lib/stage3Reveal";
-
-type ArcStage = { number: number; name: string; done: boolean };
 
 // Content-coded accent per washed card (fg = medallion + label, wash = top
 // fade). Cream cards (opener, thread, finale) don't appear here.
@@ -24,7 +22,6 @@ const ACCENT: Record<string, { fg: string; wash: string }> = {
   values: { fg: "var(--reveal-values-fg)", wash: "var(--reveal-values-wash)" },
   protect: { fg: "var(--reveal-protect-fg)", wash: "var(--reveal-protect-wash)" },
   clearEyed: { fg: "var(--reveal-clear-fg)", wash: "var(--reveal-clear-wash)" },
-  forward: { fg: "var(--reveal-forward-fg)", wash: "var(--reveal-forward-wash)" },
 };
 
 // The quiet provenance line on the content cards that carry one (spec §3).
@@ -88,12 +85,10 @@ function Motif({ kind, size = 23 }: { kind: string; size?: number }) {
 
 export default function UnderstandCards({
   cards,
-  arc,
   currentStage,
   returnHref,
 }: {
   cards: RevealCard[];
-  arc: ArcStage[];
   currentStage: number;
   returnHref: string;
 }) {
@@ -130,6 +125,22 @@ export default function UnderstandCards({
     <div className="rlp-ureveal">
       <style>{css}</style>
 
+      <div
+        className="band"
+        style={{ background: stageColorFor(currentStage) }}
+        aria-hidden="true"
+      />
+
+      {/* The reveal's framing — the same eyebrow + large serif title that opens
+          the Imagine and Explore reveals, before Vita starts speaking. It steps
+          aside on the final card, where the handover carries its own headline. */}
+      {!onLast && (
+        <header className="rhead">
+          <div className="r-eyebrow">The heart of your plan</div>
+          <h1 className="r-display">The person inside your picture</h1>
+        </header>
+      )}
+
       <h2 className="sr-only">
         A thread runs through a sequence of cards — the person inside your
         picture, your strengths, your values, the one thing running through it
@@ -153,10 +164,12 @@ export default function UnderstandCards({
 
       <div className="stage">
         {cards.map((card, i) => {
+          // Cream = Vita's own cards (the framing ones), including the handover.
           const cream =
             card.kind === "opener" ||
             card.kind === "thread" ||
-            card.kind === "finale";
+            card.kind === "finale" ||
+            card.kind === "forward";
           const accent = ACCENT[card.kind];
           return (
             <section
@@ -174,7 +187,7 @@ export default function UnderstandCards({
               }
               aria-hidden={i === cur ? undefined : true}
             >
-              <CardBody card={card} arc={arc} currentStage={currentStage} />
+              <CardBody card={card} />
               {PROVENANCE[card.kind] && (
                 <div className="src-wrap">
                   <button
@@ -222,7 +235,6 @@ export default function UnderstandCards({
       )}
 
       <div className="nav" style={{ visibility: onLast ? "hidden" : "visible" }}>
-        <span className="dot-hint">Tap to continue</span>
         <div className="arrows">
           <button
             type="button"
@@ -246,50 +258,18 @@ export default function UnderstandCards({
   );
 }
 
-function CardBody({
-  card,
-  arc,
-  currentStage,
-}: {
-  card: RevealCard;
-  arc: ArcStage[];
-  currentStage: number;
-}) {
+function CardBody({ card }: { card: RevealCard }) {
   switch (card.kind) {
     case "opener":
       return (
-        <>
+        <div className="body-mid">
           <div className="vita">
             <VitaMark size={34} />
-            <span className="vita-lbl">Vita · your retirement coach</span>
+            <span className="vita-lbl">Vita</span>
           </div>
-          <div className="stage-arc">
-            {arc.map((s, i) => (
-              <span key={s.number} className="arc-item">
-                {i > 0 && <span className="arc-line" aria-hidden="true" />}
-                <span
-                  className={`arc-name${
-                    s.number === currentStage
-                      ? " now"
-                      : s.done
-                        ? " done"
-                        : ""
-                  }`}
-                >
-                  {s.done && (
-                    <span className="arc-tick" aria-hidden="true">
-                      {"\u2713"}
-                    </span>
-                  )}
-                  {s.name}
-                </span>
-              </span>
-            ))}
-          </div>
-          <div className="body-mid">
-            <p className="lede h-md">{card.line}</p>
-          </div>
-        </>
+          <p className="lede h-md">{card.line}</p>
+          <p className="tap-more">Tap to reveal more</p>
+        </div>
       );
 
     case "strengths":
@@ -345,17 +325,15 @@ function CardBody({
 
     case "thread":
       return (
-        <>
+        <div className="body-mid">
           <div className="vita">
             <VitaMark size={34} />
             <span className="vita-lbl">Vita noticed</span>
           </div>
-          <div className="body-mid">
-            <p className="frame">One thing keeps surfacing underneath it all</p>
-            <p className="hero h-lg">{card.name}</p>
-            {card.trace && <p className="sub t-17">{card.trace}</p>}
-          </div>
-        </>
+          <p className="frame">One thing keeps surfacing underneath it all</p>
+          <p className="hero h-lg">{card.name}</p>
+          {card.trace && <p className="sub t-17">{card.trace}</p>}
+        </div>
       );
 
     case "protect":
@@ -400,35 +378,42 @@ function CardBody({
             ) : (
               <p className="hero h-lg">{card.meaning}</p>
             )}
-            <div className="scene">
-              <BloomMotif />
-            </div>
           </div>
         </>
       );
 
     case "forward":
       return (
-        <>
-          <div className="med">
-            <Motif kind="forward" />
-          </div>
-          <div className="eyebrow">The heart of your plan</div>
-          <div className="body-mid">
-            <p className="hero h-md">This is the heart of your Retirement Life Plan.</p>
-            <p className="frame">
-              Next, in <strong>Plan</strong>, we turn it into something you can
-              actually live.
-            </p>
-          </div>
-        </>
+        <div className="body-mid">
+          <div className="eyebrow">What&rsquo;s next</div>
+          <p className="hero h-lg">
+            This is the heart of your Retirement Life Plan.
+          </p>
+          <p className="sub t-17">
+            The strengths you will carry forward, the values you want to live
+            by, and what matters most to you in this chapter — this is the
+            ground everything else gets built on.
+          </p>
+          <p className="onward">
+            Next, in <strong>Plan</strong>, we turn it into something you can
+            actually live: when and how you step back from work, and the goals
+            worth moving toward.
+          </p>
+        </div>
       );
   }
 }
 
 const css = `
-.rlp-ureveal{position:relative;max-width:600px;width:100%;margin:0 auto;font-family:var(--font-sans);color:var(--text);background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--r-lg);overflow:hidden}
+.rlp-ureveal{position:relative;max-width:600px;width:100%;margin:0 auto;font-family:var(--font-sans);color:var(--text);background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-lg);box-shadow:var(--shadow-md);overflow:hidden}
 .rlp-ureveal *{box-sizing:border-box}
+.rlp-ureveal .band{height:28px;width:100%}
+
+/* reveal framing — mirrors StageReveal's eyebrow + display title */
+.rlp-ureveal .rhead{padding:30px 32px 4px;text-align:center}
+.rlp-ureveal .r-eyebrow{font-size:var(--fs-eyebrow);letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:600;margin-bottom:10px}
+.rlp-ureveal .r-display{font-family:var(--font-serif);font-size:var(--fs-display);font-weight:600;line-height:1.12;color:var(--ink);letter-spacing:-.01em;margin:0}
+@media(max-width:600px){.rlp-ureveal .rhead{padding:24px 22px 2px}.rlp-ureveal .r-display{font-size:28px}}
 .rlp-ureveal .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .rlp-ureveal a{text-decoration:none}
 
@@ -436,25 +421,26 @@ const css = `
 .rlp-ureveal .thread{display:flex;align-items:center;padding:16px 22px 6px}
 .rlp-ureveal .thread .node{flex:none;width:8px;height:8px;border-radius:50%;background:var(--info-line);transition:all .3s ease}
 .rlp-ureveal .thread .seg{flex:1;height:1.5px;background:var(--info-line);transition:background .3s ease}
-.rlp-ureveal .thread .node.done,.rlp-ureveal .thread .node.now{background:var(--brand-primary)}
-.rlp-ureveal .thread .seg.done{background:var(--brand-primary)}
-.rlp-ureveal .thread .node.now{box-shadow:0 0 0 4px rgba(1,50,129,.13)}
-.rlp-ureveal .thread .node.bloom.done{width:11px;height:11px;box-shadow:0 0 0 5px rgba(1,50,129,.10)}
+.rlp-ureveal .thread .node.done,.rlp-ureveal .thread .node.now{background:var(--ink)}
+.rlp-ureveal .thread .seg.done{background:var(--ink)}
+.rlp-ureveal .thread .node.now{box-shadow:0 0 0 4px color-mix(in srgb, var(--ink) 14%, transparent)}
+.rlp-ureveal .thread .node.bloom.done{width:11px;height:11px;box-shadow:0 0 0 5px color-mix(in srgb, var(--ink) 11%, transparent)}
 
 /* cards */
-.rlp-ureveal .stage{position:relative;min-height:548px}
-.rlp-ureveal .card{position:absolute;inset:0;padding:22px 24px 20px;display:none;flex-direction:column;opacity:0;transition:opacity .32s ease;background:var(--bg)}
+.rlp-ureveal .stage{position:relative;min-height:430px}
+.rlp-ureveal .card{position:absolute;inset:0;padding:26px 28px 22px;display:none;flex-direction:column;text-align:center;opacity:0;transition:opacity .32s ease;background:var(--bg)}
 .rlp-ureveal .card.on{display:flex;opacity:1}
-.rlp-ureveal .card.washed{background:linear-gradient(180deg,var(--accbg) 0%,var(--bg) 46%)}
+.rlp-ureveal .card.washed{background:linear-gradient(180deg,color-mix(in srgb, var(--accbg) 72%, var(--warm-surface)) 0%,var(--warm-surface) 40%)}
 .rlp-ureveal .card.cream{background:var(--warm-surface)}
 
-.rlp-ureveal .med{width:46px;height:46px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:var(--accbg);color:var(--acc)}
-.rlp-ureveal .vita{display:flex;align-items:center;gap:9px;margin-bottom:14px}
-.rlp-ureveal .vita-lbl{font-size:11.5px;color:var(--color-vita);font-weight:600}
+.rlp-ureveal .med{width:46px;height:46px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;background:var(--accbg);color:var(--acc)}
+.rlp-ureveal .vita{display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:14px}
+.rlp-ureveal .vita-lbl{font-family:var(--font-serif);font-size:16px;color:var(--color-vita);font-weight:600}
 
-.rlp-ureveal .eyebrow{font-size:var(--fs-eyebrow);font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin-bottom:10px}
-.rlp-ureveal .card.cream .eyebrow{color:var(--color-brand-primary)}
-.rlp-ureveal .profile-tag{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);margin-bottom:8px}
+/* Eyebrows match the shared reveal shell (muted, .12em) — the aspect colour is
+   carried by the medallion alone, so the cards don't read as a different system. */
+.rlp-ureveal .eyebrow{font-size:var(--fs-eyebrow);font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
+.rlp-ureveal .profile-tag{font-size:var(--fs-eyebrow);font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px}
 
 .rlp-ureveal .body-mid{flex:1;display:flex;flex-direction:column;justify-content:center}
 .rlp-ureveal .lede,.rlp-ureveal .hero,.rlp-ureveal .sub{font-family:var(--font-serif);margin:0}
@@ -462,40 +448,31 @@ const css = `
 .rlp-ureveal .hero{color:var(--ink);font-weight:600;line-height:1.28}
 .rlp-ureveal .sub{color:var(--text);line-height:1.5;margin-top:14px}
 .rlp-ureveal .frame{font-family:var(--font-sans);font-size:13.5px;color:var(--text-muted);line-height:1.55;margin:0 0 8px}
-.rlp-ureveal .h-xl{font-size:29px}.rlp-ureveal .h-lg{font-size:24px}.rlp-ureveal .h-md{font-size:21px}
+.rlp-ureveal .tap-more{font-family:var(--font-sans);font-size:13px;color:var(--text-muted);margin:16px 0 0}
+/* the handover line into Plan — set apart above the actions */
+.rlp-ureveal .onward{font-family:var(--font-sans);font-size:14.5px;line-height:1.6;color:var(--text);margin:18px auto 0;max-width:44ch;padding-top:16px;border-top:1px solid var(--warm-line)}
+.rlp-ureveal .onward strong{color:var(--ink);font-weight:600}
+.rlp-ureveal .h-xl{font-size:34px;letter-spacing:-.01em}.rlp-ureveal .h-lg{font-size:27px;letter-spacing:-.01em}.rlp-ureveal .h-md{font-size:22px}
 .rlp-ureveal .t-17{font-size:17px}.rlp-ureveal .t-19{font-size:19px}
 
-.rlp-ureveal .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.rlp-ureveal .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:14px}
 .rlp-ureveal .chips b{font-family:var(--font-serif);font-weight:500;font-size:14.5px;color:var(--text);background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--r-pill);padding:4px 12px}
 .rlp-ureveal .carry{font-family:var(--font-sans);margin-top:15px;padding-top:13px;border-top:1px solid var(--border);font-size:14px;color:var(--text);line-height:1.5}
-.rlp-ureveal .carry .k{font-weight:600;color:var(--acc)}
+.rlp-ureveal .carry .k{font-weight:600;color:var(--ink)}
 
 .rlp-ureveal .src-wrap{margin-top:auto;padding-top:14px}
 .rlp-ureveal .srcbtn{font-family:var(--font-sans);background:none;border:none;padding:0;color:var(--acc);font-weight:600;font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .rlp-ureveal .srctxt{font-size:12px;color:var(--text-muted);padding-top:8px;line-height:1.45;margin:0;max-width:42ch}
 
-/* opener stage arc */
-.rlp-ureveal .stage-arc{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-bottom:4px}
-.rlp-ureveal .arc-item{display:inline-flex;align-items:center;gap:5px}
-.rlp-ureveal .arc-line{width:12px;height:1px;background:var(--border-strong)}
-.rlp-ureveal .arc-name{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--text-faint);font-weight:500}
-.rlp-ureveal .arc-name.done{color:var(--ink)}
-.rlp-ureveal .arc-name.now{color:var(--brand-primary);font-weight:700}
-.rlp-ureveal .arc-tick{color:var(--success-text);font-size:11px}
-
-/* finale — the Chorus gradient + bloom (a fresh chapter ahead) */
-.rlp-ureveal .scene{margin-top:18px;border-radius:var(--r-md);overflow:hidden}
-
-/* actions on the forward card */
-.rlp-ureveal .actions{margin-top:16px}
-.rlp-ureveal .cta{width:100%;background:var(--brand-primary);color:var(--brand-on-primary);border:none;border-radius:var(--r-sm);min-height:48px;font-family:var(--font-sans);font-weight:600;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+/* actions on the forward card — same navy + ghost pair as the shared shell */
+.rlp-ureveal .actions{margin-top:18px;display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
+.rlp-ureveal .cta{background:var(--brand-primary);color:var(--brand-on-primary);border:none;border-radius:var(--r-sm);min-height:48px;padding:13px 22px;font-family:var(--font-sans);font-weight:600;font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px}
 .rlp-ureveal .cta:hover{background:var(--brand-primary-hover)}
-.rlp-ureveal .ghost{width:100%;margin-top:10px;background:transparent;color:var(--brand-primary);border:1.5px solid var(--border-strong);border-radius:var(--r-sm);min-height:46px;font-family:var(--font-sans);font-weight:600;font-size:14.5px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.rlp-ureveal .ghost{background:transparent;color:var(--brand-primary);border:1.5px solid var(--border-strong);border-radius:var(--r-sm);min-height:48px;padding:13px 22px;font-family:var(--font-sans);font-weight:600;font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
 .rlp-ureveal .ghost:hover{background:var(--brand-primary-tint)}
 
 /* nav */
-.rlp-ureveal .nav{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 22px 18px}
-.rlp-ureveal .dot-hint{font-size:12px;color:var(--text-muted)}
+.rlp-ureveal .nav{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 22px 18px}
 .rlp-ureveal .arrows{display:flex;gap:8px}
 .rlp-ureveal .arrows button{width:40px;height:40px;border-radius:var(--r-sm);border:1.5px solid var(--border-strong);background:var(--bg);color:var(--brand-primary);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1}
 .rlp-ureveal .arrows button:disabled{opacity:.35;cursor:default}

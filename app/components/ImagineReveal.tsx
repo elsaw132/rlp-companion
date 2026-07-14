@@ -20,6 +20,7 @@ import {
   type RevealSynthesis,
 } from "@/lib/stageReveal";
 import StageReveal from "./StageReveal";
+import { stageColorFor } from "@/lib/stageColors";
 import ArchetypeBlock from "./ArchetypeBlock";
 
 export default function ImagineReveal() {
@@ -134,6 +135,7 @@ export default function ImagineReveal() {
   return (
     <StageReveal
       arc={arc}
+      bandColor={stageColorFor(1)}
       eyebrow="Where your plan begins"
       title={retired ? "Your retirement, reviewed" : "Your retirement, imagined"}
       vitaIntro={vitaIntro}

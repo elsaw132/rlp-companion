@@ -12,14 +12,15 @@
 
 import Link from "next/link";
 import VitaMark from "./VitaMark";
-import BloomMotif from "./BloomMotif";
+import StageArc from "./StageArc";
 import type { RevealThread } from "@/lib/stageReveal";
 
 export type StageRevealProps = {
   // The five stages in order, each flagged done (real progress drives this).
   arc: { number: number; name: string; done: boolean }[];
-  // Decorative header illustration at the top of the card (Imagine = dawn).
-  motif?: React.ReactNode;
+  // The stage's own colour, shown as a thin band across the top of the card —
+  // the shared wayfinding cue every reveal carries (see stageColorFor).
+  bandColor: string;
   eyebrow: string;
   title: string;
   // The intro line beneath the Vita lockup (names the person).
@@ -40,7 +41,7 @@ export type StageRevealProps = {
 
 export default function StageReveal({
   arc,
-  motif,
+  bandColor,
   eyebrow,
   title,
   vitaIntro,
@@ -56,18 +57,16 @@ export default function StageReveal({
       <style>{css}</style>
 
       {/* Five-stage arc — one of five done, nothing more. */}
-      <div className="arc rise d1">
-        {arc.map((s, i) => (
-          <div key={s.number} className={`s ${s.done ? "done" : "todo"}`}>
-            <div className="d">{s.done ? "\u2713" : s.number}</div>
-            <div className="c">{s.name}</div>
-            {i < arc.length - 1 && <span className="line" aria-hidden="true" />}
-          </div>
-        ))}
+      <div className="rise d1">
+        <StageArc arc={arc} />
       </div>
 
       <section className="reveal">
-        {motif ?? <BloomMotif />}
+        <div
+          className="band"
+          style={{ background: bandColor }}
+          aria-hidden="true"
+        />
 
         <div className="body">
           <div className="eyebrow rise d2">{eyebrow}</div>
@@ -76,7 +75,6 @@ export default function StageReveal({
           <div className="vita rise d3">
             <VitaMark size={34} />
             <span className="name">Vita</span>
-            <span className="pill">Your retirement coach</span>
           </div>
 
           <p className="intro rise d3">{vitaIntro}</p>
@@ -117,19 +115,10 @@ const css = `
 .rlp-reveal{max-width:860px;margin:0 auto;padding:40px 24px 96px}
 .rlp-reveal a{text-decoration:none}
 
-/* slim stage arc */
-.rlp-reveal .arc{display:flex;align-items:flex-start;gap:0;margin:0 auto 28px;max-width:480px}
-.rlp-reveal .arc .s{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
-.rlp-reveal .arc .d{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;z-index:1}
-.rlp-reveal .arc .s.done .d{background:var(--brand-primary);color:#fff}
-.rlp-reveal .arc .s.todo .d{background:var(--border);color:var(--text-faint)}
-.rlp-reveal .arc .c{font-size:var(--fs-eyebrow);font-weight:600;color:var(--text-muted);text-align:center}
-.rlp-reveal .arc .s.done .c{color:var(--ink)}
-.rlp-reveal .arc .s .line{position:absolute;top:13px;left:50%;width:100%;height:2px;background:var(--border)}
-.rlp-reveal .arc .s.done .line{background:var(--brand-primary)}
-
-/* reveal card (cream = the coach is present) */
+/* reveal card (cream = the coach is present) with a thin stage-colour band across
+   the top — the shared header cue in place of the old bloom hero. */
 .rlp-reveal .reveal{background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-lg);box-shadow:var(--shadow-md);overflow:hidden}
+.rlp-reveal .band{height:28px;width:100%}
 .rlp-reveal .body{padding:44px 56px 40px}
 
 .rlp-reveal .eyebrow{font-size:var(--fs-eyebrow);letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:600;text-align:center;margin-bottom:10px}
@@ -138,7 +127,6 @@ const css = `
 /* Vita lockup */
 .rlp-reveal .vita{display:flex;align-items:center;justify-content:center;gap:10px;margin:22px 0 18px}
 .rlp-reveal .vita .name{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--color-vita)}
-.rlp-reveal .vita .pill{font-size:var(--fs-label);font-weight:600;color:#fff;background:var(--color-vita);border-radius:var(--r-pill);padding:4px 11px}
 
 .rlp-reveal .intro{font-family:var(--font-serif);font-size:var(--fs-h2);line-height:1.5;color:var(--text);text-align:center;max-width:54ch;margin:0 auto 34px}
 
