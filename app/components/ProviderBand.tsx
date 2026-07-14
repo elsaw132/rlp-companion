@@ -66,7 +66,7 @@ export default function ProviderBand() {
           used — the white variant is reserved for dark surfaces. Never redraw it. */}
       <Link href="/home" className="brand" aria-label={`${PROVIDER_NAME} — back to dashboard`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="logo" src="/chorus-life-logo.svg" alt={PROVIDER_NAME} width={76} height={24} />
+        <img className="logo" src="/chorus-life-logo.svg" alt={PROVIDER_NAME} width={95} height={30} />
         <span className="brand-divider" aria-hidden="true" />
         <span className="descriptor">Your retirement coach</span>
       </Link>
@@ -148,7 +148,7 @@ const bandCss = `
 @media (max-width:880px){.rlp-band{display:none}}
 .rlp-band .brand{display:flex;align-items:center;gap:14px;text-decoration:none;border-radius:var(--r-sm)}
 .rlp-band .brand:focus-visible{outline:none;box-shadow:var(--focus-ring-accent)}
-.rlp-band .logo{height:24px;width:auto;display:block}
+.rlp-band .logo{height:30px;width:auto;display:block}
 .rlp-band .brand-divider{width:1px;height:24px;background:var(--border-strong);flex:none}
 .rlp-band .descriptor{font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--ink);letter-spacing:.01em;line-height:1.2}
 .rlp-band .right{display:flex;align-items:center;gap:20px}

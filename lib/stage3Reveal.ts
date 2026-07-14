@@ -76,7 +76,7 @@ export type RevealCard =
 // fallback never asserts material it can't ground in a real confirmation.
 export const FALLBACK_STAGE3_SYNTHESIS: Stage3Synthesis = {
   opener:
-    "Here's the person who's been taking shape across this stage — drawn from what you confirmed, one piece at a time.",
+    "You named the strengths you will carry forward, the values you want to live by, and what matters most to you in this chapter — here's the person that came through.",
   strengthsProfile: "The strengths you recognised as most yours.",
   strengthsCarry: "These are the things you'll lean on in the years ahead.",
   strengthsChips: [],

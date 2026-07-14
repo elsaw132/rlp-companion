@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { STAGES, type BuildResult } from "@/lib/modules";
 import { useUserData } from "@/lib/userData";
+import StageArc from "./StageArc";
 import {
   FALLBACK_STAGE3_SYNTHESIS,
   isFallbackStage3Synthesis,
@@ -44,10 +45,16 @@ export default function UnderstandReveal() {
   // Once the data layer is ready: show the saved reveal, or generate one. Run in
   // render (guarded by `loaded`) so the first paint already reflects the right
   // state — the same pattern the other reveals use.
+  // /stage/3?regen=1 forces a fresh generation (overwriting the saved one) — the
+  // reveal is deliberately cached to stay stable on revisit, so this is the way to
+  // pick up prompt/copy changes without touching the database.
   if (user && !userData.loading && !loaded) {
     setLoaded(true);
+    const forceRegen =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("regen") === "1";
     const saved = userData.getStage3Reveal();
-    if (saved && !isFallbackStage3Synthesis(saved.synthesis)) {
+    if (!forceRegen && saved && !isFallbackStage3Synthesis(saved.synthesis)) {
       setSynthesis(saved.synthesis);
     } else {
       void generate();
@@ -181,7 +188,20 @@ export default function UnderstandReveal() {
   const mat = gatherMaterial();
   const name = userData.getDisplayName(user);
   const s = synthesis;
-  const cards: RevealCard[] = [{ kind: "opener", name, line: s.opener }];
+  // The opener mirrors Imagine's: the system marks the stage done and names the
+  // person, then Vita's generated sentence frames what follows. Keeping the
+  // greeting deterministic means every reveal opens the same way.
+  // Syntheses saved before the prompt stopped greeting still begin "Hello <name>."
+  // — strip any leading greeting so those don't read "…done, Elsa. Hello Elsa."
+  const nameBit = name ? `, ${name}` : "";
+  const framing = s.opener.replace(/^\s*(hello|hi|hey)\b[^.!?]*[.!?]\s*/i, "");
+  const cards: RevealCard[] = [
+    {
+      kind: "opener",
+      name,
+      line: `That's the understanding done${nameBit}. ${framing}`,
+    },
+  ];
 
   if (s.strengthsChips.length > 0 || s.strengthsProfile) {
     cards.push({
@@ -209,7 +229,16 @@ export default function UnderstandReveal() {
   if (mat.hadLiveFears && s.clearEyed.trim()) {
     cards.push({ kind: "clearEyed", line: s.clearEyed });
   }
-  cards.push({ kind: "finale", chapterTitle: s.chapterTitle, meaning: s.meaning });
+  // The finale drops out like every other card when its material is thin — the
+  // prompt returns "" for both chapterTitle and meaning when the person wrote
+  // nothing usable, which would otherwise render an empty card.
+  if (s.chapterTitle.trim() || s.meaning.trim()) {
+    cards.push({
+      kind: "finale",
+      chapterTitle: s.chapterTitle,
+      meaning: s.meaning,
+    });
+  }
   cards.push({ kind: "forward", primaryHref: "/home" });
 
   const completedIds = new Set(userData.getCompletedIds());
@@ -224,18 +253,14 @@ export default function UnderstandReveal() {
   return (
     <main className="rlp-ureveal-page">
       <style>{pageCss}</style>
-      <UnderstandCards
-        cards={cards}
-        arc={arc}
-        currentStage={3}
-        returnHref="/home"
-      />
+      <StageArc arc={arc} />
+      <UnderstandCards cards={cards} currentStage={3} returnHref="/home" />
     </main>
   );
 }
 
 const pageCss = `
-.rlp-ureveal-page{max-width:var(--content-max);width:100%;margin:0 auto;padding:32px 16px 56px;display:flex;justify-content:center}
+.rlp-ureveal-page{max-width:var(--content-max);width:100%;margin:0 auto;padding:32px 16px 56px;display:flex;flex-direction:column;align-items:center}
 `;
 
 const loadingCss = `

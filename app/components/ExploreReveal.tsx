@@ -23,6 +23,7 @@ import {
 import { buildStatContext, selectStats } from "@/lib/stage2Selection";
 import type { Stage2Area } from "@/lib/stage2Stats";
 import StageReveal from "./StageReveal";
+import { stageColorFor } from "@/lib/stageColors";
 import ExploreWheel from "./ExploreWheel";
 
 export default function ExploreReveal() {
@@ -211,6 +212,7 @@ export default function ExploreReveal() {
   return (
     <StageReveal
       arc={arc}
+      bandColor={stageColorFor(2)}
       eyebrow="Exploring done"
       title="A fuller picture of your retirement"
       vitaIntro={synthesis.intro}
