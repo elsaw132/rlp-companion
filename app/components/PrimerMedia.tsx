@@ -25,6 +25,30 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// A primer's reading passage, as the writer laid it out.
+//
+// The copy carries its own shape and both kinds of break matter, so neither is
+// thrown away: a blank line starts a new paragraph, and a single line break
+// inside one is kept, because some passages are written as short stacked lines
+// rather than prose. Rendering the raw string into one <p> silently loses the
+// lot — HTML collapses every run of whitespace to a single space — which reads
+// as one dense slab no matter how carefully the copy was set out.
+export function PrimerText({ value }: { value: string }) {
+  const paragraphs = value
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return (
+    <div style={styles.textBlock}>
+      {paragraphs.map((p, i) => (
+        <p key={i} style={styles.reading}>
+          {p}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 // A single hero image. Sized by its own proportions rather than forced into a
 // fixed crop: the real assets run from panoramic (1-roles, 1.90) to portrait
 // (1-week-01, 0.77), so a fixed aspect would badly cut some of them. Capping
@@ -330,6 +354,28 @@ export const primerMediaCss = `
 `;
 
 const styles: Record<string, React.CSSProperties> = {
+  // Paragraphs sit closer together than the primer's blocks do, so a passage
+  // reads as one piece of writing rather than as separate blocks.
+  textBlock: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
+  },
+  // Serif, and larger than functional body copy: this is the writing the
+  // session wants the reader to sit with, which is the system's own test for
+  // serif. The measure is capped because the 720px column runs a line to ~85
+  // characters, far enough for the eye to lose its place on the way back.
+  // pre-line keeps the single breaks inside a paragraph; the blank lines have
+  // already become separate paragraphs by the time we get here.
+  reading: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-reading)",
+    lineHeight: "var(--lh-body)",
+    color: "var(--text)",
+    margin: 0,
+    maxWidth: "var(--reading-measure)",
+    whiteSpace: "pre-line",
+  },
   imageWrap: {
     display: "flex",
     justifyContent: "center",

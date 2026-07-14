@@ -1467,13 +1467,13 @@ WATCH FOR
         durationMin: 15,
         closeInOneStep: true,
         primer: [
-          { type: "image", src: "/primers/1-money.jpg" },
           {
             type: "text",
             value: `If every bill was paid for the rest of your life, what would you do tomorrow morning?
 
 For the next few minutes, forget what's practical. Nothing has to be sensible. Simply notice what your imagination reaches for first.`,
           },
+          { type: "image", src: "/primers/1-money.jpg" },
         ],
         coachOpening: `Oh, now THIS is a good list — so this is what you'd do if money were no object! How fun does that sound. If you could only afford three of these dreams, which three would you pick?`,
         interaction: {
@@ -1539,7 +1539,6 @@ WATCH FOR
           "Beyond what you'll do — who you want to be. The roles that give your retirement shape and meaning.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/1-roles.jpg" },
           {
             type: "text",
             value: `Have you ever noticed how easily roles find us?
@@ -1550,6 +1549,7 @@ The interesting thing is that roles aren't fixed. Some we carry forward because 
 
 Which roles still feel like you and which new ones are quietly waiting for an invitation?`,
           },
+          { type: "image", src: "/primers/1-roles.jpg" },
         ],
         coachOpening: `Here are the roles you've picked out. Let's start with one that feels most alive to you right now — what draws you to it?`,
         interaction: {
@@ -1629,6 +1629,12 @@ WATCH FOR
         durationMin: 15,
         primer: [
           {
+            type: "text",
+            value: `As you look through these moments, you'll probably find yourself drawn to some and not others. An ideal week isn't about fitting everything in. It's about discovering the mix that feels most like you.
+
+As you explore the next conversation, notice which ingredients you'd like to include in your recipe for an ideal week.`,
+          },
+          {
             type: "image-slideshow",
             images: [
               { src: "/primers/1-week-01.jpg" },
@@ -1644,12 +1650,6 @@ WATCH FOR
               { src: "/primers/1-week-11.jpg" },
               { src: "/primers/1-week-12.jpg" },
             ],
-          },
-          {
-            type: "text",
-            value: `As you look through these moments, you'll probably find yourself drawn to some and not others. An ideal week isn't about fitting everything in. It's about discovering the mix that feels most like you.
-
-As you explore the next conversation, notice which ingredients you'd like to include in your recipe for an ideal week.`,
           },
         ],
         coachOpening: `Here's the balance you've set for your ideal week. Which of these did you feel most strongly about?`,
@@ -1702,7 +1702,6 @@ WATCH FOR
           "A short letter to someone in your life, written from a good way into your retirement — catching them up on how it all looks now.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/1-letter.jpg" },
           {
             type: "text",
             value: `Imagine yourself a good way into retirement - settled, comfortable and living a life you're truly happy with.
@@ -1713,6 +1712,7 @@ Before you begin, choose a person to write this letter to. Someone who would gen
 
 If it helps you settle into the moment, you might enjoy listening to Carole King's 'Tapestry' while you write.`,
           },
+          { type: "image", src: "/primers/1-letter.jpg" },
           {
             type: "audio",
             src: "/primers/1-5-tapestry.mp3",
@@ -1758,13 +1758,13 @@ If it helps you settle into the moment, you might enjoy listening to Carole King
           "The movement woven through your week — what keeps you up and about, and the part you'd like it to play.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/2-1.jpg" },
           {
             type: "text",
             value: `The healthiest lives aren't always built around 'formal' exercise. They're often built around movement that people genuinely look forward to.
 
 What kinds of movement could you imagine happily returning to, week after week?`,
           },
+          { type: "image", src: "/primers/2-1.jpg" },
         ],
         coachOpening: `Here's what you'd like your active life to look like. Let's start with the one you're most drawn to — what is it about that one that appeals to you?`,
         interaction: {
@@ -1985,7 +1985,6 @@ WATCH FOR
           "The relationships and connections that support and enrich your retirement — who matters most, and the social world you'd like around you.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/2-3.jpg" },
           {
             type: "text",
             value: `The people who enrich our lives aren't always the people we see most often. They're the ones who help us laugh, think, feel understood or simply remind us who we are.
@@ -1994,6 +1993,7 @@ Retirement can change our routines, but it also creates space to strengthen old 
 
 As you begin this next conversation, ask yourself: who do I hope will be part of my life in the years ahead?`,
           },
+          { type: "image", src: "/primers/2-3.jpg" },
           {
             type: "links",
             links: [
@@ -2121,15 +2121,6 @@ WATCH FOR
         durationMin: 15,
         primer: [
           {
-            type: "image-slideshow",
-            images: [
-              { src: "/primers/2-4-01.jpg" },
-              { src: "/primers/2-4-02.jpg" },
-              { src: "/primers/2-4-03.jpg" },
-              { src: "/primers/2-4-04.jpg" },
-            ],
-          },
-          {
             type: "text",
             value: `Some people think retirement is about having enough to do.
 
@@ -2138,6 +2129,15 @@ It may be more important to have somewhere, or someone, where you still feel you
 That doesn't have to mean changing the world. It might be sharing what you know, helping someone else flourish, making something with your hands, caring for a place, or simply being someone people are glad to see.
 
 Purpose isn't measured by the size of your contribution. It's measured by whether your life still feels connected to something beyond yourself.`,
+          },
+          {
+            type: "image-slideshow",
+            images: [
+              { src: "/primers/2-4-01.jpg" },
+              { src: "/primers/2-4-02.jpg" },
+              { src: "/primers/2-4-03.jpg" },
+              { src: "/primers/2-4-04.jpg" },
+            ],
           },
         ],
         coachOpening: `Here are the things that give you a sense of purpose. Let's start with the one that feels most meaningful — what is it about that one that matters to you?`,
@@ -2207,7 +2207,6 @@ WATCH FOR
           "The vitality everything else rests on — what lifts you, what drains you, and the levers worth building on.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/2-5.jpg" },
           {
             type: "text",
             value: `Most of us notice when our energy is low.
@@ -2218,6 +2217,7 @@ Vitality, feeling well, having pep in your step isn't about finding one magic an
 
 As you begin this conversation, you are invited to become curious about your own energy and the foundations of having vitality in life.`,
           },
+          { type: "image", src: "/primers/2-5.jpg" },
         ],
         coachOpening: `Here's what lifts your energy and what drains it. Let's start with what you said energises you — which of those makes the biggest difference to a good day?`,
         interaction: {
@@ -2399,7 +2399,6 @@ WATCH FOR
           "Just two senses — sight and hearing. They shape how you take in everything around you, and they're easy to look after with a couple of small, regular habits.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/2-6.jpg" },
           {
             type: "text",
             value: `Some of life's best moments arrive through your eyes and ears.
@@ -2412,6 +2411,7 @@ The simplest habit is just keeping a check on the basics. A routine eye test eve
 
 So this isn't about preparing for things to go wrong. It's some of the easiest, highest-return upkeep there is. Let's see where you are with the basics, in this conversation.`,
           },
+          { type: "image", src: "/primers/2-6.jpg" },
         ],
         coachOpening: `Thanks for marking those two down — quick to answer, and a useful place to round off Explore. Let's take a look at where you've landed.`,
         interaction: {
@@ -2475,7 +2475,6 @@ So this isn't about preparing for things to go wrong. It's some of the easiest, 
           "The things you're naturally good at and energised by — drawn from your own picture, for you to confirm and make your own.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/3-1.jpg" },
           {
             type: "text",
             value: `We often notice our weaknesses because they ask for our attention. Our strengths can be much quieter.
@@ -2486,6 +2485,7 @@ Sometimes our greatest strengths are the ones we assume everyone else has too.
 
 This conversation is about recognising the qualities that have quietly shaped your life and how they might continue to shape what comes next.`,
           },
+          { type: "image", src: "/primers/3-1.jpg" },
         ],
         coachOpening: `Here are the strengths you kept — and the few you marked as most you. Let's take one of those: where do you picture it actually living in the retirement you've been designing?`,
         interaction: {
@@ -2657,7 +2657,6 @@ WATCH FOR
           "What would quietly get in the way of living each of your values — and what you'd protect to keep it.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/3-4.jpg" },
           {
             type: "text",
             value: `We rarely discover our values by thinking about them.
@@ -2668,6 +2667,7 @@ The challenge is that values don't usually disappear overnight. They quietly get
 
 This conversation explores what might be getting in the way of living your most important values, and how you can make a little more room for them again.`,
           },
+          { type: "image", src: "/primers/3-4.jpg" },
         ],
         coachOpening: `Here's each of your values with what's most likely to get in the way of living it. Let's take the first — does that threat ring true, or is there a more real one?`,
         interaction: {
@@ -2710,7 +2710,6 @@ WATCH FOR
           "The quieter half of the picture — what you're hoping for, and what worries you, as you move into retirement and beyond.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/3-5.jpg" },
           {
             type: "text",
             value: `Retirement brings freedom from work.
@@ -2719,6 +2718,7 @@ It also brings questions. Some are exciting. Some may be uncomfortable; both des
 
 This conversation isn't about becoming fearless. It's about understanding what your hopes and your worries might be trying to protect.`,
           },
+          { type: "image", src: "/primers/3-5.jpg" },
         ],
         coachOpening: `Some of these you set aside, and a few you kept. Let's stay with the ones that landed. Take the one that sits heaviest — what's the worry underneath it for you?`,
         interaction: {
@@ -2770,7 +2770,6 @@ WATCH FOR
           "A short, honest piece of writing about how you'd want to have lived these years — and the lines you'd want them to stand for.",
         durationMin: 20,
         primer: [
-          { type: "image", src: "/primers/3-6.jpg" },
           {
             type: "text",
             value: `You've spent time noticing what matters to you.
@@ -2779,6 +2778,7 @@ Your strengths. Your values. Your hopes.
 
 Now it's time to bring them together. You're about to become the author of one of the most interesting chapters of your story.`,
           },
+          { type: "image", src: "/primers/3-6.jpg" },
         ],
         coachOpening: `Thank you for writing that. There's a lot in what you wrote — let's take one part of it. What is it about that one that made you want to put it down?`,
         interaction: {
@@ -2831,13 +2831,13 @@ WATCH FOR
         // here; unchanged for everyone else and with the flag off.
         hideFrom: ["recently_retired", "established"],
         primer: [
-          { type: "self-hosted-video", src: "/primers/4-1.mp4" },
           {
             type: "text",
             value: `Few people wake up one morning knowing exactly when they want to retire. For many, the decision creeps closer until something finally tips the balance.
 
 This conversation invites you to pause before that moment arrives, and think not only when you'd like to leave work, but how you'd like that transition to feel.`,
           },
+          { type: "self-hosted-video", src: "/primers/4-1.mp4" },
         ],
         coachOpening: `Here's the readiness snapshot you've just built. Before we look at where it feels strong and where it feels shaky, tell me — when you picture leaving work, does it feel like a single event, or more of a gradual process?`,
         interaction: {
@@ -2932,7 +2932,6 @@ Mirror back, in their words: the window or timing they're picturing (however wid
           "Retirement isn't one long stretch — it unfolds in chapters. A map of how your priorities might shift over the years, and what you'd want to keep throughout.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/4-2.jpg" },
           {
             type: "text",
             value: `Few of us stay the same for a long time.
@@ -2941,6 +2940,7 @@ The things we enjoy, the people we spend time with and the way we use our days n
 
 Retirement is no different. This conversation invites you to think in chapters as your life continues to unfold.`,
           },
+          { type: "image", src: "/primers/4-2.jpg" },
         ],
         coachOpening: `Here's the board you've laid out — your retirement sketched as chapters rather than one long stretch. Let's start at the beginning: in those early years, while you've got the most energy and freedom, what matters most to you to do?`,
         interaction: {
@@ -3004,11 +3004,11 @@ Reflect back the broad shape of the chapters they've sketched, in their own word
           "The handful of goals whose absence would leave retirement feeling incomplete — ranked, with what each one means to you.",
         durationMin: 20,
         primer: [
-          { type: "image", src: "/primers/4-3.jpg" },
           {
             type: "text",
             value: `You may have more ideas for your retirement than you'll ever have time for, which is a great problem to have! This conversation isn't about squeezing everything in - it's to help you decide what deserves your time, your energy and your attention in the years ahead.`,
           },
+          { type: "image", src: "/primers/4-3.jpg" },
         ],
         coachOpening: `Here's your retirement laid across the five areas of a balanced life — Restore, Move, Think, Connect, Contribute — with the goals you've kept and the few you've put in the spotlight. We can leave them just as they are. If you'd like to make any bolder, or talk one through, I'm right here.`,
         interaction: {
@@ -3105,7 +3105,6 @@ A short, warm sign-off — one or two sentences. Note that these goals are now t
           "The route to each goal you spotlighted — a few stepping stones from where you are now to there, with much of the way already behind you.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/4-4.jpg" },
           {
             type: "text",
             value: `A goal can feel daunting.
@@ -3114,6 +3113,7 @@ It's often easier once you know where to begin.
 
 This conversation helps you turn your goals into the next few achievable steps.`,
           },
+          { type: "image", src: "/primers/4-4.jpg" },
         ],
         coachOpening: `Here's a path for each goal you spotlighted — a few stepping stones from where you are now to there. A good part of several of them is already behind you, which is worth noticing. Nudge any stone into shape, mark the ones you've passed, and if you'd like to talk one path through I'm right here.`,
         interaction: {
@@ -3173,13 +3173,13 @@ A short, warm sign-off — one or two sentences. Note that these paths now sit i
           "The trade-offs retirement really asks of you — what you'd protect, where you'll flex, and a few principles for the close calls.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/4-5.jpg" },
           {
             type: "text",
             value: `Some of the hardest choices aren't between something good and something bad. They're between two things we'd like to keep.
 
 Time, energy, attention and money all have limits. This conversation helps you think about what happens when two important priorities compete for the same space.`,
           },
+          { type: "image", src: "/primers/4-5.jpg" },
         ],
         coachOpening: `Here are the trade-offs you've just weighed. Before we draw out a few principles from them, tell me — looking back over these, which one was hardest to call?`,
         interaction: {
@@ -3243,7 +3243,6 @@ A short, warm sign-off — one or two sentences. Note that their non-negotiables
           "The character of an ordinary week — how much structure you want, the real activities that recur, and the few anchors that give it rhythm.",
         durationMin: 15,
         primer: [
-          { type: "image", src: "/primers/4-6.jpg" },
           {
             type: "text",
             value: `An enjoyable retirement isn't built from occasional highlights. It's built from weeks you look forward to living.
@@ -3252,6 +3251,7 @@ This next conversation helps you shape a week that feels realistic, rewarding an
 
 Let's see what that week might look like.`,
           },
+          { type: "image", src: "/primers/4-6.jpg" },
         ],
         coachOpening: `Here's the rhythm of your week, built from the real things you've talked about. Looking at it like this — the overall feel, the few anchors, what gives you energy — does it feel like a week you could live happily for years?`,
         interaction: {
@@ -3315,13 +3315,13 @@ A short, warm sign-off — one or two sentences. Note that the rhythm they've sh
           "Everything you've built, drawn together into a specific, sequenced picture of your first year of retirement — and how it fits around any ongoing work.",
         durationMin: 20,
         primer: [
-          { type: "image", src: "/primers/4-7.jpg" },
           {
             type: "text",
             value: `You've explored ideas, made choices and built a plan that reflects what's important to you.
 
 Now it's time to see what it looks like when it becomes your first year of retirement.`,
           },
+          { type: "image", src: "/primers/4-7.jpg" },
         ],
         coachOpening: `Here's your first year, laid out as one journey — and a short story of how it could unfold. Tell me how you'd like it to feel and I'll reshape it, or nudge anything yourself.`,
         interaction: {
@@ -3639,7 +3639,6 @@ export function retiredLetter(): {
 } {
   return {
     primer: [
-      { type: "image", src: "/primers/1-letter.jpg" },
       {
         type: "text",
         value: `You're living the retirement you once wondered about. Not a future to imagine any more — the real thing, with its own texture.
@@ -3650,6 +3649,7 @@ Or you might write to the version of you from just before you retired — the on
 
 If it helps you settle in, you might enjoy listening to Carole King's 'Tapestry' while you write.`,
       },
+      { type: "image", src: "/primers/1-letter.jpg" },
       {
         type: "audio",
         src: "/primers/1-5-tapestry.mp3",

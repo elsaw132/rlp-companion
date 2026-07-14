@@ -1,13 +1,14 @@
 "use client";
 
-// TEMPORARY PREVIEW PAGE — the primer media blocks (image, slideshow, audio,
-// self-hosted video, link) rendered against the real assets in public/primers/,
-// so they can be checked without walking a seeded account into a session. These
-// are the real components SessionContainer uses, on the same warm content card,
-// so this reflects what a primer actually looks like. Nothing is saved.
+// TEMPORARY PREVIEW PAGE — the primer blocks rendered against the real assets
+// in public/primers/, so they can be checked without walking a seeded account
+// into a session. These are the real components SessionContainer uses, on the
+// same warm content card, with the real copy — so this reflects what a primer
+// actually looks like. Nothing is saved.
 //
-// The last panel points at a filename that doesn't exist, on purpose: it's the
-// graceful-degradation case, and it should render as a calm gap, never a crash.
+// Two things it exists to prove, beyond "does it render":
+//   - paragraph shape survives (blank lines separate, single breaks are kept)
+//   - a missing asset degrades to a calm gap, never a crash
 //
 // Safe to delete once the primer content has landed and been reviewed.
 
@@ -15,18 +16,17 @@ import {
   PrimerAudio,
   PrimerImage,
   PrimerSlideshow,
+  PrimerText,
   PrimerVideo,
   primerMediaCss,
 } from "../../components/PrimerMedia";
 
 const weekSlides = Array.from({ length: 12 }, (_, i) => ({
   src: `/primers/1-week-${String(i + 1).padStart(2, "0")}.jpg`,
-  alt: `An ordinary moment in a week, ${i + 1} of 12`,
 }));
 
 const purposeSlides = Array.from({ length: 4 }, (_, i) => ({
   src: `/primers/2-4-0${i + 1}.jpg`,
-  alt: `A way of mattering to someone, ${i + 1} of 4`,
 }));
 
 function Panel({ label, children }: { label: string; children: React.ReactNode }) {
@@ -61,17 +61,6 @@ function Panel({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-// Mirrors SessionContainer's bodyText so this page stays a truthful preview of
-// what a primer actually looks like.
-const body: React.CSSProperties = {
-  fontFamily: "var(--font-serif)",
-  fontSize: "var(--fs-reading)",
-  lineHeight: "var(--lh-body)",
-  color: "var(--text)",
-  margin: 0,
-  maxWidth: "var(--reading-measure)",
-};
-
 export default function PrimerMediaPreview() {
   return (
     <div
@@ -86,49 +75,70 @@ export default function PrimerMediaPreview() {
     >
       <style>{primerMediaCss}</style>
 
-      <Panel label="Image → text">
-        <PrimerImage src="/primers/1-money.jpg" alt="" />
-        <p style={body}>
-          If every bill was paid for the rest of your life, what would you do
-          tomorrow morning?
-        </p>
+      <Panel label="Text → image · 1.money (four paragraphs of shape)">
+        <PrimerText
+          value={`If every bill was paid for the rest of your life, what would you do tomorrow morning?
+
+For the next few minutes, forget what's practical. Nothing has to be sensible. Simply notice what your imagination reaches for first.`}
+        />
+        <PrimerImage src="/primers/1-money.jpg" />
       </Panel>
 
-      <Panel label="Image → text · panoramic asset (1-roles, 1.90)">
-        <PrimerImage src="/primers/1-roles.jpg" alt="" />
-        <p style={body}>The widest asset in the set — checking it doesn’t blow out.</p>
+      <Panel label="Text → video · 1.day (single line breaks, not paragraphs)">
+        <PrimerText
+          value={`Before you begin planning, it helps to imagine what life might feel like when work is no longer setting the rhythm.
+Not the whole picture - just one ordinary day.
+Take a little time to watch the video below:`}
+        />
+        <PrimerVideo src="/primers/4-1.mp4" />
       </Panel>
 
-      <Panel label="Slideshow → text · 12 slides, mixed portrait and landscape">
+      <Panel label="Text → image · panoramic asset (1-roles, 1.90)">
+        <PrimerText
+          value={`Have you ever noticed how easily roles find us?
+
+Some arrive with ceremony. Others appear so gradually that we hardly notice we've taken them on. We become the organiser, the helper, the listener, the mender, the coach, the volunteer.
+
+The interesting thing is that roles aren't fixed. Some we carry forward because they still bring us energy and purpose. Others we can gently lay down.
+
+Which roles still feel like you and which new ones are quietly waiting for an invitation?`}
+        />
+        <PrimerImage src="/primers/1-roles.jpg" />
+      </Panel>
+
+      <Panel label="Text → slideshow · 12 slides, mixed portrait and landscape">
+        <PrimerText
+          value={`As you look through these moments, you'll probably find yourself drawn to some and not others. An ideal week isn't about fitting everything in. It's about discovering the mix that feels most like you.`}
+        />
         <PrimerSlideshow images={weekSlides} />
-        <p style={body}>
-          An ideal week isn’t about fitting everything in. It’s about
-          discovering the mix that feels most like you.
-        </p>
       </Panel>
 
-      <Panel label="Slideshow · 4 slides">
+      <Panel label="Text → slideshow · 4 slides">
+        <PrimerText
+          value={`Some people think retirement is about having enough to do.
+
+It may be more important to have somewhere, or someone, where you still feel you matter.`}
+        />
         <PrimerSlideshow images={purposeSlides} />
       </Panel>
 
-      <Panel label="Image → text → audio">
-        <PrimerImage src="/primers/1-letter.jpg" alt="" />
-        <p style={body}>
-          If it helps you settle into the moment, you might enjoy listening to
-          Carole King’s ‘Tapestry’ while you write.
-        </p>
+      <Panel label="Text → image → audio · 1.letter">
+        <PrimerText
+          value={`Imagine yourself a good way into retirement - settled, comfortable and living a life you're truly happy with.
+
+Before you begin, choose a person to write this letter to. Someone who would genuinely want to know how life has turned out for you.
+
+If it helps you settle into the moment, you might enjoy listening to Carole King's 'Tapestry' while you write.`}
+        />
+        <PrimerImage src="/primers/1-letter.jpg" />
         <PrimerAudio src="/primers/1-5-tapestry.mp3" title="Tapestry · Carole King" />
       </Panel>
 
-      <Panel label="Self-hosted video → text">
-        <PrimerVideo src="/primers/4-1.mp4" />
-        <p style={body}>
-          Few people wake up one morning knowing exactly when they want to
-          retire.
-        </p>
-      </Panel>
-
-      <Panel label="Link affordance (the existing 'links' block)">
+      <Panel label="Text → image → link · 2.3">
+        <PrimerText
+          value={`The people who enrich our lives aren't always the people we see most often. They're the ones who help us laugh, think, feel understood or simply remind us who we are.`}
+        />
+        <PrimerImage src="/primers/2-3.jpg" />
         <a
           href="/primers/2-3-nyt.pdf"
           target="_blank"
@@ -157,13 +167,12 @@ export default function PrimerMediaPreview() {
       </Panel>
 
       <Panel label="Missing assets — must degrade, not crash">
-        <PrimerImage src="/primers/does-not-exist.jpg" alt="" />
+        <PrimerText
+          value={`The text still renders. The image below removes itself; the audio and video say so quietly.`}
+        />
+        <PrimerImage src="/primers/does-not-exist.jpg" />
         <PrimerAudio src="/primers/does-not-exist.mp3" title="Missing audio" />
         <PrimerVideo src="/primers/does-not-exist.mp4" />
-        <p style={body}>
-          The text still renders. The image above removed itself; the audio and
-          video say so quietly.
-        </p>
       </Panel>
     </div>
   );
