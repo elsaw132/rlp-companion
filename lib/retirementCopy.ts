@@ -63,24 +63,8 @@ export const RULES: Rule[] = [
   },
 
   // ---- 2.2 Keeping your mind alive (§7) --------------------------------------
-  {
-    find: "Work quietly keeps the mind busy all day — decisions, new problems, fresh information, people to read. When that goes, the stimulation can go with it, and that matters more than most people expect:",
-    variants: v(
-      "Work quietly keeps the mind busy all day — decisions, new problems, fresh information, people to read. As work winds down, that stimulation can ease off with it, and that matters more than most people expect:",
-      "Work quietly kept the mind busy all day — decisions, new problems, fresh information, people to read. Since work ended, you may already have noticed some of that stimulation fall away, and it matters more than most people expect:",
-      "Work keeps the mind busy all day — decisions, new problems, fresh information, people to read. When it ends, that stimulation can go with it, and it stays just as true years on:"
-    ),
-  },
 
   // ---- 2.3 The people in your life (§7) --------------------------------------
-  {
-    find: "is the bit that often goes quietest when the commute and colleagues do, and it's the one most people don't see coming.",
-    variants: v(
-      "is the bit that often goes quietest as the commute and colleagues drop away, and it's the one most people don't see coming.",
-      "is the bit that often goes quietest once the commute and colleagues do, and it's the one most people don't see coming — you may be noticing it now.",
-      "is the bit that often went quietest when the commute and colleagues did, and it's the one most people don't see coming."
-    ),
-  },
   {
     // 2.3 sessionInstructions mirrors the primer line — keep the two in step.
     find: "and that's the bit that goes quietest when commute and colleagues do.",
@@ -93,24 +77,8 @@ export const RULES: Rule[] = [
 
   // ---- 2.4 Purpose and contribution (§7) -------------------------------------
   // RR = describes their current state; EST = a phase they've passed.
-  {
-    find: "For many people, work is the main source of purpose and identity — and losing it is more destabilising than expected, with retirement satisfaction often dipping in the first year or two before new sources of meaning take hold.",
-    variants: v(
-      "For many people, work is the main source of purpose and identity — and stepping back from it is more destabilising than expected, with retirement satisfaction often dipping in the first year or two before new sources of meaning take hold.",
-      "For many people, work is the main source of purpose and identity — and losing it is more destabilising than expected. Retirement satisfaction often dips in the first year or two, right where you are now, before new sources of meaning take hold.",
-      "For many people, work was the main source of purpose and identity — and losing it is more destabilising than expected, with retirement satisfaction often dipping in the first year or two. You'll likely have come through that dip and found some of those new sources by now."
-    ),
-  },
 
   // ---- 2.5 Energy, sleep and feeling well (§7) -------------------------------
-  {
-    find: "and a working routine can hide the early signs — so small habits compound powerfully across a 20–30 year retirement, in both directions.",
-    variants: v(
-      "and as work reduces, the routine that can hide the early signs falls away — so small habits compound powerfully across a 20–30 year retirement, in both directions.",
-      "and the working routine that used to hide the early signs has gone — so small habits compound powerfully across a 20–30 year retirement, in both directions.",
-      "and the working routine that once hid the early signs is behind you now — so small habits compound powerfully across a 20–30 year retirement, in both directions."
-    ),
-  },
 
   // ---- Stage 3 intro (§8) ----------------------------------------------------
   {
@@ -157,14 +125,6 @@ export const RULES: Rule[] = [
   },
 
   // ---- 3.2 Your values (§8) --------------------------------------------------
-  {
-    find: "In working life they often go unspoken, carried along by the job and the routine. In retirement they matter even more: with more of your time your own to shape, what you value is what tells you how to spend it.",
-    variants: v(
-      "In working life they often go unspoken, carried along by the job and the routine. As work winds down they matter even more: with more of your time becoming your own to shape, what you value is what tells you how to spend it.",
-      "In working life they often went unspoken, carried along by the job and the routine. In retirement they matter even more: now more of your time is your own to shape, what you value is what tells you how to spend it.",
-      "In working life they often went unspoken, carried along by the job and the routine. In retirement they matter even more: with your time your own to shape, what you value is what tells you how to spend it."
-    ),
-  },
 
   // ---- 3.5 Hopes and fears (§8) — description + the three-horizon framing -----
   {
@@ -174,15 +134,6 @@ export const RULES: Rule[] = [
       "what you're hoping for, and what worries you, as you move into retirement and beyond.",
       "what you're hoping for, and what worries you, in retirement and the years ahead.",
       "what you're hoping for, and what worries you, in retirement and the years ahead."
-    ),
-  },
-  {
-    // EST: de-emphasise "the transition" horizon; keep the later two.
-    find: "grouped by when they tend to show up — the change itself, the years that follow, and the longer view.",
-    variants: v(
-      "grouped by when they tend to show up — the change itself, the years that follow, and the longer view.",
-      "grouped by when they tend to show up — settling in, the years that follow, and the longer view.",
-      "grouped by when they tend to show up — life in retirement now, and the longer view."
     ),
   },
 
@@ -201,10 +152,10 @@ export const RULES: Rule[] = [
     ),
   },
   {
-    find: "Before you can plan a retirement, it helps to be able to picture one. Not the big milestones — just an ordinary day. In a moment, Vita will walk you through one: a Tuesday in October, a few years from now. There are no right answers, and nothing to work out.",
+    find: "Before you begin planning, it helps to imagine what life might feel like when work is no longer setting the rhythm.\nNot the whole picture - just one ordinary day.\nTake a little time to watch the video below:",
     variants: v(
-      "Before you can plan a retirement, it helps to be able to picture one. Not the big milestones — just an ordinary day. In a moment, Vita will walk you through one: a Tuesday in October, a few years from now. There are no right answers, and nothing to work out.",
-      "A good way to take stock is to picture an ordinary day as it is now. Not the big milestones — just a normal Tuesday in October. In a moment, Vita will walk you through one, so you can see the shape of your days and notice what's working and what you'd want more or less of. There are no right answers."
+      "Before you begin planning, it helps to imagine what life might feel like when work is no longer setting the rhythm.\nNot the whole picture - just one ordinary day.\nTake a little time to watch the video below:",
+      "You're living these days now, rather than imagining them.\nSo let's look at an ordinary one. Not the whole of retirement — just a typical day as it is for you now.\nTake a moment with the clip below:"
     ),
   },
   {
@@ -224,10 +175,10 @@ export const RULES: Rule[] = [
     ),
   },
   {
-    find: "This session is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.",
+    find: "Have you ever noticed how easily roles find us?\n\nSome arrive with ceremony. Others appear so gradually that we hardly notice we've taken them on. We become the organiser, the helper, the listener, the mender, the coach, the volunteer.\n\nThe interesting thing is that roles aren't fixed. Some we carry forward because they still bring us energy and purpose. Others we can gently lay down. As work takes up less of your week, there is often space for entirely new roles to emerge. You don't have to keep playing yesterday's part, and you don't have to audition for someone else's.\n\nWhich roles still feel like you and which new ones are quietly waiting for an invitation?",
     variants: v(
-      "This session is about which of those you want to carry into retirement, and which you'd like to grow into for the first time.",
-      "This session is about the roles you play now, the ones that matter most to you, and any you'd still like to grow into."
+      "Have you ever noticed how easily roles find us?\n\nSome arrive with ceremony. Others appear so gradually that we hardly notice we've taken them on. We become the organiser, the helper, the listener, the mender, the coach, the volunteer.\n\nThe interesting thing is that roles aren't fixed. Some we carry forward because they still bring us energy and purpose. Others we can gently lay down. As work takes up less of your week, there is often space for entirely new roles to emerge. You don't have to keep playing yesterday's part, and you don't have to audition for someone else's.\n\nWhich roles still feel like you and which new ones are quietly waiting for an invitation?",
+      "Have you ever noticed how easily roles find us? Some arrive with ceremony. Others appear so gradually that we hardly notice we've taken them on — the organiser, the helper, the listener, the mender, the coach, the volunteer.\n\nNow that work no longer takes up the week, the roles you play are more your own than they've ever been. Some you carry forward because they still bring energy and purpose. Others you may already, quietly, have set down. And there's more room than there used to be for entirely new ones to appear.\n\nYou don't have to keep playing yesterday's part, and you don't have to audition for someone else's.\n\nWhich roles still feel like you, and which new ones are quietly waiting for an invitation?"
     ),
   },
 
@@ -239,13 +190,9 @@ export const RULES: Rule[] = [
       "A day is a snapshot; a week is a rhythm. The shape, balance, and pace of your time as it is now — and anything you'd like to shift."
     ),
   },
-  {
-    find: "This session is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.",
-    variants: v(
-      "This session is about the rhythm of your retirement — how much routine, variety, and rest feels right across the week, and how it might shift with the seasons.",
-      "This session is about the rhythm of your retirement as it is now — how much routine, variety, and rest you have across the week, what's working, and what you'd like to shift."
-    ),
-  },
+  // 1.week's primer is no longer tailored: the content drop gives it one set of
+  // copy for every cohort, so there's nothing cohort-specific left to rewrite.
+  // Its description and coachOpening below still are.
   {
     find: "Here's the balance you've set for your ideal week. Which of these did you feel most strongly about?",
     variants: v(
