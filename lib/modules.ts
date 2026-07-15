@@ -1991,6 +1991,12 @@ As you begin this next conversation, ask yourself: who do I hope will be part of
           },
           { type: "image", src: "/primers/2-3.jpg" },
           {
+            // Sits under the image, against the usual text-first order, because
+            // it hands off to the article button directly beneath it.
+            type: "text",
+            value: `Strong relationships don't require a large social circle — a handful of meaningful connections and everyday interactions can improve your health, resilience and long-term wellbeing. Take a few minutes to read the New York Times article linked below about the importance of having different types of relationships in your life.`,
+          },
+          {
             type: "links",
             links: [
               {
