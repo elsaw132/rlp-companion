@@ -53,12 +53,15 @@ type Rule = { find: string; variants: Variants };
 // retirement-paths-investigation-result.md §7 = Stage 2, §8 = Stage 3).
 export const RULES: Rule[] = [
   // ---- Stage 2 intro (§7) ----------------------------------------------------
+  // Only the opening clause is rewritten; the rest of the paragraph is the same
+  // for everyone. The retired cohorts met Stage 1 as "Review" (stageNameFor), so
+  // naming "Imagine" back to them would point at a stage they never saw.
   {
     find: "In Imagine, you sketched the shape of the retirement you want.",
     variants: v(
       "In Imagine, you sketched the shape of the retirement you're moving into.",
-      "In Imagine, you pictured the retirement you're settling into.",
-      "In Imagine, you pictured the retirement you're living."
+      "In Review, you pictured the retirement you're settling into.",
+      "In Review, you pictured the retirement you're living."
     ),
   },
 
@@ -82,11 +85,49 @@ export const RULES: Rule[] = [
 
   // ---- Stage 3 intro (§8) ----------------------------------------------------
   {
-    find: "In Imagine you pictured the retirement you want, and in Explore you looked at it area by area.",
+    find: "In Imagine you pictured the retirement you want, and in Explore you looked at the elements of a balanced retirement one by one.",
     variants: v(
-      "In Imagine you pictured the retirement you're moving into, and in Explore you looked at it area by area.",
-      "In Imagine you pictured the retirement you're settling into, and in Explore you looked at it area by area.",
-      "In Imagine you pictured the retirement you're living, and in Explore you looked at it area by area."
+      "In Imagine you pictured the retirement you're moving into, and in Explore you looked at the elements of a balanced retirement one by one.",
+      "In Review you pictured the retirement you're settling into, and in Explore you looked at the elements of a balanced retirement one by one.",
+      "In Review you pictured the retirement you're living, and in Explore you looked at the elements of a balanced retirement one by one."
+    ),
+  },
+
+  // ---- Stage 4 intro ---------------------------------------------------------
+  // Three rewrites: the heading (the retired cohorts are reshaping a retirement
+  // they're living, not making a plan for one ahead), the backward reference,
+  // and the artefact's name — Retirement Life Plan for those still working
+  // toward it, Retirement Reset Plan for those already in it. The name mirrors
+  // stageNameFor's Stage 4 rename and the plan document's own title.
+  {
+    find: "Now let's make your plan",
+    variants: v("Now let's make your plan", "Now let's shape your reset"),
+  },
+  {
+    find: "In Imagine you pictured the retirement you want, in Explore you looked at the elements of a balanced retirement one by one, and in Understand you found what sits beneath it. Now the work changes gear — from understanding what matters to deciding what to do about it: when and how you'll leave work, the goals worth pursuing, and the shape of an ordinary week.",
+    variants: v(
+      "In Imagine you pictured the retirement you're moving into, in Explore you looked at the elements of a balanced retirement one by one, and in Understand you found what sits beneath it. Now the work changes gear — from understanding what matters to deciding what to do about it: how you'll finish leaving work, the goals worth pursuing, and the shape of an ordinary week.",
+      "In Review you pictured the retirement you're settling into, in Explore you looked at the elements of a balanced retirement one by one, and in Understand you found what sits beneath it. Now the work changes gear — from understanding what matters to deciding what to do about it: the goals worth pursuing, and the shape of an ordinary week now work is behind you.",
+      "In Review you pictured the retirement you're living, in Explore you looked at the elements of a balanced retirement one by one, and in Understand you found what sits beneath it. Now the work changes gear — from understanding what matters to deciding what to do about it: the goals still worth pursuing, and the shape of an ordinary week."
+    ),
+  },
+  {
+    find: "Together, these sessions build your Retirement Life Plan — the heart of the whole programme. Take them in order; each adds a piece.",
+    variants: v(
+      "Together, these sessions build your Retirement Life Plan — the heart of the whole programme. Take them in order; each adds a piece.",
+      "Together, these sessions build your Retirement Reset Plan — the heart of the whole programme. Take them in order; each adds a piece."
+    ),
+  },
+
+  // ---- Stage 5 intro ---------------------------------------------------------
+  // Only the closing paragraph moves: how immediately useful Act's sessions are
+  // depends entirely on how far into retirement someone already is.
+  {
+    find: "Some won't come into their own until retirement is closer, and that's fine — they'll be here when you need them. You can revisit your plan any time.",
+    variants: v(
+      "A few are most useful just as you finish leaving work, and that's fine — they'll be here when the moment comes. You can revisit your plan any time.",
+      "Now you're retired, most of these are immediately useful — start wherever feels most alive. You can revisit your plan any time.",
+      "Most of these speak straight to where you are — start wherever feels most alive. You can revisit your plan any time."
     ),
   },
 

@@ -1740,12 +1740,14 @@ If it helps you settle into the moment, you might enjoy listening to Carole King
     lookAhead:
       "you go deeper area by area — movement, mind, people, purpose, energy, and the senses",
     intro: {
-      // [Placeholder — SMW to replace.] Framed on the WHO's Intrinsic Capacity
-      // model as an invitation, not an audit.
+      // Framed on the WHO's Intrinsic Capacity model as an invitation, not an
+      // audit. The first paragraph's opening clause is rewritten per cohort in
+      // retirementCopy.ts — the retired cohorts met Stage 1 as "Review", not
+      // "Imagine", so the backward reference has to name what they saw.
       heading: "Now let's look a little closer",
       body: [
-        "[Placeholder — SMW to replace.] In Imagine, you sketched the shape of the retirement you want. Now we go a little deeper, area by area. Research on what makes retirement truly good for people points to a handful of evidence-based domains — movement, a curious mind, the people around you, a sense of purpose, your energy, and your senses.",
-        "Most people's first picture of retirement is stronger in some of these than others, and that's completely normal. These sessions aren't an audit of what's missing — they're an invitation to look at each area in turn and notice what you'd like to keep, change, or add.",
+        "In Imagine, you sketched the shape of the retirement you want. Now we go a little deeper, area by area. Research on what makes retirement truly good for people points to a handful of evidence-based domains — movement, a curious mind, the people around you, a sense of purpose, your energy, and your senses.",
+        "Some people already have a clear, balanced picture of their retirement; many haven't yet considered some of the areas we'll look at in this stage. These sessions aren't an audit of what's missing — they're an invitation to take each area in turn and notice what you're naturally drawn to.",
         "We'll take the areas one at a time, in order — each builds on the last, and together they make the full picture. There's no rush: come to them whenever you have a little time, and your answers are always saved.",
       ],
       buttonLabel: "Let's carry on",
@@ -2459,12 +2461,13 @@ So this isn't about preparing for things to go wrong. It's some of the easiest, 
     lookAhead:
       "we step back to what's underneath it all — your strengths, your values, and what a truly good day looks like for you",
     intro: {
-      // [Placeholder — SMW to replace.] Framed as stepping back to what's
-      // underneath the picture, not a test of the person.
+      // Framed as stepping back to what's underneath the picture, not a test of
+      // the person. The first paragraph's opening clause is rewritten per cohort
+      // in retirementCopy.ts (the retired cohorts met Stage 1 as "Review").
       heading: "Now let's understand what's underneath",
       body: [
-        "[Placeholder — SMW to replace.] In Imagine you pictured the retirement you want, and in Explore you looked at it area by area. This stage steps back to ask what's underneath all of it — the strengths you bring, the values that matter most to you, and what a truly good day looks like for you.",
-        "Nothing here is a test, and there are no right answers. Each session starts from what you've already told us, so you're never beginning with a blank page — you're confirming, adjusting, and putting things in your own words.",
+        "In Imagine you pictured the retirement you want, and in Explore you looked at the elements of a balanced retirement one by one. This stage steps back to ask what's underneath all of it — the strengths you bring, the values that matter most to you, and what a truly good day looks like for you.",
+        "Nothing here is a test, and there are no right answers. Lots of these sessions begin with a synthesis of everything you've shared so far, so you're never beginning with a blank page — you're confirming, adjusting, and putting things in your own words.",
         "What comes out of this stage becomes the compass for your plan: a clear sense of what matters most, to carry into the years ahead.",
       ],
       buttonLabel: "Let's carry on",
@@ -2819,6 +2822,20 @@ WATCH FOR
     number: 4,
     name: "Plan",
     subtitle: "Shape the years ahead",
+    intro: {
+      // The gear-change: from understanding what matters to deciding what to do
+      // about it. Heading, the first paragraph and the last are all rewritten
+      // per cohort in retirementCopy.ts — the retired cohorts are shaping a
+      // reset of a retirement they're living, not making a plan for one ahead,
+      // and their artefact is the Retirement Reset Plan.
+      heading: "Now let's make your plan",
+      body: [
+        "In Imagine you pictured the retirement you want, in Explore you looked at the elements of a balanced retirement one by one, and in Understand you found what sits beneath it. Now the work changes gear — from understanding what matters to deciding what to do about it: when and how you'll leave work, the goals worth pursuing, and the shape of an ordinary week.",
+        "Lots of these sessions begin with a synthesis of everything you've shared so far, so mostly you'll be shaping and choosing rather than building from scratch. Each session has something to do as well as a conversation to talk it through.",
+        "Together, these sessions build your Retirement Life Plan — the heart of the whole programme. Take them in order; each adds a piece.",
+      ],
+      buttonLabel: "Let's carry on",
+    },
     modules: [
       {
         id: "4.1",
@@ -3385,6 +3402,20 @@ A short, warm sign-off — one or two sentences. Note that this first-year pictu
     number: 5,
     name: "Act",
     subtitle: "Turn it into next steps",
+    // Act works differently from the rest: no set order, nothing required. The
+    // last paragraph is rewritten per cohort in retirementCopy.ts — how useful
+    // these sessions are right now depends on how far into retirement someone
+    // is. Not shown while Act has no sessions: the dashboard renders
+    // PILOT_CALLOUT in its place until then (see moduleVisibleFor / comingSoon).
+    intro: {
+      heading: "Now let's put it to work",
+      body: [
+        "Having a plan is one thing; knowing what to do with it is another. This stage is about carrying your plan into the real world — each session takes something from it and helps you think it through in practice, from what it means for your money to the conversations ahead.",
+        "These sessions work differently from the rest. There's no set order, and no need to do them all — take the ones that fit, whenever the timing feels right.",
+        "Some won't come into their own until retirement is closer, and that's fine — they'll be here when you need them. You can revisit your plan any time.",
+      ],
+      buttonLabel: "Explore the sessions",
+    },
     modules: [
       {
         id: "5.1",
@@ -3612,6 +3643,25 @@ Mirror back, in their words: how they want the rest of the wind-down to go, the 
 // retirement" opening written for someone with it all still ahead. The stage
 // label stays "STAGE 1 · IMAGINE"; only the body changes. Applied in the home
 // dashboard behind the flag; everyone else keeps the default intro.
+// What stands in for Act's intro while Act has no sessions to open — the pilot
+// has reached the end of what's built. Shown through the same StageIntro
+// surface, so it reads as Vita speaking rather than as an error, and its button
+// returns to the plan (the thing they've just finished making) rather than
+// carrying on into a stage that isn't there.
+//
+// The dashboard chooses between this and Act's real intro on whether Act has any
+// visible sessions — not on a flag — so the day Act's sessions land, this
+// disappears on its own and the real intro takes over. Its "seen" state is
+// tracked separately from the stage intros for the same reason: someone who saw
+// this must still meet the real Act intro when it ships.
+export const PILOT_CALLOUT: StageIntro = {
+  heading: "You're all done for now",
+  body: [
+    "Stage 5, Act, isn't ready yet — we're still building it. We'll be in touch the moment its sessions are open to pilot participants. For now, you've reached the end of what's here. Thank you for taking part; it makes a real difference to what we're building. We'll speak soon.",
+  ],
+  buttonLabel: "Back to my plan",
+};
+
 export const WINDING_STAGE1_INTRO_BODY: string[] = [
   "You've already started the shift out of work — one foot in, one stepping into what's next. That gives you a real head start: you're not imagining retirement from a standing start, you're picturing the rest of a change that's already underway.",
   "There's no right answer here, and nothing to get perfect. These first few sessions help you build a vivid picture of the retirement your wind-down is leading toward — something you'll come back to, deepen, and reshape as you go.",
