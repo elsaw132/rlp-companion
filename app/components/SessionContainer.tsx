@@ -27,6 +27,14 @@ import ScreeningCheck, {
 } from "./ScreeningCheck";
 import ScreeningCommitment from "./ScreeningCommitment";
 import LetterFlow from "./LetterFlow";
+import {
+  PrimerAudio,
+  PrimerImage,
+  PrimerSlideshow,
+  PrimerText,
+  PrimerVideo,
+  primerMediaCss,
+} from "./PrimerMedia";
 import MirrorCards, {
   MirrorCardsSummary,
   mirrorCardsSummaryText,
@@ -1673,8 +1681,16 @@ export default function SessionContainer({
 
   // Label and gate wording flex with the primer's makeup: text-only reads,
   // video-only watches, and any mix gets neutral "Continue" wording.
-  const allText = primer.every((b) => b.type === "text");
-  const allVideo = primer.every((b) => b.type === "video");
+  //
+  // A still image counts as reading, not watching: the ask is still "read
+  // this", and the picture sits with the words rather than replacing them. So
+  // an image→text primer keeps the reading wording it would have had as
+  // text alone. Anything with a moving or paged element (video, audio, a
+  // slideshow) is a mix, and takes the neutral wording.
+  const allText = primer.every((b) => b.type === "text" || b.type === "image");
+  const allVideo = primer.every(
+    (b) => b.type === "video" || b.type === "self-hosted-video"
+  );
   const labelIcon = allVideo ? "🎬" : "📖";
   const labelText = allVideo ? "Watch this" : allText ? "Read this" : "Take a look";
   const gateLabel = allVideo
@@ -1722,7 +1738,7 @@ export default function SessionContainer({
 
   return (
     <div style={styles.container}>
-      <style>{focusCss}</style>
+      <style>{focusCss + primerMediaCss}</style>
 
       {/* ZONE 1 — PROGRAMME HEADER */}
       <header style={styles.header}>
@@ -1799,6 +1815,20 @@ export default function SessionContainer({
               </div>
             );
           }
+          if (block.type === "image") {
+            return <PrimerImage key={i} src={block.src} alt={block.alt} />;
+          }
+          if (block.type === "image-slideshow") {
+            return <PrimerSlideshow key={i} images={block.images} />;
+          }
+          if (block.type === "audio") {
+            return <PrimerAudio key={i} src={block.src} title={block.title} />;
+          }
+          if (block.type === "self-hosted-video") {
+            return (
+              <PrimerVideo key={i} src={block.src} poster={block.poster} />
+            );
+          }
           if (block.type === "links") {
             return (
               <div key={i} style={styles.linksBlock}>
@@ -1818,11 +1848,7 @@ export default function SessionContainer({
               </div>
             );
           }
-          return (
-            <p key={i} style={styles.bodyText}>
-              {block.value}
-            </p>
-          );
+          return <PrimerText key={i} value={block.value} />;
         })}
 
         {phase === "reading" && (
@@ -2843,13 +2869,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-sans)",
     fontSize: "13px",
     color: "var(--text-muted)",
-  },
-  bodyText: {
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--fs-body)",
-    lineHeight: "var(--lh-body)",
-    color: "var(--text)",
-    margin: 0,
   },
   videoFrame: {
     position: "relative",

@@ -104,7 +104,9 @@ describe("retiredLetter — turns the letter into a keep/change/leave conversati
     expect(rl.sessionInstructions.toLowerCase()).toContain("keep");
     expect(rl.coachOpening.length).toBeGreaterThan(0);
     expect(rl.writingPlaceholder.length).toBeGreaterThan(0);
-    expect(rl.primer[0].type).toBe("text");
+    // The primer leads with its image now, so assert on what this test is
+    // actually about: that there's reading copy in there for Vita to draw on.
+    expect(rl.primer.some((b) => b.type === "text")).toBe(true);
     // The default letter module carries no sessionInstructions, so its flow is
     // untouched.
     expect(getModule("1.letter")?.module.sessionInstructions).toBeUndefined();
