@@ -1,11 +1,13 @@
 # RLP Companion — Design System
 
-**Theme:** Aviva-derived palette (white-label reference; the reference deployment shows the provider name "Lionsgate Pensions"). **Fonts:** Source Serif 4 + Inter.
-**Companion files:** `tokens.css` (the source of truth — import it once, globally), `aviva-rlp-design-system.html` (a rendered reference of every component), and `aviva-rlp-home-screen.html` (the composed home-screen target).
+**Theme:** **Chorus Life**. **Fonts:** Source Serif 4 + Inter.
+**Companion file:** `tokens.css` — the source of truth; import it once, globally.
 
-**Terminology:** a unit of the programme is a **module** (e.g. 1.1) — that's the user-facing word and the code term. "Stage" is the group of modules (Imagine, Explore…). Don't use "session" or "step" in user-facing copy; "conversation" refers to the coach exchange inside a module.
+> **The two `aviva-*.html` files in this folder are HISTORY, not a target.** They render the original Aviva/"Lionsgate Pensions" white-label brand this product was first built against — navy, yellow band. Chorus replaced that. Do not build to them.
 
-This document tells you how to build the RLP Companion's interface so it matches the agreed look. Build against the **semantic CSS variables** in `tokens.css`, never against raw hex values. The design has two layers: a **brand layer** (navy, yellow band — swappable per pension provider) and a **product layer** (warm cream, orange accent, neutrals — fixed everywhere). To re-skin for a different provider, only the brand block in `tokens.css` changes.
+**Terminology:** a unit of the programme is a **session** (e.g. 1.1) in everything the user sees. `module` survives as the CODE term only (ids, DB columns, the `[[MODULE_COMPLETE]]` token) — never in user-facing copy. "Stage" is the group of sessions (Imagine, Explore…); "conversation" is the coach exchange inside a session.
+
+This document tells you how to build the RLP Companion's interface so it matches the agreed look. Build against the **semantic CSS variables** in `tokens.css`, never against raw hex values. The brand splits in two: a **structure layer** (Chorus Dark Green `#0A322D` — `--color-brand-primary`) and an **interaction layer** (Chorus Green `#00645F` — `--color-interactive-primary`, aliased to `--brand-primary`), over a fixed **product layer** (warm cream, orange accent, neutrals). Only the brand block in `tokens.css` changes to re-skin.
 
 ---
 
@@ -38,7 +40,7 @@ If web fonts fail to load, the stacks fall back to Georgia (serif) and the syste
 
 ## 2. Colour, in one paragraph
 
-Navy (`--brand-primary`) is the only colour for interactive and completed states. Orange (`--accent`) is reserved for the **single current step** and nothing else — it behaves like a cursor pointing at "do this next". Cream (`--warm-surface`) appears only where the coach, Vita, is present. Everything else is white with hairline borders. Green means complete; lavender (`--info-surface`) means gentle orientation; grey (`--muted-surface`) means not-yet-available. The yellow band (`--brand-band`) is the provider's header and belongs to them.
+Chorus green (`--brand-primary`) is the only colour for interactive and completed states. Orange (`--accent`) is reserved for the **single current step** and nothing else — it behaves like a cursor pointing at "do this next". Cream (`--warm-surface`) appears only where the coach, Vita, is present. Everything else is white with hairline borders. Green means complete; lavender (`--info-surface`) means gentle orientation; grey (`--muted-surface`) means not-yet-available. `--brand-band` is Chorus Dark Green and carries the structural marks (the avatar). The app header itself is a light, frosted bar — not a coloured band.
 
 ---
 
@@ -67,38 +69,38 @@ Two families, never blurred:
 Each component below maps to a section in the HTML reference. Match structure, spacing, and states.
 
 ### Buttons
-- **Primary (navy):** `--brand-primary` fill, white text, `--r-sm`, min-height 48px, 13×20 padding, weight 600. Hover → `--brand-primary-hover`. Default primary action everywhere. The next-step Continue is **"Continue with Vita →"**, navy — in both the hero and the active module card (identical: same colour, same label).
+- **Primary (Chorus green):** `--brand-primary` fill, white text, `--r-sm`, min-height 48px, 13×20 padding, weight 600. Hover → `--brand-primary-hover`. Default primary action everywhere. The next-step Continue is **"Continue with Vita →"**, Chorus green — in both the hero and the active module card (identical: same colour, same label).
 - **Ghost:** transparent, `--brand-primary` text, 1.5px `--border-strong`. Secondary actions ("Back to home").
-- **Link:** navy text, weight 600, trailing `›` or `→`, no background.
+- **Link:** Chorus green text, weight 600, trailing `›` or `→`, no background.
 - All buttons carry a trailing `→` for forward motion, `›` for navigation.
 - **No orange button fills.** Orange (`--accent` / `--accent-strong`) is *not* used as a button. The current step is signalled by the active module card's highlight (accent surface + border) and the orange stage-arc dot — not by an orange button. `--accent-strong` is retained only as a safeguard for any future orange-on-white control a provider brand might require.
 
 ### Status (a module shows exactly one)
 - **Complete:** pill, white bg, 1.5px `--success-line` border, `--success-text` text, trailing `✓`. Completed module cards are **revisitable** — clickable, with a hover lift and a trailing `›`.
-- **Active:** the card carries the orange current-step highlight (`--accent-surface` + `--accent-line` border); its action is the navy **"Continue with Vita →"** button — not an orange button.
+- **Active:** the card carries the orange current-step highlight (`--accent-surface` + `--accent-line` border); its action is the Chorus green **"Continue with Vita →"** button — not an orange button.
 - **Not started:** pill, `--muted-surface` bg, `--text-muted` text, inert.
 
 ### Duration chip
 `🕐 15 min` — pill, white bg, hairline border, `--text-muted`, 13px.
 
 ### Five-stage arc (`Imagine · Explore · Understand · Plan · Act`)
-40px circles joined by a 2px line. Done = navy fill + `✓`, navy connector. Active = `--accent` fill + number. Future = `--border` fill + faint number. Caption beneath each; the active caption is `--ink`, others `--text-muted`.
+40px circles joined by a 2px line. Done = Chorus green fill + `✓`, Chorus green connector. Active = `--accent` fill + number. Future = `--border` fill + faint number. Caption beneath each; the active caption is `--ink`, others `--text-muted`.
 
 ### Stage score / progress
-- **Radial (stage score):** conic-gradient, `--brand-primary` fill on `--border` track, white inner disc, navy percentage. Label is **dynamic and names the active stage** — "Your {Stage} score" (e.g. "Your Imagine score"). Value = completion *within the active stage* (modules complete in that stage ÷ total modules in that stage). Never a global completed-÷-all figure — that breaks "no progress shame". Confidence-weighting (how firm the answers are) is a Phase 2 enhancement.
+- **Radial (stage score):** conic-gradient, `--brand-primary` fill on `--border` track, white inner disc, Chorus green percentage. Label is **dynamic and names the active stage** — "Your {Stage} score" (e.g. "Your Imagine score"). Value = completion *within the active stage* (modules complete in that stage ÷ total modules in that stage). Never a global completed-÷-all figure — that breaks "no progress shame". Confidence-weighting (how firm the answers are) is a Phase 2 enhancement.
 - **Bar:** 6px, pill radius, `--brand-primary` fill on `--border` track, with an "X of Y modules complete" label above.
 
 ### Sidebar nav item
-Row: numbered circle + a **vertical stack** (title on its own line, subtitle beneath — never run together inline). **Active** → `--brand-primary-tint` background, solid navy numeral. **Done** → navigable (clickable, hover), navy numeral/✓. **Future (locked)** → dimmed, not clickable. Subtitle always present, muted. Completed and active stages are navigable (back-navigation); future stages are locked.
+Row: numbered circle + a **vertical stack** (title on its own line, subtitle beneath — never run together inline). **Active** → `--brand-primary-tint` background, solid Chorus green numeral. **Done** → navigable (clickable, hover), Chorus green numeral/✓. **Future (locked)** → dimmed, not clickable. Subtitle always present, muted. Completed and active stages are navigable (back-navigation); future stages are locked.
 
 ### Coach "next-step" hero (the dashboard's centrepiece)
-Two columns inside one `--r-lg` card. Left = `--warm-surface` body containing: Vita lockup (sun disc + serif "Vita"), the `--coach-pill` "Your retirement coach" tag, a 1–2 line personalised intro referencing the prior module, the `Your next step` eyebrow, the serif step title, a navy **"Continue with Vita →"** button, and a duration chip. Right = a soft illustrated scene (sky→hills gradient using the `--ill-*` palette). Lift: `--shadow-md`.
+Two columns inside one `--r-lg` card. Left = `--warm-surface` body containing: Vita lockup (sun disc + serif "Vita"), the `--coach-pill` "Your retirement coach" tag, a 1–2 line personalised intro referencing the prior module, the `Your next step` eyebrow, the serif step title, a Chorus green **"Continue with Vita →"** button, and a duration chip. Right = a brand field: the Chorus vector graphic (`ChorusVectorGraphic`), cropped large over a colour ground from `lib/stageColors.ts`. Lift: `--shadow-md`.
 
 ### Stage progress card
 Horizontal: sun disc + ("Stage X of 5 · {Stage}" heading, muted description) + right-aligned "X of Y modules complete" with a progress bar. Hairline border, `--shadow-sm`.
 
 ### Module card
-Grid: thumbnail (88×72, `--r-md`) · (serif title + muted description) · duration chip · status control. Default = white, hairline, `--shadow-sm`. **Active variant** = `--accent-surface` background, `--accent-line` border, `--shadow-md`, and the navy **"Continue with Vita →"** button (identical to the hero — not an orange button). Only one card is ever active. **Completed** cards are clickable to revisit (hover lift, trailing `›`). Responsive: a grid that reflows, never overflows — `minmax(0,1fr)` on the body so long serif titles wrap; below ~880px the thumbnail spans two rows with the chip + status on a meta row beneath.
+Grid: thumbnail (88×72, `--r-md`) · (serif title + muted description) · duration chip · status control. Default = white, hairline, `--shadow-sm`. **Active variant** = `--accent-surface` background, `--accent-line` border, `--shadow-md`, and the Chorus green **"Continue with Vita →"** button (identical to the hero — not an orange button). Only one card is ever active. **Completed** cards are clickable to revisit (hover lift, trailing `›`). Responsive: a grid that reflows, never overflows — `minmax(0,1fr)` on the body so long serif titles wrap; below ~880px the thumbnail spans two rows with the chip + status on a meta row beneath.
 
 ### Encouragement card
 `--info-surface` (lavender) with `--info-line` border. Soft avatar + serif title + muted body + a link. For orientation/reassurance only — never a required action.
@@ -107,10 +109,10 @@ Grid: thumbnail (88×72, `--r-md`) · (serif title + muted description) · durat
 Coach bubble: `--warm-surface`, `--ink` text, 16px, radius `18px 18px 18px 4px`, left-aligned, hairline `--warm-line`. User bubble: white, 1.5px `--border-strong`, radius `18px 18px 4px 18px`, right-aligned. One question per coach turn.
 
 ### Stage intro
-A brief framing moment on the warm/coach surface, shown once on first forward entry into a stage (not on back-navigation): Vita lockup + serif heading + short body + a single navy button. Intro copy lives per-stage in the config.
+A brief framing moment on the warm/coach surface, shown once on first forward entry into a stage (not on back-navigation): Vita lockup + serif heading + short body + a single Chorus green button. Intro copy lives per-stage in the config.
 
 ### Edit-your-selections
-On the read-only interaction summary above a module's conversation, a quiet navy "Edit your selections ›" link returns the user to the interaction pre-filled to adjust (not restart); the conversation is preserved, and the coach acknowledges the change in one line on its next turn. Distinct from "Restart this module" (a full start-over).
+On the read-only interaction summary above a module's conversation, a quiet Chorus green "Edit your selections ›" link returns the user to the interaction pre-filled to adjust (not restart); the conversation is preserved, and the coach acknowledges the change in one line on its next turn. Distinct from "Restart this module" (a full start-over).
 
 ---
 
@@ -126,11 +128,11 @@ On the read-only interaction summary above a module's conversation, a quiet navy
 ## 6. Accessibility (acceptance criterion — non-negotiable)
 
 - **Target WCAG 2.1 AA.** Reading content is ≥16px.
-- **Orange usage:** the bright `--accent` (`#E06F1F`) only meets AA for *large* text, so it's used for borders, the active stage-arc dot, and surfaces — never behind small white text, and never as a button fill (the current step's action is the navy Continue). `--accent-strong` (`#B85C16`, 4.5:1 on white) is kept only as a safeguard should a provider brand ever need an orange-on-white control.
-- **Focus:** every interactive element shows a visible focus ring — `box-shadow: var(--focus-ring)` (3px navy glow), offset where needed. Don't remove outlines without replacing them.
+- **Orange usage:** the bright `--accent` (`#E06F1F`) only meets AA for *large* text, so it's used for borders, the active stage-arc dot, and surfaces — never behind small white text, and never as a button fill (the current step's action is the Chorus green Continue). `--accent-strong` (`#B85C16`, 4.5:1 on white) is kept only as a safeguard should a provider brand ever need an orange-on-white control.
+- **Focus:** every interactive element shows a visible focus ring — `box-shadow: var(--focus-ring)` (3px Chorus green glow), offset where needed. Don't remove outlines without replacing them.
 - **Tap targets:** ≥44px.
 - **Status by more than colour:** Complete carries a `✓`, Not started carries its label — never colour alone.
-- **Contrast that passes:** ink/body/muted text on white all pass; navy on yellow band passes; white on navy passes. `--text-faint` is for decorative/least-critical text only.
+- **Contrast that passes:** ink/body/muted text on white all pass; white on Chorus dark green passes; white on Chorus green passes. `--text-faint` is for decorative/least-critical text only.
 
 ---
 
@@ -151,6 +153,6 @@ To deploy for a different pension provider, edit only the brand block in `tokens
 
 ---
 
-*Design System v1.1 — built from the Aviva dashboard reference. Pair with `tokens.css`, `aviva-rlp-design-system.html`, and `aviva-rlp-home-screen.html`.*
+*Design System v2 — Chorus Life. Pair with `tokens.css` (the source of truth). The `aviva-*.html` files are the superseded white-label reference, kept as history only.*
 
-*v1.1 changes: both next-step Continue buttons are navy "Continue with Vita →" (no orange button fills — orange is the active-card highlight + arc dot only); "clarity score" is now the dynamic "Your {Stage} score" (current-stage completion); unit term standardised to "module"; added stage intro, edit-your-selections, completed-card revisit, and locked/navigable stages.*
+*v1.1 changes: both next-step Continue buttons are Chorus green "Continue with Vita →" (no orange button fills — orange is the active-card highlight + arc dot only); "clarity score" is now the dynamic "Your {Stage} score" (current-stage completion); unit term standardised to "module"; added stage intro, edit-your-selections, completed-card revisit, and locked/navigable stages.*

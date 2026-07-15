@@ -75,7 +75,15 @@ export default async function SessionPage({
   if (!found) {
     return (
       <main style={styles.notFoundPage}>
-        <p style={styles.notFoundText}>Session not found</p>
+        <p style={styles.notFoundEyebrow}>Chorus Life</p>
+        <p style={styles.notFoundText}>We can&rsquo;t find that session</p>
+        <p style={styles.notFoundBody}>
+          The link may be out of date, or the session may not be part of your
+          programme.
+        </p>
+        <a style={styles.notFoundLink} href="/home">
+          Back to your sessions
+        </a>
       </main>
     );
   }
@@ -253,18 +261,51 @@ export default async function SessionPage({
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  // The session screen deliberately carries no app chrome — it is a focus mode.
+  // That left the not-found state as one line of bare text on an empty page: no
+  // mark, no explanation, no way out. It gets a little of the brand back, and a
+  // door.
   notFoundPage: {
     minHeight: "100dvh",
     background: "var(--bg-alt)",
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     padding: "48px 24px",
+    textAlign: "center",
+  },
+  notFoundEyebrow: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-eyebrow)",
+    letterSpacing: ".12em",
+    textTransform: "uppercase",
+    fontWeight: 700,
+    color: "var(--brand-primary)",
+    margin: "0 0 10px",
   },
   notFoundText: {
     fontFamily: "var(--font-serif)",
     fontSize: "var(--fs-h2)",
     fontWeight: 600,
     color: "var(--ink)",
+    margin: 0,
+  },
+  notFoundBody: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-body)",
+    color: "var(--text-muted)",
+    maxWidth: "42ch",
+    margin: "12px 0 24px",
+  },
+  notFoundLink: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-body)",
+    fontWeight: 600,
+    color: "var(--brand-on-primary)",
+    background: "var(--brand-primary)",
+    borderRadius: "var(--r-sm)",
+    padding: "12px 22px",
+    textDecoration: "none",
   },
 };
