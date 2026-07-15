@@ -18,10 +18,19 @@ import { useUserData } from "@/lib/userData";
 import { type ModelSource } from "@/lib/userModel";
 import { buildRlpPlan } from "@/lib/rlpPlan";
 import { SEED_SOURCE, SEED_MEMBER_NAME } from "@/lib/rlpPlanSeed";
+import { seedSourceForCohort, isSeedCohort } from "@/lib/rlpPlanSeedRetired";
 import { todayISODate } from "@/lib/planDate";
 import type { PlanIntro } from "@/lib/planIntro";
 import { ensurePlanIntro, ensurePlanImages } from "@/lib/planPrewarm";
 import RlpPlanDocument from "./RlpPlanDocument";
+
+// Dev-only cohort override. Seeded material only (see the call site) — a real
+// member's plan takes its stage from their own onboarding, never the URL.
+function cohortFromUrl() {
+  if (typeof window === "undefined") return null;
+  const v = new URLSearchParams(window.location.search).get("cohort");
+  return isSeedCohort(v) ? v : null;
+}
 
 export default function RlpReveal() {
   const { user } = useUser();
@@ -52,19 +61,32 @@ export default function RlpReveal() {
     getActiveFacts: userData.getActiveFacts,
   };
 
+  // The plan's creation date is STORED, not computed. It used to be todayISODate()
+  // on every render, which meant the plan claimed to have been created on whatever
+  // day you opened it, and "next review" (created + 12 months) slid forward with
+  // you — so it could never come due. Stamped once, on the first view of a real
+  // plan, and read back forever after.
   const today = todayISODate();
+  const createdOn = userData.getPlanCreatedOn() ?? today;
   let plan = buildRlpPlan(liveSource, {
     name: userData.getDisplayName(user),
-    dateCreated: today,
+    dateCreated: createdOn,
   });
 
   // Dev seeding: with no Stage 4 material yet, show one realistic member so the
   // document is never empty. The seed flows through the exact same assembler.
   const seeded = !plan.hasPlan;
-  const source = seeded ? SEED_SOURCE : liveSource;
+  // /plan?cohort=winding_down|recently_retired|established swaps the seed for a
+  // retirement-path variant, so the cohort branches can actually be looked at.
+  // Seeded dev material only — it can never touch a real member's plan.
+  const cohort = seeded ? cohortFromUrl() : null;
+  const seedFor = cohort ? seedSourceForCohort(cohort) : null;
+  const source = seeded ? (seedFor?.source ?? SEED_SOURCE) : liveSource;
   if (seeded) {
-    plan = buildRlpPlan(SEED_SOURCE, {
-      name: userData.getDisplayName(user) ?? SEED_MEMBER_NAME,
+    plan = buildRlpPlan(source, {
+      // The cohort fixtures carry their own names — a Reset Plan headed with the
+      // signed-in developer's name reads as if it were theirs.
+      name: seedFor?.name ?? userData.getDisplayName(user) ?? SEED_MEMBER_NAME,
       dateCreated: "2026-06-01",
       dateLastReviewed: "2026-06-01",
     });
@@ -74,9 +96,14 @@ export default function RlpReveal() {
   // Both live in lib/planPrewarm — the same cache-first, dedup-guarded path the
   // 4.7 pre-warm uses, so a plan opened after pre-warm is an instant cache hit
   // and nothing ever generates twice.
+  // A cohort fixture must never touch the saved prose: its text would be written
+  // over the signed-in member's own cached intro, and switching cohorts would
+  // then read back the PREVIOUS cohort's copy — Ray's plan showing Jean's reset
+  // suggestions. So the fixtures run cache-blind: generate every load, keep it in
+  // React state, save nothing.
   const io = {
-    getPlanIntro: userData.getPlanIntro,
-    savePlanIntro: userData.savePlanIntro,
+    getPlanIntro: cohort ? () => null : userData.getPlanIntro,
+    savePlanIntro: cohort ? () => {} : userData.savePlanIntro,
     getPlanImages: userData.getPlanImages,
     savePlanImage: userData.savePlanImage,
     onIntro: (next: PlanIntro) => setIntro(next),
@@ -89,7 +116,22 @@ export default function RlpReveal() {
   if (user && !loaded) {
     setLoaded(true);
     setImages(userData.getPlanImages());
-    void ensurePlanIntro(plan, source, io);
+    // Stamp the plan's birthday the first time a REAL plan is opened. Never for
+    // the seed or a cohort fixture — their dates are fixture values, and writing
+    // one would give the signed-in member a creation date they never had.
+    if (!seeded && !userData.getPlanCreatedOn()) {
+      userData.savePlanCreatedOn(today);
+    }
+    // /plan?regen=1 regenerates Vita's prose over the top of the saved copy —
+    // the plan is generated once and cached, so prompt changes are otherwise
+    // invisible on a plan that already exists.
+    const regen =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("regen") === "1";
+    // A cohort fixture always generates: its cache is stubbed out above, and
+    // force also clears the module-level in-flight job so switching cohorts can't
+    // reuse the previous one's generation.
+    void ensurePlanIntro(plan, source, io, regen || !!cohort);
     void ensurePlanImages(plan, io);
   }
 
@@ -106,6 +148,7 @@ export default function RlpReveal() {
           selfIntro: intro.selfIntro || plan.opening.selfIntro,
         },
         balance: { ...plan.balance, shape: intro.balanceShape },
+        paths: { ...plan.paths, strengthsRead: intro.strengthsRead },
         movingTowards: { ...plan.movingTowards, arc: intro.seasonsArc },
         week: plan.week ? { ...plan.week, rhythm: intro.weekRhythm } : plan.week,
         leavingWork: plan.leavingWork
@@ -113,6 +156,16 @@ export default function RlpReveal() {
           : plan.leavingWork,
         connections: intro.connections,
         openThreads: intro.openThreads,
+        reflections: {
+          balanceCallout: intro.balanceCallout,
+          balanceRead: intro.balanceRead,
+          realismCallout: intro.realismCallout,
+          realismNote: intro.realismNote,
+          strongCallout: intro.strongCallout,
+          whatsStrong: intro.whatsStrong,
+          coherenceCallout: intro.coherenceCallout,
+          coherence: intro.coherence,
+        },
         // "Worth picking up": the richer generated version when it landed, else
         // the plan's deterministic framed fallback — never the raw items.
         resetActions: intro.resetActions?.length

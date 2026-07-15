@@ -65,7 +65,17 @@ export function buildPlanIntroRequest(
     onsetGentle: plan.onsetGentle,
     resetItems: plan.candidateGoals,
     coreValues: introValues,
+    // Tab 6 material. The rules are the standard the coherence read holds the
+    // plan against; the buckets let the realism read tie a protective habit to a
+    // value they said they'd hold firm on.
+    principles: plan.values.principles,
+    nonNegotiables: plan.values.nonNegotiables,
+    flexible: plan.values.flexible,
+    // Computed once, on the plan (see lib/rlpPlan), so the transition tab's name
+    // and Vita's calibration always read the same signal.
+    farHorizon: plan.farHorizon,
     roles: model.roles.all,
+    strengths: plan.paths.strengths,
     mostAliveRoles: model.roles.mostAlive,
     energySources: model.energySources,
     aspirations: model.aspirations.map((a) => a.text),
@@ -147,13 +157,18 @@ const imageJobs = new Map<string, Promise<string | null>>();
 export async function ensurePlanIntro(
   plan: RlpPlan,
   source: ModelSource,
-  io: PlanGenIO
+  io: PlanGenIO,
+  // Skip the cache and generate afresh, overwriting what's saved. The prose is
+  // deliberately generated once and kept, so this is the only way to pick up a
+  // prompt or copy change on a plan that already exists (/plan?regen=1).
+  force = false
 ): Promise<void> {
   const cached = io.getPlanIntro();
-  if (cached) {
+  if (cached && !force) {
     io.onIntro?.(cached);
     return;
   }
+  if (force) introJob = null;
   if (!introJob) {
     const req = buildPlanIntroRequest(plan, source);
     introJob = (async () => {

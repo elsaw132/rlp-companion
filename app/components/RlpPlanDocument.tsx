@@ -10,18 +10,64 @@
 // interactive lenses. Everything renders from the assembled RlpPlan — the same
 // data model the (future) still PDF keepsake will render.
 
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type {
   RlpPlan,
-  PlanArea,
+  PlanBalance,
   PlanGoal,
   PlanPath,
   PlanScene,
 } from "@/lib/rlpPlan";
 import { seasonLabel43 } from "@/lib/rlpPlan";
-import type { ConnectionsGraph } from "@/lib/planIntro";
+import type { ConnectionsGraph, ConnectionKind } from "@/lib/planIntro";
 import type { BalancedAreaId } from "@/lib/modules";
 import { HelperLine } from "./InteractionShell";
+import PlanTabs, { type PlanTabDef } from "./PlanTabs";
+import ChorusVectorGraphic from "./ChorusVectorGraphic";
+import { stageHeroGroundFor, stageHeroGraphicFor } from "@/lib/stageColors";
+import VitaMark from "./VitaMark";
+
+// ---- Tab 6 · the balance band ----
+//
+// The band is FACT: how many of the five areas carry at least one goal. That is
+// deliberately all it measures — the old chart sized each area by how many goals
+// were typed into it, which made someone with three loose Connect goals and one
+// profound Contribute goal read as "unbalanced towards Connect". Coverage is a
+// claim the data can actually support; volume isn't.
+//
+// No number, no badge, no mid-point labels — a marker on a band, per the no-shame
+// rule. Whether that spread SERVES the person is Vita's sentence beneath it, not
+// the band's job.
+
+function BalanceBand({ areas }: { areas: PlanBalance["areas"] }) {
+  const total = areas.length;
+  const covered = areas.filter((a) => a.goals.length > 0).length;
+  // Inset so a full or empty spread never sits flush against the edge.
+  const pos = total > 0 ? 6 + ((total - covered) / total) * 88 : 50;
+  const where =
+    covered >= total - 1
+      ? "toward well balanced"
+      : covered === total - 2
+        ? "around the middle"
+        : "toward wobbly";
+
+  return (
+    <div className="rlp-balband">
+      <div
+        className="rlp-balband-track"
+        role="img"
+        aria-label={`Balance: ${where}`}
+      >
+        <span className="rlp-balband-marker" style={{ left: `${pos}%` }} />
+      </div>
+      <div className="rlp-balband-labels">
+        <span>Well balanced</span>
+        <span>Wobbly</span>
+      </div>
+    </div>
+  );
+}
 
 // ---- area theme: the five balanced areas mapped onto the existing palette ----
 const AREA_THEME: Record<BalancedAreaId, { base: string; sel: string; fg: string }> = {
@@ -51,22 +97,15 @@ function formatDate(iso: string): string {
   return `${d} ${months[m - 1]} ${y}`;
 }
 
-function SectionHead({
-  index,
-  eyebrow,
-  title,
-}: {
-  index: number;
-  eyebrow: string;
-  title: string;
-}) {
+// The numbers are gone. They were the spine of the old single-scroll document,
+// where §1…§11 ran in order; once the sections were dealt out across six tabs
+// they stopped counting anything (three different sections were all "08") and
+// just advertised that the plan had been cut up. The eyebrow does the work now.
+function SectionHead({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <header className="rlp-sec-head">
-      <span className="rlp-sec-no">{index > 0 ? String(index).padStart(2, "0") : "✦"}</span>
-      <div>
-        <p className="rlp-eyebrow">{eyebrow}</p>
-        <h2 className="rlp-sec-title">{title}</h2>
-      </div>
+      <p className="rlp-eyebrow">{eyebrow}</p>
+      <h2 className="rlp-sec-title">{title}</h2>
     </header>
   );
 }
@@ -109,10 +148,12 @@ function SelfIntro({
   selfIntro,
   savedSelfIntro,
   onSave,
+  printing = false,
 }: {
   selfIntro: string;
   savedSelfIntro?: string | null;
   onSave?: (text: string) => void;
+  printing?: boolean;
 }) {
   const [value, setValue] = useState<string>(savedSelfIntro ?? selfIntro);
   const [busy, setBusy] = useState(false);
@@ -145,6 +186,9 @@ function SelfIntro({
         do?&rdquo; once the job title is gone. Here&rsquo;s one way you might put
         it &mdash; yours to edit, or to shift in tone.
       </p>
+      {printing ? (
+        <p className="rlp-intro-text rlp-intro-print">{value}</p>
+      ) : (
       <textarea
         className="rlp-intro-text"
         value={value}
@@ -162,6 +206,7 @@ function SelfIntro({
           }
         }}
       />
+      )}
       <div className="rlp-intro-tones">
         <span className="rlp-intro-tones-lbl">Shift the tone:</span>
         <button type="button" disabled={busy} onClick={() => retone("warmer")}>Warmer</button>
@@ -173,52 +218,14 @@ function SelfIntro({
   );
 }
 
-// ---- §2 the balanced retirement (the at-a-glance SHAPE only) ----
-// A balance picture of the five areas and their relative fullness, plus one
-// synthesis sentence naming the shape. The goals themselves live in §5 and are
-// deliberately NOT repeated here.
-
-function BalanceOverview({ areas, shape }: { areas: PlanArea[]; shape: string }) {
-  const max = Math.max(1, ...areas.map((a) => a.goals.length));
-
-  return (
-    <div className="rlp-balance">
-      <div className="rlp-balance-row" aria-label="The five areas of a balanced retirement">
-        {areas.map((a) => {
-          const theme = AREA_THEME[a.id];
-          const fullness = a.goals.length / max;
-          const heightPct = a.deliberateGap ? 8 : a.goals.length === 0 ? 6 : Math.max(20, fullness * 100);
-          return (
-            <div
-              key={a.id}
-              className="rlp-area-tile"
-              style={{
-                ["--a-sel" as string]: theme.sel,
-                ["--a-fg" as string]: theme.fg,
-              }}
-            >
-              <span className="rlp-area-fill" aria-hidden="true">
-                <span className="rlp-area-fill-bar" style={{ height: `${heightPct}%` }} />
-              </span>
-              <span className="rlp-area-label">{a.label}</span>
-              <span className="rlp-area-count">
-                {a.deliberateGap ? "deliberately quiet" : a.goals.length === 0 ? "open" : `${a.goals.length}`}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      {shape && <p className="rlp-balance-shape">{shape}</p>}
-    </div>
-  );
-}
-
 // ---- §3 values compass ----
 
 function ValuesCompass({
   values,
   buckets,
+  printing = false,
 }: {
+  printing?: boolean;
   values: {
     value: string;
     meaning?: string;
@@ -228,24 +235,10 @@ function ValuesCompass({
   }[];
   buckets: { nonNegotiable: string[]; flexible: string[] };
 }) {
-  const [sel, setSel] = useState(0);
-  const n = values.length;
-  if (n === 0) return null;
+  const [sel, setSel] = useState<number | null>(0);
+  if (values.length === 0) return null;
+  // On paper there is nothing to tap, so every value is already open.
 
-  const cx = 150;
-  const cy = 150;
-  const r = 104;
-  const nodes = values.map((v, i) => {
-    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
-    return {
-      ...v,
-      x: cx + r * Math.cos(angle),
-      y: cy + r * Math.sin(angle),
-      i,
-    };
-  });
-
-  const active = values[sel];
   const bucketOf = (name: string) =>
     buckets.nonNegotiable.includes(name)
       ? "Non-negotiable"
@@ -254,78 +247,59 @@ function ValuesCompass({
         : null;
 
   return (
-    <div className="rlp-compass-wrap">
-      <svg viewBox="0 0 300 300" className="rlp-compass" role="img" aria-label="My values">
-        <circle cx={cx} cy={cy} r={r} className="rlp-compass-ring" />
-        {nodes.map((nd) => (
-          <g
-            key={`l${nd.i}`}
-            onClick={() => setSel(nd.i)}
-            className="rlp-compass-spoke-hit"
-          >
-            <line
-              x1={cx}
-              y1={cy}
-              x2={nd.x}
-              y2={nd.y}
-              className={`rlp-compass-spoke${nd.i === sel ? " on" : ""}`}
-            />
-            {/* Invisible thick line widens the spoke's clickable area. */}
-            <line
-              x1={cx}
-              y1={cy}
-              x2={nd.x}
-              y2={nd.y}
-              stroke="transparent"
-              strokeWidth={16}
-            />
-          </g>
-        ))}
-        {nodes.map((nd) => (
-          <g key={`n${nd.i}`} onClick={() => setSel(nd.i)} className="rlp-compass-node">
-            {/* Invisible larger circle widens the dot's clickable target. */}
-            <circle cx={nd.x} cy={nd.y} r={22} fill="transparent" stroke="none" />
-            <circle cx={nd.x} cy={nd.y} r={nd.i === sel ? 9 : 6} className={nd.i === sel ? "on" : ""} />
-            <text
-              x={nd.x}
-              y={nd.y < cy ? nd.y - 14 : nd.y + 22}
-              textAnchor={Math.abs(nd.x - cx) < 12 ? "middle" : nd.x < cx ? "end" : "start"}
-              className={`rlp-compass-text${nd.i === sel ? " on" : ""}`}
+    <div className="rlp-vlist">
+      {values.map((v, i) => {
+        const on = printing || sel === i;
+        const bucket = bucketOf(v.value);
+        const hasFacets =
+          v.threat || (v.protectors && v.protectors.length > 0);
+        return (
+          <div key={v.value}>
+            <button
+              type="button"
+              className={`rlp-vrow${on ? " sel" : ""}`}
+              aria-expanded={on}
+              aria-controls={`value-${i}`}
+              onClick={() => setSel(on ? null : i)}
             >
-              {nd.value}
-            </text>
-          </g>
-        ))}
-        <text x={cx} y={cy - 6} textAnchor="middle" className="rlp-compass-center-lbl">
-          What guides
-        </text>
-        <text x={cx} y={cy + 12} textAnchor="middle" className="rlp-compass-center-lbl">
-          your choices
-        </text>
-      </svg>
-
-      <div className="rlp-compass-detail" aria-live="polite">
-        <div className="rlp-compass-detail-head">
-          <h3>{active.value}</h3>
-          {bucketOf(active.value) && (
-            <span className={`rlp-vtag ${bucketOf(active.value) === "Non-negotiable" ? "firm" : "flex"}`}>
-              {bucketOf(active.value)}
-            </span>
-          )}
-        </div>
-        {active.meaning && <p className="rlp-compass-meaning">&ldquo;{active.meaning}&rdquo;</p>}
-        {active.threat && (
-          <p className="rlp-compass-note">What puts it at risk: {active.threat}</p>
-        )}
-        {active.protectors && active.protectors.length > 0 && (
-          <p className="rlp-compass-note">
-            What protects it: {active.protectors.join(", ")}
-          </p>
-        )}
-        {active.confidence === "still forming" && (
-          <p className="rlp-compass-note">Still forming &mdash; settling as you go.</p>
-        )}
-      </div>
+              <span className="rlp-vrow-lbl">{v.value}</span>
+              {bucket && (
+                <span className={`rlp-vtag ${bucket === "Non-negotiable" ? "firm" : "flex"}`}>
+                  {bucket}
+                </span>
+              )}
+            </button>
+            {on && (
+              <div className="rlp-vopen" id={`value-${i}`}>
+                {v.meaning && <p className="rlp-vmeaning">&ldquo;{v.meaning}&rdquo;</p>}
+                {/* Risk / protect are kept, but tightened: a label and the member's
+                    own phrase, rather than a full "What puts it at risk: …"
+                    sentence each. The words are theirs, so only the framing
+                    around them is compressed. */}
+                {hasFacets && (
+                  <dl className="rlp-vfacets">
+                    {v.threat && (
+                      <div>
+                        <dt>At risk from</dt>
+                        <dd>{v.threat}</dd>
+                      </div>
+                    )}
+                    {v.protectors && v.protectors.length > 0 && (
+                      <div>
+                        <dt>Protected by</dt>
+                        <dd>{v.protectors.join(" \u00b7 ")}</dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+                {v.confidence === "still forming" && (
+                  <p className="rlp-vnote">Still forming &mdash; settling as you go.</p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -377,10 +351,28 @@ function SeasonsTimeline({
   );
 }
 
-// ---- §5 goal cards (open to detail) ----
+// ---- Tab 3 · the goal, and its route ----
+//
+// One component for both lenses. The heart-of-it detail and the route used to be
+// two sections that each listed every goal, so the member read the same titles
+// twice; folding the path into the card means opening a goal re-lenses it (what
+// it is → how you get there) instead of re-listing it. The route also owns the
+// per-goal timing, so time is told once here and once in the first-year zoom.
 
-function GoalCard({ goal }: { goal: PlanGoal }) {
-  const [open, setOpen] = useState(false);
+function GoalCard({
+  goal,
+  path,
+  areaLabel,
+  printing = false,
+}: {
+  goal: PlanGoal;
+  path?: PlanPath;
+  areaLabel?: string;
+  printing?: boolean;
+}) {
+  const [tapped, setTapped] = useState(false);
+  const open = printing || tapped;
+  const setOpen = setTapped;
   const theme = AREA_THEME[goal.area];
   const season = seasonLabel43(goal.season);
 
@@ -390,7 +382,11 @@ function GoalCard({ goal }: { goal: PlanGoal }) {
       style={{ ["--a-base" as string]: theme.base, ["--a-fg" as string]: theme.fg }}
     >
       <button className="rlp-goal-top" onClick={() => setOpen(!open)} aria-expanded={open}>
-        {goal.rank && <span className="rlp-goal-rank">{goal.rank}</span>}
+        {goal.rank && (
+          <span className="rlp-goal-rank" title={`Priority ${goal.rank} in your order`}>
+            {goal.rank}
+          </span>
+        )}
         <span className="rlp-goal-label">{goal.label}</span>
         <span className="rlp-goal-meta">
           {season && <span className="rlp-goal-season">{season}</span>}
@@ -399,6 +395,7 @@ function GoalCard({ goal }: { goal: PlanGoal }) {
       </button>
       {open && (
         <div className="rlp-goal-body">
+          {areaLabel && <p className="rlp-goal-area">{areaLabel}</p>}
           {goal.note && <p className="rlp-goal-why">&ldquo;{goal.note}&rdquo;</p>}
           {goal.track === "do" ? (
             <>
@@ -417,19 +414,25 @@ function GoalCard({ goal }: { goal: PlanGoal }) {
               <p><span className="rlp-k">In an ordinary week</span> {goal.ordinaryWeek}</p>
             )
           )}
+          {path && <GoalRoute path={path} />}
         </div>
       )}
     </div>
   );
 }
 
-// ---- §6 paths ----
+// The route lens, rendered inside the goal it belongs to.
 
-function PathBlock({ path }: { path: PlanPath }) {
+function GoalRoute({ path }: { path: PlanPath }) {
+  const hasSupport =
+    (path.alreadyHelps?.length ?? 0) > 0 || (path.wouldHelp?.length ?? 0) > 0;
+  const hasLadder = path.track === "do" && (path.milestones?.length ?? 0) > 0;
+  if (!hasLadder && !hasSupport && !path.lean) return null;
+
   return (
     <div className="rlp-path">
-      <h3>{path.goal}</h3>
-      {path.track === "do" && path.milestones ? (
+      <p className="rlp-path-head">The route</p>
+      {hasLadder && path.milestones ? (
         <ol className="rlp-ladder">
           {path.milestones.map((m, i) => (
             <li key={i} className={m.done ? "done" : ""}>
@@ -490,10 +493,7 @@ function WeekGroup({ title, items }: { title: string; items: WeekActivity[] }) {
       <h3>{title}</h3>
       <ul>
         {items.map((a, i) => (
-          <li key={i}>
-            <span className="rlp-week-marker" aria-hidden="true">
-              {a.energy && <span className="rlp-week-dot" />}
-            </span>
+          <li key={i} className={a.energy ? "energy" : ""}>
             <span className="rlp-week-act">
               {a.label}
               {a.fixed && <span className="rlp-week-ongoing"> · ongoing work</span>}
@@ -507,117 +507,200 @@ function WeekGroup({ title, items }: { title: string; items: WeekActivity[] }) {
 }
 
 // ---- "See how it all connects" — the signature web ----
-// A calm, legible web of the REAL links between goals, values and people (built
-// only from connections the member would recognise). Selecting a node shows what
-// it connects to, and why, in the member's own terms.
+//
+// A calm vertical list of the REAL links between values, goals and people, where
+// selecting a node draws ONLY its own connections and says why, in the member's
+// own terms.
+//
+// It used to be a radial ring, which couldn't work: up to 18 nodes on a circle
+// leaves ~40px between them, so every label was hard-cut to 21 characters and the
+// ends were still clipped by the page's overflow. The deeper problem was drawing
+// all ~16 edges at once — that turns to spaghetti in ANY layout. So the fix isn't
+// a cleverer arrangement: it's showing the pieces calmly and drawing connections
+// only on demand. A single column is also already the phone layout, so nothing
+// has to collapse, and labels get the full width and never need truncating.
 
-const WEB_KIND_COLOR: Record<string, string> = {
-  value: "var(--accent-strong)",
-  goal: "var(--brand-primary)",
-  person: "var(--success-text)",
-};
+const WEB_GROUPS: { kind: ConnectionKind; name: string }[] = [
+  { kind: "value", name: "Values" },
+  { kind: "goal", name: "Goals" },
+  { kind: "person", name: "People" },
+];
 
-function trunc(s: string, n = 22): string {
-  return s.length > n ? `${s.slice(0, n - 1)}…` : s;
+// Where the dots actually sit, read back from the rendered rows. The links open
+// INLINE under the row you tapped, so the rows below shift and no fixed layout
+// maths can predict the geometry — we measure instead, and the arcs are drawn
+// against what's really on screen. Measuring also means a wrapped label or a
+// narrow phone can't put the SVG out of step with the DOM.
+type WebGeom = { h: number; x: number; y: Record<string, number> };
+
+function sameGeom(a: WebGeom, b: WebGeom) {
+  if (a.h !== b.h || a.x !== b.x) return false;
+  const ak = Object.keys(a.y);
+  if (ak.length !== Object.keys(b.y).length) return false;
+  return ak.every((k) => a.y[k] === b.y[k]);
 }
 
-function ConnectionsWeb({ graph }: { graph: ConnectionsGraph }) {
+function ConnectionsWeb({ graph, printing = false }: { graph: ConnectionsGraph; printing?: boolean }) {
   const [sel, setSel] = useState<string | null>(null);
+  const [geom, setGeom] = useState<WebGeom>({ h: 0, x: 0, y: {} });
+  const stackRef = useRef<HTMLDivElement | null>(null);
+  const dots = useRef(new Map<string, HTMLSpanElement>());
   const { nodes, edges } = graph;
-  const cx = 180;
-  const cy = 180;
-  const r = 116;
 
-  const kindOrder: Record<string, number> = { value: 0, goal: 1, person: 2 };
-  const ordered = [...nodes].sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind]);
-  const total = ordered.length;
-  const pos = new Map<string, { x: number; y: number }>();
-  ordered.forEach((node, i) => {
-    const angle = (i / total) * 2 * Math.PI - Math.PI / 2;
-    pos.set(node.id, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
-  });
+  const measure = useCallback(() => {
+    const stack = stackRef.current;
+    if (!stack) return;
+    const box = stack.getBoundingClientRect();
+    const y: Record<string, number> = {};
+    let x = 0;
+    dots.current.forEach((el, id) => {
+      const r = el.getBoundingClientRect();
+      y[id] = r.top - box.top + r.height / 2;
+      x = r.left - box.left + r.width / 2;
+    });
+    const next = { h: stack.offsetHeight, x, y };
+    setGeom((prev) => (sameGeom(prev, next) ? prev : next));
+  }, []);
 
-  const touches = (id: string) => edges.filter((e) => e.from === id || e.to === id);
-  const nodeActive = (id: string) =>
-    !sel || id === sel || touches(sel).some((e) => e.from === id || e.to === id);
-  const labelOf = (id: string) => nodes.find((nd) => nd.id === id)?.label ?? "";
+  // Re-measure before paint whenever the selection changes the layout, and on
+  // any resize (rotation, wrapped labels).
+  useLayoutEffect(() => {
+    measure();
+    const stack = stackRef.current;
+    if (!stack || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(stack);
+    return () => ro.disconnect();
+  }, [measure, sel]);
 
-  const details = sel
-    ? touches(sel).map((e) => {
-        const otherId = e.from === sel ? e.to : e.from;
-        return { label: labelOf(otherId), why: e.why };
-      })
-    : [];
+  const labelOf = (id: string) => nodes.find((n) => n.id === id)?.label ?? id;
+
+  // What the selection touches — used to light rows and to draw the only arcs
+  // that ever appear.
+  const linked = new Set<string>();
+  if (sel) {
+    linked.add(sel);
+    for (const e of edges) {
+      if (e.from === sel) linked.add(e.to);
+      if (e.to === sel) linked.add(e.from);
+    }
+  }
+
+  const groups = WEB_GROUPS.map((g) => ({
+    ...g,
+    items: nodes.filter((n) => n.kind === g.kind),
+  })).filter((g) => g.items.length > 0);
+
+  const linksFor = (id: string) =>
+    edges
+      .filter((e) => e.from === id || e.to === id)
+      .map((e) => ({ label: labelOf(e.from === id ? e.to : e.from), why: e.why }));
+
+  // On paper there is no selection, so the arcs carry nothing — drawing all of
+  // them at once is the hairball this layout exists to avoid. The links become
+  // text instead: each node, and what it connects to, with the reason.
+  if (printing) {
+    return (
+      <div className="rlp-web-print">
+        {groups.map((g) => (
+          <div key={g.kind} className="rlp-web-group">
+            <div className="rlp-web-grouphead">{g.name}</div>
+            {g.items.map((n) => {
+              const links = linksFor(n.id);
+              if (links.length === 0) return null;
+              return (
+                <div key={n.id} className="rlp-web-pnode">
+                  <h4>{n.label}</h4>
+                  <ul>
+                    {links.map((d, i) => (
+                      <li key={i}>
+                        <strong>{d.label}</strong>
+                        {d.why ? ` — ${d.why}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="rlp-web-wrap">
-      <svg viewBox="0 0 360 360" className="rlp-web" role="img" aria-label="How my goals, values and people connect">
-        {edges.map((e, i) => {
-          const a = pos.get(e.from)!;
-          const b = pos.get(e.to)!;
-          const on = !sel || e.from === sel || e.to === sel;
-          return (
-            <line
-              key={i}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              className={`rlp-web-edge${sel ? (on ? " on" : " dim") : ""}`}
-            />
-          );
-        })}
-        {ordered.map((node) => {
-          const p = pos.get(node.id)!;
-          const active = nodeActive(node.id);
-          const anchor = Math.abs(p.x - cx) < 16 ? "middle" : p.x < cx ? "end" : "start";
-          return (
-            <g
-              key={node.id}
-              className={`rlp-web-node${sel && !active ? " dim" : ""}`}
-              onClick={() => setSel(sel === node.id ? null : node.id)}
-              style={{ cursor: "pointer" }}
-            >
-              <circle cx={p.x} cy={p.y} r={sel === node.id ? 9 : 6} style={{ fill: WEB_KIND_COLOR[node.kind] }} />
-              <text
-                x={p.x + (anchor === "end" ? -10 : anchor === "start" ? 10 : 0)}
-                y={p.y < cy ? p.y - 11 : p.y + 18}
-                textAnchor={anchor}
-                className={`rlp-web-text${sel === node.id ? " sel" : ""}`}
-              >
-                {trunc(node.label)}
-              </text>
-            </g>
-          );
-        })}
-        <text x={cx} y={cy - 4} textAnchor="middle" className="rlp-web-center">How it all</text>
-        <text x={cx} y={cy + 14} textAnchor="middle" className="rlp-web-center">connects</text>
-      </svg>
+    <div className="rlp-web">
+      <div className="rlp-web-stack" ref={stackRef}>
+        <svg
+          className="rlp-web-arcs"
+          width={geom.x + 6}
+          height={geom.h}
+          viewBox={`0 0 ${geom.x + 6} ${geom.h}`}
+          aria-hidden="true"
+        >
+          {edges
+            .filter((e) => sel && (e.from === sel || e.to === sel))
+            .map((e, i) => {
+              const y1 = geom.y[e.from];
+              const y2 = geom.y[e.to];
+              if (y1 === undefined || y2 === undefined) return null;
+              // Bulge left into the gutter, more for a longer reach — but never
+              // past the edge, however narrow the gutter gets.
+              const b = Math.min(geom.x - 6, 8 + Math.abs(y2 - y1) * 0.09);
+              return (
+                <path
+                  key={i}
+                  d={`M ${geom.x} ${y1} C ${geom.x - b} ${y1}, ${geom.x - b} ${y2}, ${geom.x} ${y2}`}
+                  fill="none"
+                  stroke="var(--ink)"
+                  strokeWidth={2}
+                />
+              );
+            })}
+        </svg>
 
-      <div className="rlp-web-detail">
-        <div className="rlp-web-legend">
-          <span style={{ color: "var(--accent-strong)" }}>&#9679; Values</span>
-          <span style={{ color: "var(--brand-primary)" }}>&#9679; Goals</span>
-          <span style={{ color: "var(--success-text)" }}>&#9679; People</span>
-        </div>
-        {sel ? (
-          <>
-            <h3>{labelOf(sel)}</h3>
-            <ul className="rlp-web-links">
-              {details.map((d, i) => (
-                <li key={i}>
-                  <strong>{d.label}</strong>
-                  {d.why ? ` — ${d.why}` : ""}
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="rlp-web-hint">
-            The threads between your goals, the people who matter, and what you
-            value.
-          </p>
-        )}
+        {groups.map((g) => (
+          <div key={g.kind} className="rlp-web-group">
+            <div className="rlp-web-grouphead">{g.name}</div>
+            {g.items.map((n) => {
+              const isSel = sel === n.id;
+              const lit = !sel || linked.has(n.id);
+              return (
+                <div key={n.id}>
+                  <div className="rlp-web-line">
+                    <span
+                      ref={(el) => {
+                        if (el) dots.current.set(n.id, el);
+                        else dots.current.delete(n.id);
+                      }}
+                      className={`rlp-web-dot${lit ? " lit" : ""}`}
+                      aria-hidden="true"
+                    />
+                    <button
+                      type="button"
+                      className={`rlp-web-row${isSel ? " sel" : ""}${lit ? "" : " dim"}`}
+                      aria-expanded={isSel}
+                      aria-controls={`web-links-${n.id}`}
+                      onClick={() => setSel(isSel ? null : n.id)}
+                    >
+                      {n.label}
+                    </button>
+                  </div>
+                  {isSel && (
+                    <ul className="rlp-web-links" id={`web-links-${n.id}`}>
+                      {linksFor(n.id).map((d, i) => (
+                        <li key={i}>
+                          <strong>{d.label}</strong>
+                          {d.why ? ` — ${d.why}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -642,36 +725,78 @@ export default function RlpPlanDocument({
   // Retirement paths (Phase 5): all empty/null for working + flag-off. (The
   // "keep" items double as the week's anchors — rendered in the reset section.)
   // resetActions is the FRAMED "Worth picking up" (never the raw change items).
-  const { orientation, reset, resetActions, windDownExit, onsetGentle } = plan;
+  const { title, retired, reflections, orientation, reset, resetActions, windDownExit, onsetGentle } =
+    plan;
+
+  // The plan reads as six tabs rather than one long scroll. Section order in this
+  // file already matches the tab order, so each section is grouped in place by a
+  // guard rather than being moved — the one exception is the retired reset, whose
+  // columns belong to Overview and whose "Worth picking up" belongs to Goals.
+  // Tab 5's name is per-cohort: the retired cohorts aren't planning a first year.
+  // Goals and their routes are keyed by the goal's label (the route build copies
+  // it across verbatim), so the two lenses can be paired back up into one card.
+  const pathByGoal = new Map(paths.paths.map((p) => [p.goal, p]));
+  const pathFor = (label: string) => pathByGoal.get(label);
+
+  // Tab 5's name has to be true of where the member stands. Anyone still working
+  // is looking at the crossing itself, whenever it lands — so the tab is "The
+  // transition" whether they're two years out or twenty. Once they're retired
+  // there's no crossing left to name and the tab is simply the year they're in.
+  const aheadLabel = retired ? "The year ahead" : "The transition";
+  const TABS: PlanTabDef[] = [
+    { id: "overview", label: "Overview" },
+    { id: "days", label: "Days and years" },
+    { id: "goals", label: "Goals" },
+    { id: "connections", label: "Connections" },
+    { id: "ahead", label: aheadLabel },
+    { id: "reflections", label: "Reflections" },
+  ];
+  const [tab, setTab] = useState<string>("overview");
+  const areaLabels = Object.fromEntries(
+    balance.areas.map((a) => [a.id, a.label])
+  ) as Record<BalancedAreaId, string>;
+
+  // One flat list in the member's chosen order. Goals with no rank sort last
+  // rather than jumping to the front on a falsy 0/undefined.
+  const orderedGoals = prioritisedAreas
+    .flatMap((a) => a.goals)
+    .sort((x, y) => (x.rank ?? Infinity) - (y.rank ?? Infinity));
+
+  // Values already shown as a tagged row in the compass list — so the bucket
+  // chips below it only need to carry anything the list didn't.
+  const coreNames = new Set(values.coreValues.map((v) => v.value));
+  const firmOnly = values.nonNegotiables.filter((v) => !coreNames.has(v));
+  const flexOnly = values.flexible.filter((v) => !coreNames.has(v));
+
   const heroScene = plan.scenes.find((s) => s.slot === "hero");
   const sceneFor = (id: string) => plan.scenes.find((s) => s.slot === id);
 
-  const [downloading, setDownloading] = useState(false);
-  async function downloadPdf() {
-    setDownloading(true);
+  // PRINTING. The PDF is this same document, printed — not a second
+  // implementation. `printing` unfolds every tab and opens every expandable, then
+  // the browser prints; @media print does the rest. There is no parallel renderer
+  // to keep in sync, so the PDF cannot drift from the app.
+  // PREVIEW vs PRINTING are two different things and were wrongly one piece of
+  // state: /plan?print=1 shows the unfolded document on screen, and the button
+  // runs a real print. Conflating them meant the effect bailed out on the
+  // preview URL — so on ?print=1 the Save as PDF button silently did nothing.
+  const [preview] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("print") === "1"
+  );
+  const [printing, setPrinting] = useState(false);
+  // Unfolded = every tab rendered and every expandable open — what print reads.
+  const unfolded = preview || printing;
+
+  function printPlan() {
+    // flushSync, not a timeout: the unfolded DOM must exist BEFORE print() reads
+    // it, and print() must stay inside the click's user activation — a deferred
+    // call loses the gesture and browsers may refuse it with no error at all.
+    flushSync(() => setPrinting(true));
     try {
-      const res = await fetch("/api/plan-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, images }),
-      });
-      if (!res.ok) throw new Error("pdf failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = meta.name
-        ? `Retirement-Life-Plan-${meta.name.replace(/\s+/g, "-")}.pdf`
-        : "Retirement-Life-Plan.pdf";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      // last resort: the browser's own print-to-PDF
       window.print();
     } finally {
-      setDownloading(false);
+      setPrinting(false);
     }
   }
 
@@ -686,67 +811,119 @@ export default function RlpPlanDocument({
         </div>
       )}
 
-      <div className="rlp-toolbar">
-        <button type="button" onClick={downloadPdf} disabled={downloading} className="rlp-download">
-          {downloading ? "Preparing PDF…" : "Save as PDF"}
-        </button>
-      </div>
+      {/* ---- The plan's own head: everything true of the WHOLE artefact sits
+           above the tabs, so it reads as one document with six ways in rather
+           than six documents. The title, who it's for and when it was made
+           belong to the plan, not to the Overview tab. ---- */}
+      <header className="rlp-head" style={{ ["--rlp-head-ground" as string]: stageHeroGroundFor(4) }}>
+        {/* The Chorus front door. The plan is Stage 4's output, so it wears
+            Stage 4's pairing — cream field, orange graphic — read from the same
+            table as the dashboard's stage heroes rather than hardcoded here. The
+            graphic is cropped bottom-right and the body is width-capped so the
+            circles can never run through the title. */}
+        <ChorusVectorGraphic fill={stageHeroGraphicFor(4)} className="rlp-head-gfx" />
+        <div className="rlp-head-body">
+          <h1 className="rlp-plan-title">{title}</h1>
+          <p className="rlp-head-lede">
+            Your plan in six parts. Move through the tabs to read it in full.
+          </p>
+          <dl className="rlp-meta">
+            {meta.name && (
+              <div><dt>For</dt><dd>{meta.name}</dd></div>
+            )}
+            <div><dt>Created</dt><dd>{formatDate(meta.dateCreated)}</dd></div>
+            <div><dt>Last reviewed</dt><dd>{formatDate(meta.dateLastReviewed)}</dd></div>
+            <div><dt>Next review</dt><dd>{formatDate(meta.nextReviewDue)}</dd></div>
+          </dl>
+          {/* Under the meta rather than beside the title: the title is wide enough
+              at display size that two pills alongside it just wrap, which put the
+              buttons between the title and its own opening line. */}
+          <div className="rlp-head-actions">
+            <a href="#whats-next" className="rlp-headbtn">Next Stage</a>
+            <a href="/home" className="rlp-headbtn">Return Home</a>
+            <button type="button" onClick={printPlan} className="rlp-headbtn">
+              Save as PDF
+            </button>
+          </div>
+        </div>
+      </header>
 
+      <PlanTabs tabs={TABS} activeId={tab} onChange={setTab}>
+
+      {/* ---- TAB 1 · Overview ----
+          Sections are GROUPED BY TAB, and the groups run in tab order. They used
+          to be interleaved — file order decided the layout, so the Reflections
+          read physically sat between the self-intro and the values. Invisible
+          while one tab renders at a time; wrong the moment the whole document is
+          printed in order. Keep each tab's sections together. */}
+      {(unfolded || tab === "overview") && (
+      <>
       {/* §1 — opening */}
       <section className="rlp-section rlp-opening">
-        {heroScene && <SceneImage scene={heroScene} ratio="21 / 9" src={images.hero} />}
-        <p className="rlp-eyebrow">Your Retirement Life Plan</p>
         <h1 className="rlp-chapter-title">{opening.chapterTitle}</h1>
+        {heroScene && <SceneImage scene={heroScene} ratio="21 / 9" src={images.hero} />}
         {orientation && <p className="rlp-overview rlp-orientation">{orientation}</p>}
         {opening.overview && <p className="rlp-overview">{opening.overview}</p>}
         {opening.insight && <p className="rlp-insight">{opening.insight}</p>}
+      </section>
+
+      {/* The self-portrait, given its own section. It was buried at the foot of
+          the opening with nothing to announce it — the single most personal
+          thing in the plan, reading as an afterthought to the chapter title. */}
+      <section className="rlp-section">
+        <SectionHead eyebrow="In your words" title="How you'd introduce yourself now" />
         <SelfIntro
           key={opening.selfIntro}
           selfIntro={opening.selfIntro}
           savedSelfIntro={savedSelfIntro}
           onSave={onSaveSelfIntro}
+          printing={unfolded}
         />
-        <dl className="rlp-meta">
-          {meta.name && (
-            <div><dt>For</dt><dd>{meta.name}</dd></div>
-          )}
-          <div><dt>Created</dt><dd>{formatDate(meta.dateCreated)}</dd></div>
-          <div><dt>Last reviewed</dt><dd>{formatDate(meta.dateLastReviewed)}</dd></div>
-          <div><dt>Next review</dt><dd>{formatDate(meta.nextReviewDue)}</dd></div>
-        </dl>
       </section>
+      </>
+      )}
 
-      {/* §2 — balanced retirement */}
+      {/* §3 — values (Tab 1 · Overview) */}
+      {(unfolded || tab === "overview") && (
       <section className="rlp-section">
-        <SectionHead index={2} eyebrow="The shape of it" title="Your balanced retirement" />
-        <BalanceOverview areas={balance.areas} shape={balance.shape} />
-      </section>
-
-      {/* §3 — values */}
-      <section className="rlp-section">
-        <SectionHead index={3} eyebrow="Your compass" title="What matters most to you" />
+        {/* "Your compass" named a picture that no longer exists. */}
+        <SectionHead eyebrow="Guiding principles" title="What matters most to you" />
         {values.coreValues.length > 0 && (
-          <HelperLine>Tap each value to read what it means to you.</HelperLine>
+          <>
+            <p className="rlp-lede">
+              These are the values that will steer you when you&rsquo;re pulled in
+              different directions.
+            </p>
+            <div className="rlp-helper">
+              <HelperLine>Tap any value to read what it means to you.</HelperLine>
+            </div>
+          </>
         )}
         <ValuesCompass
           values={values.coreValues}
           buckets={{ nonNegotiable: values.nonNegotiables, flexible: values.flexible }}
+          printing={unfolded}
         />
-        {(values.nonNegotiables.length > 0 || values.flexible.length > 0) && (
+        {/* Only the buckets that AREN'T already on a value row. Each row now
+            carries its own Non-negotiable / Flexible tag, so listing the same
+            names again underneath was the plan reading itself back. The lists
+            can hold names that were never chosen as core values, though, so the
+            strays still get shown rather than silently dropped. */}
+        {(firmOnly.length > 0 || flexOnly.length > 0) && (
           <div className="rlp-buckets">
-            {values.nonNegotiables.length > 0 && (
+            {firmOnly.length > 0 && (
               <div>
-                <h3>What I&rsquo;ll hold firm on</h3>
+                <h3>Also holding firm on</h3>
                 <div className="rlp-chips">
-                  {values.nonNegotiables.map((v) => <span key={v} className="rlp-chip firm">{v}</span>)}
+                  {firmOnly.map((v) => <span key={v} className="rlp-chip firm">{v}</span>)}
                 </div>
               </div>
             )}
-            {values.flexible.length > 0 && (
+            {flexOnly.length > 0 && (
               <div>
-                <h3>Where I can flex</h3>
+                <h3>Where else you can flex</h3>
                 <div className="rlp-chips">
-                  {values.flexible.map((v) => <span key={v} className="rlp-chip flex">{v}</span>)}
+                  {flexOnly.map((v) => <span key={v} className="rlp-chip flex">{v}</span>)}
                 </div>
               </div>
             )}
@@ -754,117 +931,22 @@ export default function RlpPlanDocument({
         )}
         {values.principles.length > 0 && (
           <div className="rlp-principles">
-            <h3>How I&rsquo;ll decide when things pull apart</h3>
+            <h3>How you&rsquo;ll decide when things pull apart</h3>
             <ul>
               {values.principles.map((p, i) => <li key={i}>{p}</li>)}
             </ul>
           </div>
         )}
       </section>
-
-      {/* §4 — seasons */}
-      <section className="rlp-section">
-        <SectionHead index={4} eyebrow="The when" title="The retirement you're moving towards" />
-        <p className="rlp-lede">
-          {movingTowards.arc ||
-            "Retirement isn’t one long chapter — it unfolds in seasons. Here is how your priorities shift over the years, and what you’d want to hold onto throughout."}
-        </p>
-        <SeasonsTimeline seasons={movingTowards.seasons} enduring={movingTowards.enduring} />
-      </section>
-
-      {/* §5 — most important goals */}
-      <section className="rlp-section">
-        <SectionHead index={5} eyebrow="The heart of it" title="Your most important goals" />
-        <p className="rlp-lede">
-          The handful whose absence would leave retirement feeling incomplete
-          &mdash; grouped by the five areas, in the order they matter to you.
-          Select any goal to open it.
-        </p>
-        {prioritisedAreas.map((area) => (
-          <div key={area.id} className="rlp-goal-group">
-            <h3
-              className="rlp-goal-group-head"
-              style={{ ["--a-fg" as string]: AREA_THEME[area.id].fg }}
-            >
-              {area.label}
-            </h3>
-            {area.goals.map((g, i) => <GoalCard key={i} goal={g} />)}
-          </div>
-        ))}
-      </section>
-
-      {/* See how it all connects — the signature web */}
-      {connections && (
-        <section className="rlp-section">
-          <SectionHead index={0} eyebrow="The web of it" title="See how it all connects" />
-          <HelperLine>Tap any point to see what it connects to.</HelperLine>
-          <ConnectionsWeb graph={connections} />
-        </section>
       )}
 
-      {/* §6 — the path */}
-      <section className="rlp-section">
-        <SectionHead index={6} eyebrow="The route" title="The path to your goals" />
-        <p className="rlp-lede">
-          For each goal, a few stepping stones &mdash; with much of the way
-          already behind you. The precise first steps come in Act.
-        </p>
-        <div className="rlp-paths">
-          {paths.paths.map((p, i) => <PathBlock key={i} path={p} />)}
-        </div>
-        {paths.strengths.length > 0 && (
-          <div className="rlp-strengths">
-            <h3>Strengths and resources to lean on</h3>
-            <div className="rlp-chips">
-              {paths.strengths.map((s) => <span key={s} className="rlp-chip">{s}</span>)}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* §7 — how my days feel */}
-      {week && (
+      {/* §8 — retired: the reset. Split across two tabs: the stock-take columns
+          are a compact summary in Overview, while "Worth picking up" (below) is a
+          source of goals and belongs in Goals. Separating them also stops the
+          member reading their own `change` items twice on one screen. */}
+      {(unfolded || tab === "overview") && reset && (
         <section className="rlp-section">
-          <SectionHead index={7} eyebrow="The everyday" title="How you want your days to feel" />
-          {week.rhythm && <p className="rlp-week-narrative">{week.rhythm}</p>}
-          <div className="rlp-structure">
-            <span>{week.structureLeft}</span>
-            <div className="rlp-structure-track">
-              <span className="rlp-structure-dot" style={{ left: `${week.structure}%` }} />
-            </div>
-            <span>{week.structureRight}</span>
-          </div>
-          {(() => {
-            const holds = week.activities
-              .filter((a) => a.anchor || a.fixed)
-              .sort(byFrequency);
-            const moves = week.activities
-              .filter((a) => !a.anchor && !a.fixed)
-              .sort(byFrequency);
-            const anyEnergy = week.activities.some((a) => a.energy);
-            return (
-              <>
-                <div className="rlp-week-groups">
-                  <WeekGroup title="What holds your week" items={holds} />
-                  <WeekGroup title="What moves around it" items={moves} />
-                </div>
-                {anyEnergy && (
-                  <p className="rlp-week-legend">
-                    <span className="rlp-week-marker" aria-hidden="true"><span className="rlp-week-dot" /></span>
-                    gives you energy
-                  </p>
-                )}
-              </>
-            );
-          })()}
-          <p className="rlp-fineprint">The character of an ordinary week, lived for years &mdash; not a timetable.</p>
-        </section>
-      )}
-
-      {/* §8 — retired: the reset (carrying forward / reshaping / letting go) */}
-      {reset && (
-        <section className="rlp-section">
-          <SectionHead index={8} eyebrow="The reset" title="Carrying forward, reshaping, letting go" />
+          <SectionHead eyebrow="The reset" title="Carrying forward, reshaping, letting go" />
           {onsetGentle && (
             <p className="rlp-overview">
               Leaving work wasn&rsquo;t entirely on your terms, so this is less
@@ -901,95 +983,142 @@ export default function RlpPlanDocument({
               </div>
             )}
           </div>
-          {resetActions.length > 0 && (
-            <div className="rlp-candidates">
-              <h3 className="rlp-reset-head">Worth picking up</h3>
-              <p className="rlp-reset-sub">A few ways to act on what you&rsquo;d reshape — small, concrete first moves.</p>
-              <ul className="rlp-reset-list">
-                {resetActions.map((a, i) => (
-                  <li key={i}>{a}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </section>
       )}
 
-      {/* §8 — winding-down, decided: the settled exit (from the wind_down_exit fact) */}
-      {windDownExit && (
+      {/* ---- TAB 2 · Days and years ---- */}
+      {/* §4 — the seasons, heading this tab. It keeps its per-season items:
+          they're what makes the shape of the years legible, and losing them cost
+          more than the repetition did. The generated arc line is the lede. */}
+      {(unfolded || tab === "days") && (
+      <section className="rlp-section">
+        <SectionHead eyebrow="The shape of it" title="How the years unfold" />
+        {movingTowards.arc && <p className="rlp-lede">{movingTowards.arc}</p>}
+        <SeasonsTimeline seasons={movingTowards.seasons} enduring={movingTowards.enduring} />
+      </section>
+      )}
+
+      {/* §7 — how my days feel (Tab 2 · Days and years) */}
+      {(unfolded || tab === "days") && week && (
         <section className="rlp-section">
-          <SectionHead index={8} eyebrow="The threshold" title="Leaving work" />
-          <dl className="rlp-facts">
-            <div>
-              <dt>Your plan</dt>
-              <dd>You&rsquo;ve settled how and when you&rsquo;ll leave work fully.</dd>
+          <SectionHead eyebrow="The everyday" title="How you want your days to feel" />
+          {week.rhythm && <p className="rlp-week-narrative">{week.rhythm}</p>}
+          <div className="rlp-structure">
+            <span>{week.structureLeft}</span>
+            <div className="rlp-structure-track">
+              <span className="rlp-structure-dot" style={{ left: `${week.structure}%` }} />
             </div>
-            {windDownExit.currentShape && (
-              <div>
-                <dt>Where you are now</dt>
-                <dd>
-                  Still working {windDownExit.currentShape.toLowerCase()}
-                  {windDownExit.windingDuration
-                    ? `, winding down ${windDownExit.windingDuration.toLowerCase()}`
-                    : ""}.
-                </dd>
-              </div>
-            )}
-          </dl>
-          <div className="rlp-finance">
-            <p>
-              <strong>Financial confidence.</strong>{" "}
-              Worth firming up with your pension provider or a financial adviser as the natural next step.
-            </p>
+            <span>{week.structureRight}</span>
           </div>
+          {(() => {
+            const holds = week.activities
+              .filter((a) => a.anchor || a.fixed)
+              .sort(byFrequency);
+            const moves = week.activities
+              .filter((a) => !a.anchor && !a.fixed)
+              .sort(byFrequency);
+            const anyEnergy = week.activities.some((a) => a.energy);
+            return (
+              <>
+                <div className="rlp-week-groups">
+                  <WeekGroup title="What holds your week" items={holds} />
+                  <WeekGroup title="What moves around it" items={moves} />
+                </div>
+                {anyEnergy && (
+                  <p className="rlp-week-legend">
+                    <span className="rlp-week-swatch" aria-hidden="true" />
+                    gives you energy
+                  </p>
+                )}
+              </>
+            );
+          })()}
+          <p className="rlp-fineprint">The character of an ordinary week, lived for years &mdash; not a timetable.</p>
         </section>
       )}
 
-      {/* §8 — working + winding-undecided: leaving work (from the 4.1 readiness build) */}
-      {leavingWork && (
+      {/* ---- TAB 3 · Goals ---- */}
+      {/* §5 + §6 — the goals, each carrying its own route (Tab 3 · Goals).
+          They run in the member's own order of priority rather than in five area
+          piles: grouped by area, the ranks read 3, 2, 4, 1, 5 and the order they
+          actually chose — the whole point of the exercise — was invisible. The
+          area still travels with each goal (its colour, and named in the open
+          body), so nothing is lost by dropping the group headings. */}
+      {(unfolded || tab === "goals") && (
+      <section className="rlp-section">
+        <SectionHead eyebrow="The heart of it" title="Your most important goals" />
+        <p className="rlp-lede">
+          The handful whose absence would leave retirement feeling incomplete, in
+          your order of priority. Open any goal to see what it looks like and the
+          route to it.
+        </p>
+        {orderedGoals.map((g, i) => (
+          <GoalCard key={i} goal={g} path={pathFor(g.label)} areaLabel={areaLabels[g.area]} printing={unfolded} />
+        ))}
+      </section>
+      )}
+
+      {/* §6 — the route no longer has its own section: each goal now carries its
+          own path (see GoalRoute), so the goals are listed once. What remains is
+          plan-level rather than per-goal — the strengths across all of them. */}
+      {(unfolded || tab === "goals") && paths.strengths.length > 0 && (
+      <section className="rlp-section">
+        <div className="rlp-strengths">
+          <h3>Strengths and resources to lean on</h3>
+          {paths.strengthsRead && <p className="rlp-strengths-read">{paths.strengthsRead}</p>}
+          <div className="rlp-chips">
+            {paths.strengths.map((s) => <span key={s} className="rlp-chip">{s}</span>)}
+          </div>
+        </div>
+      </section>
+      )}
+
+      {/* Worth picking up (Tab 3 · Goals) — candidate goals drawn from what the
+          member said they'd reshape, plus any unfinished work. */}
+      {(unfolded || tab === "goals") && resetActions.length > 0 && (
         <section className="rlp-section">
-          <SectionHead index={8} eyebrow="The threshold" title="Leaving work" />
-          {/* Plain labelled facts, never a stitched sentence. */}
-          <dl className="rlp-facts">
-            <div>
-              <dt>Transition</dt>
-              <dd>{leavingWork.lean === "gradual" ? "A gradual wind-down" : "A clean break"}</dd>
-            </div>
-            {leavingWork.shape && (
-              <div><dt>Shape</dt><dd>{leavingWork.shape}</dd></div>
-            )}
-            {leavingWork.period && (
-              <div><dt>Over</dt><dd>{leavingWork.period}</dd></div>
-            )}
-            {leavingWork.window && (
-              <div>
-                <dt>Window</dt>
-                <dd>{leavingWork.window.fromLabel}&ndash;{leavingWork.window.toLabel} years from now</dd>
-              </div>
-            )}
-          </dl>
-          <div className="rlp-factors">
-            {leavingWork.factors.map((f) => (
-              <div key={f.id} className="rlp-factor">
-                <span className="rlp-factor-label">{f.label}</span>
-                <span className={`rlp-factor-level lvl-${f.level.toLowerCase()}`}>{f.level}</span>
-              </div>
-            ))}
-          </div>
-          <div className="rlp-finance">
-            <p>
-              <strong>Financial confidence.</strong>{" "}
-              {leavingWork.financeNote ||
-                "Worth firming up with your pension provider or a financial adviser as the natural next step."}
-            </p>
+          <div className="rlp-candidates">
+            <h3 className="rlp-reset-head">Worth picking up</h3>
+            <p className="rlp-reset-sub">A few ways to act on what you&rsquo;d reshape — small, concrete first moves.</p>
+            <ul className="rlp-reset-list">
+              {resetActions.map((a, i) => (
+                <li key={i}>{a}</li>
+              ))}
+            </ul>
           </div>
         </section>
       )}
 
-      {/* §9 — first year */}
-      {firstYear && (
+      {/* ---- TAB 4 · Connections ---- */}
+      {/* The web (Tab 4 · Connections) — its own tab, a light breather. */}
+      {(unfolded || tab === "connections") && connections && (
+        <section className="rlp-section">
+          <SectionHead eyebrow="The web of it" title="See how it all connects" />
+          <p className="rlp-lede">
+            Nothing in your plan stands on its own. The values you named, the
+            goals you chose and the people around you pull on each other &mdash;
+            and those links are the reason the plan holds together.
+          </p>
+          <div className="rlp-helper">
+            <HelperLine>
+              Tap any value, goal or person to draw its connections and read why
+              each one is there. Tap it again to clear them.
+            </HelperLine>
+          </div>
+          <ConnectionsWeb graph={connections} printing={unfolded} />
+        </section>
+      )}
+
+      {/* ---- TAB 5 · The transition / The year ahead ---- */}
+      {/* §9 — the year ahead (Tab 5). The retired cohorts aren't arriving at
+          anything and aren't having a first year — they're already living it, so
+          the same season structure is framed as the chapter ahead instead. */}
+      {(unfolded || tab === "ahead") && firstYear && (
         <section className="rlp-section rlp-firstyear">
-          <SectionHead index={9} eyebrow="Arriving" title="Your first year" />
+          <SectionHead
+            eyebrow={retired ? "Ahead" : "Arriving"}
+            title={retired ? "The year ahead of you" : "Your first year of retirement"}
+          />
           {firstYear.narrative && (
             <p className="rlp-narrative">{firstYear.narrative}</p>
           )}
@@ -1038,10 +1167,139 @@ export default function RlpPlanDocument({
         </section>
       )}
 
-      {/* §10 — open threads (things still in motion) */}
-      {openThreads.length > 0 && (
+      {/* §8 — winding-down, decided: the settled exit (from the wind_down_exit fact).
+          Tab 5 · pre-exit only — the retired cohorts have no leaving-work panel. */}
+      {(unfolded || tab === "ahead") && windDownExit && (
         <section className="rlp-section">
-          <SectionHead index={10} eyebrow="Still in motion" title="What you're still working out" />
+          <SectionHead eyebrow="The threshold" title="Leaving work" />
+          <dl className="rlp-facts">
+            <div>
+              <dt>Your plan</dt>
+              <dd>You&rsquo;ve settled how and when you&rsquo;ll leave work fully.</dd>
+            </div>
+            {windDownExit.currentShape && (
+              <div>
+                <dt>Where you are now</dt>
+                <dd>
+                  Still working {windDownExit.currentShape.toLowerCase()}
+                  {windDownExit.windingDuration
+                    ? `, winding down ${windDownExit.windingDuration.toLowerCase()}`
+                    : ""}.
+                </dd>
+              </div>
+            )}
+          </dl>
+          <div className="rlp-finance">
+            <p>
+              <strong>Financial confidence.</strong>{" "}
+              Worth firming up with your pension provider or a financial adviser as the natural next step.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* §8 — working + winding-undecided: leaving work (from the 4.1 readiness
+          build). Tab 5 · pre-exit only. */}
+      {(unfolded || tab === "ahead") && leavingWork && (
+        <section className="rlp-section">
+          <SectionHead eyebrow="The threshold" title="Leaving work" />
+          {/* Plain labelled facts, never a stitched sentence. */}
+          <dl className="rlp-facts">
+            <div>
+              <dt>Transition</dt>
+              <dd>{leavingWork.lean === "gradual" ? "A gradual wind-down" : "A clean break"}</dd>
+            </div>
+            {leavingWork.shape && (
+              <div><dt>Shape</dt><dd>{leavingWork.shape}</dd></div>
+            )}
+            {leavingWork.period && (
+              <div><dt>Over</dt><dd>{leavingWork.period}</dd></div>
+            )}
+            {leavingWork.window && (
+              <div>
+                <dt>Window</dt>
+                <dd>{leavingWork.window.fromLabel}&ndash;{leavingWork.window.toLabel} years from now</dd>
+              </div>
+            )}
+          </dl>
+          <div className="rlp-factors">
+            {leavingWork.factors.map((f) => (
+              <div key={f.id} className="rlp-factor">
+                <span className="rlp-factor-label">{f.label}</span>
+                <span className={`rlp-factor-level lvl-${f.level.toLowerCase()}`}>{f.level}</span>
+              </div>
+            ))}
+          </div>
+          <div className="rlp-finance">
+            <p>
+              <strong>Financial confidence.</strong>{" "}
+              {leavingWork.financeNote ||
+                "Worth firming up with your pension provider or a financial adviser as the natural next step."}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* ---- TAB 6 · Reflections ---- */}
+      {/* Tab 6 · Vita's read — the first of two clearly-voiced halves. Cream,
+          because this is Vita speaking. §2's standalone chart is gone: its
+          five-area spread is now the band inside the balance read. */}
+      {(unfolded || tab === "reflections") && (
+      <section className="rlp-section rlp-vitaread">
+        <div className="rlp-vitaread-head">
+          <VitaMark size={34} />
+          <div>
+            <p className="rlp-eyebrow">Vita&rsquo;s read</p>
+            <h2 className="rlp-sec-title">How your plan looks to me</h2>
+          </div>
+        </div>
+
+        <div className="rlp-read">
+          <h3>Balance</h3>
+          <BalanceBand areas={balance.areas} />
+          {reflections.balanceCallout && (
+            <p className="rlp-read-callout">{reflections.balanceCallout}</p>
+          )}
+          {reflections.balanceRead && <p>{reflections.balanceRead}</p>}
+        </div>
+
+        {/* Not sought out — only shown where there was something real to say. */}
+        {reflections.realismNote && (
+          <div className="rlp-read">
+            <h3>What the plan rests on</h3>
+            {reflections.realismCallout && (
+              <p className="rlp-read-callout">{reflections.realismCallout}</p>
+            )}
+            <p>{reflections.realismNote}</p>
+          </div>
+        )}
+        {reflections.whatsStrong && (
+          <div className="rlp-read">
+            <h3>What&rsquo;s strong here</h3>
+            {reflections.strongCallout && (
+              <p className="rlp-read-callout">{reflections.strongCallout}</p>
+            )}
+            <p>{reflections.whatsStrong}</p>
+          </div>
+        )}
+        {/* Held against their OWN rules — absent when they set none. */}
+        {reflections.coherence && (
+          <div className="rlp-read">
+            <h3>Coherence with your own rules</h3>
+            {reflections.coherenceCallout && (
+              <p className="rlp-read-callout">{reflections.coherenceCallout}</p>
+            )}
+            <p>{reflections.coherence}</p>
+          </div>
+        )}
+      </section>
+      )}
+
+      {/* §10 — open threads (Tab 6 · Reflections — the USER-voice half, kept
+          distinct from Vita's read so the two voices never blur) */}
+      {(unfolded || tab === "reflections") && openThreads.length > 0 && (
+        <section className="rlp-section">
+          <SectionHead eyebrow="Still in motion" title="What you're still working out" />
           <p className="rlp-lede">
             The honest live edges of your plan &mdash; not gaps or failures, but
             the things you&rsquo;re still turning over and want to keep working out.
@@ -1054,8 +1312,13 @@ export default function RlpPlanDocument({
         </section>
       )}
 
-      {/* §11 — first steps */}
-      <section className="rlp-section rlp-firststeps">
+      </PlanTabs>
+
+      {/* §11 — first steps. Outside the tabs, at the foot of the plan: what
+          comes next follows the WHOLE plan, not the Reflections tab, and
+          shouldn't be reachable only by whoever happens to open tab 6. The
+          button in the head jumps here. */}
+      <section id="whats-next" className="rlp-section rlp-firststeps">
         <p className="rlp-eyebrow">What comes next</p>
         <h2 className="rlp-firststeps-title">First steps</h2>
         <p className="rlp-lede">
@@ -1076,16 +1339,30 @@ const css = `
 .rlp-plan p,.rlp-plan li,.rlp-plan dd{overflow-wrap:break-word}
 .rlp-overview{font-family:var(--font-serif);font-size:var(--fs-h2);line-height:1.55;color:var(--ink);margin:0 0 24px;max-width:62ch}
 .rlp-seedbar{background:var(--info-surface);border:1px solid var(--info-line);color:var(--info-text);font-size:var(--fs-sm);border-radius:var(--r-sm);padding:9px 14px;margin:16px 0}
-.rlp-toolbar{display:flex;justify-content:flex-end;margin:8px 0 4px}
-.rlp-download{font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--brand-primary);background:none;border:1px solid var(--border-strong);border-radius:var(--r-pill);padding:7px 16px;cursor:pointer}
-.rlp-download:hover{background:var(--brand-primary-tint)}
+
+/* the plan's head — above the tabs, true of the whole artefact */
+.rlp-head{position:relative;overflow:hidden;margin:12px 0 26px;padding:32px;border-radius:var(--r-lg);background:var(--rlp-head-ground);color:var(--chorus-dark-green)}
+.rlp-head-gfx{position:absolute;height:200%;left:104%;top:80%;transform:translate(-50%,-50%);pointer-events:none}
+.rlp-head-body{position:relative;max-width:62%}
+.rlp-plan-title{font-family:var(--font-serif);font-size:var(--fs-display);font-weight:600;color:var(--chorus-dark-green);letter-spacing:-.01em;line-height:1.15;margin:0}
+.rlp-head-actions{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 0}
+.rlp-headbtn{font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--chorus-dark-green);background:color-mix(in srgb, #fff 55%, transparent);border:1px solid color-mix(in srgb, var(--chorus-dark-green) 25%, transparent);border-radius:var(--r-pill);padding:7px 16px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.rlp-headbtn:hover:not(:disabled){background:#fff}
+.rlp-headbtn:disabled{opacity:.5;cursor:default}
+.rlp-head-lede{font-size:var(--fs-body);color:color-mix(in srgb, var(--chorus-dark-green) 78%, transparent);margin:10px 0 0}
 
 .rlp-section{margin:48px 0;padding-top:8px}
+/* The rule SEPARATES sections — it isn't part of a section's head. It used to
+   hang off .rlp-sec-head, which was right in a single scroll and wrong the
+   moment the sections were dealt across tabs: the first section in every tab
+   drew its own line directly under the tab strip's border, so each tab opened
+   with two rules and a band of dead space between them. */
+.rlp-section + .rlp-section{border-top:1px solid var(--border);padding-top:30px}
 .rlp-eyebrow{font-size:var(--fs-eyebrow);letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);font-weight:600;margin:0 0 6px}
 .rlp-lede{font-size:var(--fs-body);color:var(--text-muted);max-width:60ch;margin:0 0 22px}
+.rlp-helper{margin:0 0 18px}
 
-.rlp-sec-head{display:flex;gap:16px;align-items:baseline;margin:0 0 22px;border-top:1px solid var(--border);padding-top:22px}
-.rlp-sec-no{font-family:var(--font-serif);font-size:var(--fs-h2);color:var(--text-faint);font-weight:500;font-variant-numeric:tabular-nums}
+.rlp-sec-head{margin:0 0 22px}
 .rlp-sec-title{font-family:var(--font-serif);font-size:var(--fs-display);font-weight:600;color:var(--ink);margin:0;line-height:1.15;letter-spacing:-.01em}
 
 /* opening */
@@ -1094,6 +1371,7 @@ const css = `
 .rlp-intro{margin:0 0 28px}
 .rlp-intro-frame{font-size:var(--fs-body);color:var(--text-muted);max-width:58ch;margin:0 0 12px}
 .rlp-intro-text{width:100%;background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-md);padding:16px 18px;resize:none;font-family:var(--font-serif);font-size:var(--fs-title);line-height:1.5;color:var(--ink);overflow:hidden}
+.rlp-intro-print{white-space:pre-wrap;height:auto!important;overflow:visible!important;margin:0}
 .rlp-intro-text:focus{outline:none;box-shadow:var(--focus-ring);border-color:var(--brand-primary)}
 .rlp-intro-tones{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .rlp-intro-tones-lbl{font-size:var(--fs-sm);color:var(--text-muted);margin-right:2px}
@@ -1103,10 +1381,10 @@ const css = `
 .rlp-intro-busy{font-size:var(--fs-sm);font-style:italic;color:var(--text-faint)}
 .rlp-insight{font-family:var(--font-serif);font-style:italic;font-size:var(--fs-title);line-height:1.5;color:var(--accent-strong);margin:0 0 22px;padding-left:16px;border-left:2px solid var(--accent);max-width:58ch}
 
-.rlp-meta{display:flex;flex-wrap:wrap;gap:20px 36px;margin:8px 0 0;padding-top:18px;border-top:1px solid var(--border)}
+.rlp-meta{display:flex;flex-wrap:wrap;gap:16px 36px;margin:20px 0 0;padding-top:18px;border-top:1px solid color-mix(in srgb, var(--chorus-dark-green) 20%, transparent)}
 .rlp-meta div{display:flex;flex-direction:column;gap:2px}
-.rlp-meta dt{font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint);font-weight:700}
-.rlp-meta dd{margin:0;font-size:var(--fs-sm);color:var(--text);font-weight:600}
+.rlp-meta dt{font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:.1em;color:color-mix(in srgb, var(--chorus-dark-green) 60%, transparent);font-weight:700}
+.rlp-meta dd{margin:0;font-size:var(--fs-sm);color:var(--chorus-dark-green);font-weight:600}
 
 /* scene placeholders */
 .rlp-scene{position:relative;width:100%;margin:0 0 24px;border-radius:var(--r-lg);overflow:hidden;background:linear-gradient(135deg,var(--ill-sky-pale),var(--ill-lavender) 60%,var(--warm-surface));border:1px solid var(--warm-line);display:flex;align-items:flex-end}
@@ -1116,33 +1394,45 @@ const css = `
 .rlp-scene.has-img img{width:100%;height:100%;object-fit:cover;display:block}
 
 /* §2 balance — the at-a-glance shape only */
-.rlp-balance-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;align-items:end}
-.rlp-area-tile{display:flex;flex-direction:column;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 6px 12px;min-height:160px;justify-content:flex-end}
-.rlp-area-fill{flex:1;width:24px;display:flex;align-items:flex-end;background:var(--bg-alt);border-radius:var(--r-pill);overflow:hidden;min-height:70px}
-.rlp-area-fill-bar{width:100%;background:var(--a-sel);border-radius:var(--r-pill)}
-.rlp-area-label{font-size:var(--fs-sm);font-weight:700;color:var(--ink);text-align:center}
-.rlp-area-count{font-size:var(--fs-eyebrow);color:var(--text-faint);font-weight:600;text-align:center}
-.rlp-balance-shape{font-family:var(--font-serif);font-size:var(--fs-h2);line-height:1.5;color:var(--ink);margin:20px 0 0;max-width:60ch}
 .rlp-star{color:var(--accent);margin-right:7px;font-size:13px}
 
 /* §3 compass */
-.rlp-compass-wrap{display:grid;grid-template-columns:minmax(0,300px) 1fr;gap:28px;align-items:center}
-.rlp-compass{width:100%;max-width:300px;height:auto;aspect-ratio:1/1}
-.rlp-compass-ring{fill:var(--warm-surface);stroke:var(--warm-line);stroke-width:1.5}
-.rlp-compass-spoke{stroke:var(--border);stroke-width:1}
-.rlp-compass-spoke.on{stroke:var(--brand-primary);stroke-width:1.5}
-.rlp-compass-spoke-hit{cursor:pointer}
-.rlp-compass-node{cursor:pointer}
-.rlp-compass-node circle{fill:var(--surface);stroke:var(--brand-primary);stroke-width:1.5}
-.rlp-compass-node circle.on{fill:var(--brand-primary)}
-.rlp-compass-text{font-family:var(--font-sans);font-size:12.5px;fill:var(--text-muted);font-weight:600}
-.rlp-compass-text.on{fill:var(--ink);font-weight:700}
-.rlp-compass-center-lbl{font-family:var(--font-serif);font-size:13px;fill:var(--text-faint);font-style:italic}
-.rlp-compass-detail{background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-md);padding:20px 22px;min-height:120px}
-.rlp-compass-detail-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.rlp-compass-detail h3{font-family:var(--font-serif);font-size:var(--fs-h2);color:var(--ink);margin:0}
-.rlp-compass-meaning{font-family:var(--font-serif);font-style:italic;font-size:var(--fs-title);color:var(--text);margin:12px 0 0;line-height:1.4}
-.rlp-compass-note{font-size:var(--fs-sm);color:var(--text-muted);margin:10px 0 0}
+/* The values list. Deliberately the same row-and-open grammar as Connections:
+   two hand-made inventions became one pattern. It replaced a radial compass
+   whose labels sat outside the ring and were cut off at both edges ("endence",
+   "Making a differ") — a circle can't give a long label anywhere to go. */
+.rlp-vlist{margin:0 0 8px}
+.rlp-vrow{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;padding:10px 14px;margin:0 0 7px;background:var(--bg);border:1px solid color-mix(in srgb, var(--ink) 10%, transparent);border-radius:var(--r-sm);font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;color:var(--ink);cursor:pointer;text-align:left;transition:background .18s ease,border-color .18s ease}
+.rlp-vrow:hover{border-color:color-mix(in srgb, var(--ink) 35%, transparent)}
+.rlp-vrow.sel{background:var(--brand-primary);border-color:var(--brand-primary);color:var(--brand-on-primary)}
+.rlp-vrow:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+.rlp-vrow-lbl{min-width:0}
+.rlp-vopen{background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-md);padding:16px 18px;margin:0 0 7px}
+.rlp-vmeaning{font-family:var(--font-serif);font-style:italic;font-size:var(--fs-title);line-height:1.5;color:var(--ink);margin:0}
+.rlp-vnote{font-size:var(--fs-sm);color:var(--text-muted);margin:12px 0 0}
+.rlp-vfacets{display:flex;flex-direction:column;gap:8px;margin:14px 0 0;padding-top:12px;border-top:1px solid var(--warm-line)}
+.rlp-vfacets div{display:grid;grid-template-columns:112px minmax(0,1fr);gap:12px;align-items:baseline}
+.rlp-vfacets dt{font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--text-muted)}
+.rlp-vfacets dd{margin:0;font-size:var(--fs-sm);color:var(--text);line-height:1.45}
+/* Tab 6 — Vita's read. Cream, because Vita is speaking (the member's own voice
+   in "still working out" stays on the plain surface, so the two never blur). */
+.rlp-vitaread{background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-lg);padding:26px 28px}
+.rlp-vitaread-head{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.rlp-read{padding-top:18px;margin-top:18px;border-top:1px solid var(--warm-line)}
+.rlp-read:first-of-type{padding-top:0;margin-top:0;border-top:none}
+.rlp-read h3{font-family:var(--font-sans);font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--text-muted);margin:0 0 10px}
+.rlp-read p{font-size:var(--fs-sm);line-height:var(--lh-body);color:var(--text);margin:0}
+.rlp-read-callout{font-family:var(--font-serif);font-size:var(--fs-title)!important;line-height:1.3;color:var(--ink)!important;margin:0 0 8px!important}
+
+/* The band: a marker between two poles. No score, no badge, no mid-point ticks. */
+.rlp-balband{margin:0 0 14px;max-width:420px}
+.rlp-balband-track{position:relative;height:6px;border-radius:var(--r-pill);background:linear-gradient(90deg, color-mix(in srgb, var(--brand-primary) 30%, transparent), color-mix(in srgb, var(--border-strong) 70%, transparent))}
+.rlp-balband-marker{position:absolute;top:50%;width:22px;height:22px;border-radius:50%;background:var(--brand-primary);border:3px solid var(--warm-surface);box-shadow:0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent);transform:translate(-50%,-50%)}
+.rlp-balband-labels{display:flex;justify-content:space-between;margin-top:8px;font-size:var(--fs-eyebrow);color:var(--text-muted);font-weight:600}
+
+@media(max-width:600px){
+  .rlp-vfacets div{grid-template-columns:1fr;gap:2px}
+}
 .rlp-vtag{font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:.08em;font-weight:700;padding:3px 9px;border-radius:var(--r-pill)}
 .rlp-vtag.firm{background:var(--success-surface);color:var(--success-text);border:1px solid var(--success-line)}
 .rlp-vtag.flex{background:var(--info-surface);color:var(--info-text);border:1px solid var(--info-line)}
@@ -1175,11 +1465,11 @@ const css = `
 .rlp-enduring{margin-top:14px;background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-md);padding:16px}
 
 /* §5 goals */
-.rlp-goal-group{margin:0 0 24px}
-.rlp-goal-group-head{font-family:var(--font-sans);font-size:var(--fs-sm);text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--a-fg);margin:0 0 10px}
 .rlp-goal{background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--a-fg);border-radius:var(--r-md);margin-bottom:9px;overflow:hidden}
 .rlp-goal.open{box-shadow:var(--shadow-sm)}
 .rlp-goal-top{display:flex;align-items:center;gap:12px;width:100%;background:none;border:none;cursor:pointer;font-family:inherit;text-align:left;padding:14px 16px}
+.rlp-strengths-read{font-family:var(--font-serif);font-size:var(--fs-title);line-height:1.55;color:var(--ink);margin:0 0 16px;max-width:60ch}
+.rlp-goal-area{font-family:var(--font-sans);font-size:var(--fs-eyebrow);letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--a-fg);margin:0 0 10px}
 .rlp-goal-rank{flex:none;width:24px;height:24px;border-radius:50%;background:var(--a-base);color:var(--a-fg);display:grid;place-items:center;font-size:13px;font-weight:700}
 .rlp-goal-label{flex:1;font-size:var(--fs-body);font-weight:600;color:var(--ink)}
 .rlp-goal-meta{display:flex;align-items:center;gap:12px;flex:none}
@@ -1191,9 +1481,10 @@ const css = `
 .rlp-k{display:inline-block;font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);font-weight:700;margin-right:8px}
 
 /* §6 paths */
-.rlp-paths{display:flex;flex-direction:column;gap:18px}
-.rlp-path{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);padding:18px 20px}
-.rlp-path h3{font-family:var(--font-serif);font-size:var(--fs-title);color:var(--ink);margin:0 0 14px}
+/* The route now sits INSIDE its goal, so it reads as a second lens on the same
+   thing rather than a card of its own — a hairline and a label, no border box. */
+.rlp-path{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.rlp-path-head{font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--text-muted);margin:0 0 10px}
 .rlp-ladder{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0}
 .rlp-ladder li{display:flex;gap:12px;align-items:flex-start;padding:0 0 14px;position:relative}
 .rlp-ladder li:not(:last-child)::before{content:"";position:absolute;left:9px;top:20px;bottom:0;width:2px;background:var(--border)}
@@ -1216,13 +1507,18 @@ const css = `
 .rlp-week-groups{display:grid;grid-template-columns:1fr 1fr;gap:28px}
 .rlp-week-group h3{font-family:var(--font-sans);font-size:var(--fs-sm);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:700;margin:0 0 8px}
 .rlp-week-group ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column}
-.rlp-week-group li{display:flex;align-items:baseline;gap:0;padding:9px 0;border-bottom:1px solid var(--border)}
-.rlp-week-marker{flex:none;width:16px;display:inline-flex;justify-content:center}
-.rlp-week-dot{width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;position:relative;top:-1px}
+/* Energising items are TINTED rather than dotted. The dot cost a whole 16px
+   column on every row — including the rows that had no dot — to carry one bit of
+   information, which is what made the two lists feel crowded. The tint carries
+   the same bit using space the row already occupies. Rows become bands rather
+   than rules, so the hairline goes too. */
+.rlp-week-group li{display:flex;align-items:baseline;gap:0;padding:9px 12px;margin:0 0 3px;border-radius:var(--r-sm);background:transparent}
+.rlp-week-group li.energy{background:color-mix(in srgb, var(--success) 12%, transparent)}
 .rlp-week-act{flex:1;font-size:var(--fs-body);color:var(--ink);font-weight:600;padding-right:12px}
 .rlp-week-ongoing{font-size:var(--fs-sm);font-weight:400;color:var(--text-faint)}
 .rlp-week-freq{flex:none;font-size:var(--fs-sm);color:var(--text-muted);white-space:nowrap;text-align:right}
-.rlp-week-legend{display:flex;align-items:center;font-size:var(--fs-sm);color:var(--text-muted);margin:14px 0 0}
+.rlp-week-swatch{width:14px;height:14px;border-radius:4px;background:color-mix(in srgb, var(--success) 12%, transparent);border:1px solid color-mix(in srgb, var(--success) 30%, transparent);display:inline-block;margin-right:8px;flex:none}
+.rlp-week-legend{display:flex;align-items:center;font-size:var(--fs-sm);color:var(--text-muted);margin:16px 0 0}
 .rlp-fineprint{font-size:var(--fs-sm);color:var(--text-faint);font-style:italic;margin:14px 0 0}
 
 /* §8 leaving work */
@@ -1280,23 +1576,31 @@ const css = `
 /* See how it all connects — the web. Stacked (visual on top, detail below) so
    the node labels, which render outside the SVG box, never collide with the
    detail panel. The SVG is capped and centred, leaving side margin for labels. */
-.rlp-web-wrap{display:block}
-.rlp-web{display:block;margin:0 auto 20px;width:100%;max-width:420px;height:auto;aspect-ratio:1/1;overflow:visible}
-.rlp-web-edge{stroke:var(--border-strong);stroke-width:1}
-.rlp-web-edge.on{stroke:var(--brand-primary);stroke-width:1.75}
-.rlp-web-edge.dim{stroke:var(--border);opacity:.35}
-.rlp-web-node circle{stroke:var(--bg);stroke-width:2}
-.rlp-web-node.dim{opacity:.3}
-.rlp-web-text{font-family:var(--font-sans);font-size:11px;fill:var(--text);font-weight:600}
-.rlp-web-text.sel{fill:var(--ink);font-weight:700}
-.rlp-web-center{font-family:var(--font-serif);font-style:italic;font-size:13px;fill:var(--text-faint)}
-.rlp-web-detail{background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-md);padding:18px 20px;min-height:140px}
-.rlp-web-legend{display:flex;gap:16px;font-size:var(--fs-sm);font-weight:600;margin-bottom:12px}
-.rlp-web-detail h3{font-family:var(--font-serif);font-size:var(--fs-h2);color:var(--ink);margin:0 0 8px}
-.rlp-web-links{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
-.rlp-web-links li{font-size:var(--fs-body);color:var(--text)}
+/* The web: a calm vertical list; connections drawn only for the selected node.
+   One column is already the phone layout, so nothing collapses and labels keep the
+   full width — which is why they no longer need truncating. */
+.rlp-web{display:block}
+.rlp-web-print .rlp-web-group{margin:0 0 18px}
+.rlp-web-pnode{margin:0 0 12px;padding:0 0 0 14px;border-left:2px solid color-mix(in srgb, var(--ink) 18%, transparent)}
+.rlp-web-pnode h4{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:700;color:var(--ink);margin:0 0 4px}
+.rlp-web-pnode ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px}
+.rlp-web-pnode li{font-size:var(--fs-sm);color:var(--text);line-height:1.5}
+.rlp-web-pnode strong{color:var(--ink)}
+.rlp-web-stack{position:relative;margin:0 0 18px}
+.rlp-web-arcs{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.rlp-web-group{margin:0 0 14px}
+.rlp-web-grouphead{margin:0 0 8px 58px;font-family:var(--font-sans);font-size:var(--fs-eyebrow);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+.rlp-web-line{display:flex;align-items:center;margin:0 0 7px}
+.rlp-web-dot{flex:0 0 auto;width:8px;height:8px;margin:0 24px 0 26px;border-radius:50%;background:color-mix(in srgb, var(--ink) 22%, transparent);transition:background .18s ease}
+.rlp-web-dot.lit{background:var(--ink)}
+.rlp-web-row{flex:1 1 auto;min-width:0;min-height:44px;display:flex;align-items:center;text-align:left;padding:9px 14px;box-sizing:border-box;background:var(--bg);border:1px solid color-mix(in srgb, var(--ink) 10%, transparent);border-radius:var(--r-sm);font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:500;color:var(--ink);cursor:pointer;transition:opacity .18s ease,background .18s ease,border-color .18s ease}
+.rlp-web-row:hover{border-color:color-mix(in srgb, var(--ink) 35%, transparent)}
+.rlp-web-row.sel{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
+.rlp-web-row.dim{opacity:.4}
+.rlp-web-row:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+.rlp-web-links{list-style:none;margin:0 0 14px 58px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-md)}
+.rlp-web-links li{font-size:var(--fs-sm);color:var(--text);line-height:1.55}
 .rlp-web-links strong{color:var(--ink)}
-.rlp-web-hint{font-size:var(--fs-body);color:var(--text-muted);margin:0}
 
 /* §10 open threads */
 .rlp-threads{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
@@ -1304,22 +1608,103 @@ const css = `
 .rlp-threads li::before{content:"○";position:absolute;left:0;color:var(--accent);font-size:13px}
 
 @media (max-width:680px){
-  .rlp-compass-wrap,.rlp-web-wrap{grid-template-columns:1fr}
-  .rlp-compass,.rlp-web{margin:0 auto}
   .rlp-buckets,.rlp-factors,.rlp-week-groups{grid-template-columns:1fr}
   .rlp-seasons-track,.rlp-fy-track{grid-template-columns:1fr}
+  /* On a phone the head has no room for a text column beside the graphic, so the
+     text takes the full width and the graphic drops to a hint in the corner. */
+  .rlp-head{padding:24px 20px}
+  .rlp-head-body{max-width:100%}
+  .rlp-head-gfx{height:150%;left:100%;top:92%}
   /* Let the five areas wrap instead of cramming 5-across on a phone: they stay
      5 in a row where it fits (down to ~500px) and wrap to 3+ below that. */
-  .rlp-balance-row{grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px}
-  .rlp-area-label{font-size:var(--fs-eyebrow)}
-  .rlp-season-arrow{display:none}
+      .rlp-season-arrow{display:none}
   .rlp-chapter-title{font-size:34px}
 }
 
+/* PRINT / SAVE AS PDF.
+   The keepsake is this document printed, not a second renderer. The printing
+   flag (see the component) unfolds every tab and opens every expandable; this
+   block turns the result into pages. Written against a real printed PDF, not
+   from first principles — every rule here is fixing something that went wrong on
+   paper. */
+@page{size:A4;margin:16mm 14mm}
+
 @media print{
-  .rlp-seedbar,.rlp-toolbar,.rlp-begin{display:none}
-  .rlp-section{break-inside:avoid}
-  .rlp-goal-body{display:flex!important}
-  .rlp-plan{max-width:none}
+  /* 1. The app is not part of the keepsake. The header, the mobile bar and the
+     feedback launcher were all printing — the first page opened with a
+     "Dashboard / Menu" nav bar. */
+  .rlp-band,.rlp-appbar,.fb-launch{display:none!important}
+  /* Anything that only answers to a finger. */
+  .rlp-seedbar,.rlp-head-actions,.rlp-head-lede,
+  .rlp-intro-tones,.rlp-goal-toggle,.rlp-helper,
+  .rlp-tabs .rlp-tablist{display:none!important}
+  /* "First steps" is a call to action for the app — the next stage is something
+     you do here, not something you read on paper. The whole card goes, not just
+     its button; a printed plan ends on the member's own open threads. */
+  .rlp-firststeps{display:none!important}
+
+  /* This is "Save as PDF", not a memo on office paper: the colour IS the plan —
+     the cover field, the area colours, the energy tint, the value tags. Browsers
+     drop backgrounds by default, so ask for them. */
+  .rlp-plan{max-width:none;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rlp-plan *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+  /* 2. THE COVER. The head was breaking across pages — cream ran to the foot of
+     page 1 and "Next review" landed alone on page 2. It is now one unbreakable
+     cover that owns its page, with the brand graphic back (it was hidden, which
+     left a big empty cream rectangle and nothing else). */
+  .rlp-head{
+    break-inside:avoid;break-after:page;
+    margin:0;padding:46px 40px;border-radius:0;
+    min-height:262mm;
+  }
+  /* The on-screen head is a wide band; a cover is portrait, so the crop that
+     works there does not translate. Text keeps the top, the graphic takes the
+     lower-right quadrant and can't reach the title or the dates. */
+  .rlp-head-gfx{display:block;height:78%;left:88%;top:76%}
+  .rlp-head-body{max-width:74%}
+  .rlp-plan-title{font-size:46px;max-width:none}
+  .rlp-meta{gap:14px 30px}
+
+  /* 3. Sections must be free to run past a page boundary. break-inside:avoid on
+     .rlp-section was the cause of every huge white gap: a section that didn't fit
+     in what was left of the page jumped to a fresh one. Only SMALL units — the
+     things that look broken when split — get held together. */
+  .rlp-section{margin:0 0 26px;padding-top:0;break-inside:auto}
+  .rlp-section + .rlp-section{padding-top:22px}
+  .rlp-goal,.rlp-vopen,.rlp-web-pnode,.rlp-fy-phase,.rlp-read,
+  .rlp-season,.rlp-reset-col,.rlp-facts > div,.rlp-factor{break-inside:avoid}
+  /* Whole blocks that must never be cut in half. A section can run over a page
+     boundary, but the little grids and lists inside one cannot: split, they
+     stranded fragments at the top of the next page with no heading — two lone
+     decision rules, four readiness chips — that read as if they belonged to
+     nothing. MEASURED before adding: every block here is a few hundred px at
+     most, so holding it together moves it down a page rather than leaving half a
+     page empty. Deliberately NOT here: .rlp-strengths (~390px and grows), the
+     first-year track (~475px) and Vita's read (~1040px) — too tall to hold, and
+     they split cleanly anyway. */
+  .rlp-principles,.rlp-factors,.rlp-facts,.rlp-finance,.rlp-week-groups,
+  .rlp-structure,.rlp-seasons-track,.rlp-balband,.rlp-threads,
+  .rlp-fy-lane,.rlp-fy-work,.rlp-buckets,.rlp-reset,.rlp-candidates{break-inside:avoid}
+  /* Never split a heading from what it heads, or a value row from its panel. */
+  .rlp-sec-head,.rlp-chapter-title,.rlp-vrow,.rlp-goal-top,
+  .rlp-web-grouphead,.rlp-read h3,.rlp-lede{break-after:avoid}
+  h1,h2,h3,h4{break-after:avoid}
+  p,li{orphans:2;widows:2}
+
+  /* 4. The self-intro is a textarea on screen. A textarea prints one clipped line
+     and its scrollbar, so the component renders prose instead when unfolded —
+     this only tidies what's left. */
+  .rlp-intro-text{border:none;background:transparent;padding:0}
+
+  /* 5. Four first-year phases came out 3-up then 1 orphaned on the next row. */
+  .rlp-fy-track{grid-template-columns:1fr 1fr;gap:14px}
+  .rlp-seasons-track{grid-template-columns:1fr 1fr 1fr}
+
+  /* Selected / dimmed states are interaction feedback, not meaning. */
+  .rlp-vrow.sel{background:transparent;color:var(--ink);border-color:color-mix(in srgb, var(--ink) 20%, transparent)}
+  .rlp-vrow.sel .rlp-vtag{background:color-mix(in srgb, var(--chorus-green) 14%, transparent);color:var(--chorus-green)}
+  .rlp-web-row.dim,.rlp-web-dot{opacity:1}
+  a[href]:after{content:""}
 }
 `;

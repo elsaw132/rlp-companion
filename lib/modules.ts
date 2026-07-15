@@ -906,6 +906,25 @@ export function isRetired(rs: RetirementStage | null): boolean {
   return rs === "recently_retired" || rs === "established";
 }
 
+// The wind-down cohort — still working, but with an exit in view. They keep 4.1
+// (unlike the retired cohorts) and are the only ones who see 1.winddown, so the
+// plan's leaving-work panel branches on their exit decision. Named rather than
+// tested inline so the branch reads the same everywhere.
+export function isWindingDown(rs: RetirementStage | null): boolean {
+  return rs === "winding_down";
+}
+
+// The artefact's name, which is per-cohort: the two retired cohorts are building
+// a Retirement RESET Plan (they're reshaping the retirement they're living), not
+// a Retirement Life Plan. This mirrors stageNameFor's rename of stage 4 — the
+// dashboard has said "Retirement Reset Plan" to retired members for a while, so
+// without this the plan document itself contradicted it.
+export function planTitleFor(rs: RetirementStage | null): string {
+  return RETIREMENT_PATHS && isRetired(rs)
+    ? "Your Retirement Reset Plan"
+    : "Your Retirement Life Plan";
+}
+
 // Whether a module is visible to someone in the given retirement stage. A module
 // with no audience/hideFrom is universal. `audience` is an allow-list (shown only
 // to those stages, flag on); `hideFrom` is a deny-list (shown to all except those
