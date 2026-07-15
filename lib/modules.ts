@@ -1897,17 +1897,13 @@ WATCH FOR
         primer: [
           {
             type: "text",
-            value: `Stick with this video - it's good!`,
-          },
-          { type: "video", url: "https://www.youtube.com/watch?v=ad7ID2VrRFM" },
-          {
-            type: "text",
             value: `Have you ever noticed how alive you feel when you're learning something new? Perhaps you've mastered a recipe, picked up a camera for the first time, started learning a language or finally understood something that had puzzled you for years. There is satisfaction in stretching your mind.
 
 That feeling isn't just enjoyable. It's also one of the ways your brain stays adaptable throughout life. Whenever you challenge yourself with something unfamiliar, your brain responds by building and strengthening new connections.
 
 Curiosity isn't just enjoyable. It may be one of the most valuable investments you make in your future self. Retirement often removes many of the daily challenges that kept your brain working. One of the best things you can do is replace them with challenges you've chosen for yourself.`,
           },
+          { type: "video", url: "https://www.youtube.com/watch?v=ad7ID2VrRFM" },
         ],
         coachOpening: `Here's what catches your curiosity. Let's start with the one you're most drawn to — what is it about that one that pulls you in?`,
         interaction: {
@@ -2609,13 +2605,11 @@ Read their core values back, each with the description you drew out in their own
             type: "text",
             value: `We all have more things we'd like to do than time to do them.
 
-So every day we make choices. Some are obvious. Others happen almost without us noticing. Over time, those choices quietly reveal what matters most.`,
+So every day we make choices. Some are obvious. Others happen almost without us noticing. Over time, those choices quietly reveal what matters most.
+
+This short illustrated video introduces a simple way of thinking about priorities. Then, in this next conversation, you'll explore what matters most to you through a series of simple choices. Just lean towards whichever feels a little more important. There are no right or wrong answers.`,
           },
           { type: "video", url: "https://www.youtube.com/watch?v=cPgMeKfQFq8" },
-          {
-            type: "text",
-            value: `This short illustrated video introduces a simple way of thinking about priorities. Then, in this next conversation, you'll explore what matters most to you through a series of simple choices. Just lean towards whichever feels a little more important. There are no right or wrong answers.`,
-          },
         ],
         coachOpening: `Here's where you landed when things had to give. Looking at what came out on top — does that order feel true to you, or is something not sitting quite right?`,
         interaction: {
