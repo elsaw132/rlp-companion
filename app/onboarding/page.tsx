@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import ProviderBand from "../components/ProviderBand";
 import VitaMark from "../components/VitaMark";
+import ChorusVectorGraphic from "../components/ChorusVectorGraphic";
 import {
   useUserData,
   type CoachTone,
@@ -50,9 +51,38 @@ const TONE_OPTIONS: { label: string; value: CoachTone }[] = [
   { label: "Lighter and playful", value: "playful" },
 ];
 
+// /onboarding?preview=1 — walk the REAL flow without touching real data.
+//
+// The form is otherwise unreviewable once you've completed it: it redirects to
+// /home on sight, and there is no second account. Rather than a copy of the
+// screens (which would drift from these ones the moment either changed), preview
+// intercepts the DATA LAYER at a single seam: every write becomes a no-op and
+// onboarding always reports itself unfinished, so the real page renders the real
+// steps and nothing reaches the database. The prefill still reads, so it looks
+// like a true first run.
+function usePreviewData(real: ReturnType<typeof useUserData>) {
+  const preview =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("preview") === "1";
+  if (!preview) return { data: real, preview: false };
+  return {
+    preview: true,
+    // Every write this page makes, stubbed. If a new one is added to the flow it
+    // must be added here too, or preview will write it for real.
+    data: {
+      ...real,
+      isOnboardingComplete: () => false,
+      saveOnboarding: async () => {},
+      markOnboardingComplete: async () => {},
+      setPreferredName: async () => {},
+    } as ReturnType<typeof useUserData>,
+  };
+}
+
 export default function OnboardingPage() {
   const { user, isLoaded } = useUser();
-  const data = useUserData();
+  const realData = useUserData();
+  const { data, preview } = usePreviewData(realData);
   const router = useRouter();
 
   // The flow is an ordered list of step keys, and stepIndex points at the current
@@ -156,6 +186,11 @@ export default function OnboardingPage() {
       <main className="rlp-onb">
         <style>{css}</style>
         <div className="column">
+          {preview && (
+            <p className="onb-preview-note">
+              Preview &mdash; the real onboarding flow. Nothing you do here is saved.
+            </p>
+          )}
           {current !== "welcome" && (
             <button type="button" className="onb-back" onClick={goBack}>
               ← Back
@@ -301,6 +336,51 @@ export default function OnboardingPage() {
   );
 }
 
+// The graphic's crop is judged by eye, not calculated — so it gets a tuner
+// rather than a guess. /onboarding?preview=1&tune=1 puts three sliders on the
+// screen and prints the values to paste back in. Preview-only; it never renders
+// for a real member.
+function useSceneTuner() {
+  const on =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("tune") === "1" &&
+    new URLSearchParams(window.location.search).get("preview") === "1";
+  const [size, setSize] = useState(350);
+  const [x, setX] = useState(72);
+  const [y, setY] = useState(95);
+  const style = on
+    ? ({
+        ["--gfx-size" as string]: `${size}%`,
+        ["--gfx-x" as string]: `${x}%`,
+        ["--gfx-y" as string]: `${y}%`,
+      } as React.CSSProperties)
+    : undefined;
+  const panel = on ? (
+    <div className="onb-tuner">
+      <p className="onb-tuner-read">
+        size <strong>{size}%</strong> · horizontal <strong>{x}%</strong> ·
+        vertical <strong>{y}%</strong>
+      </p>
+      <label>
+        Size
+        <input type="range" min={80} max={500} value={size}
+          onChange={(e) => setSize(Number(e.target.value))} />
+      </label>
+      <label>
+        Horizontal
+        <input type="range" min={0} max={130} value={x}
+          onChange={(e) => setX(Number(e.target.value))} />
+      </label>
+      <label>
+        Vertical
+        <input type="range" min={-20} max={140} value={y}
+          onChange={(e) => setY(Number(e.target.value))} />
+      </label>
+    </div>
+  ) : null;
+  return { style, panel };
+}
+
 function Welcome({
   firstName,
   understood,
@@ -312,6 +392,7 @@ function Welcome({
   setUnderstood: (v: boolean) => void;
   onContinue: () => void;
 }) {
+  const tuner = useSceneTuner();
   // Personalised greeting when we know the signed-in user's first name; falls
   // back to the plain heading when there's no name to use.
   const heading = firstName
@@ -319,16 +400,11 @@ function Welcome({
     : "Your retirement, your way";
   return (
     <section className="welcome">
-      <div className="scene" aria-hidden="true">
-        <div className="sun-ill"></div>
-        <div className="cloud"></div>
-        <div className="cloud two"></div>
+      {tuner.panel}
+      <div className="scene" aria-hidden="true" style={tuner.style}>
+        <ChorusVectorGraphic fill="var(--chorus-green)" className="scene-gfx" />
       </div>
       <div className="body">
-        <div className="vita">
-          <VitaMark size={38} />
-          <span className="name">Vita</span>
-        </div>
         <h1 className="hero-heading">{heading}</h1>
         <p className="paragraph">
           This is a five-stage programme. Each stage is made up of several short
@@ -347,11 +423,21 @@ function Welcome({
             : " as well as practical information like when you plan to leave work and how."}{" "}
           Stage 5: Act is there to help you start putting that plan into practice.
         </p>
+        {/* The lockup introduces Vita at the point the copy first names her,
+            rather than heading the card before she's been mentioned. */}
+        <div className="vita">
+          <VitaMark size={38} />
+          <span className="name">Vita</span>
+        </div>
         <p className="paragraph">
           Vita, your AI coach, is there to guide you the whole way through. Vita
           isn&apos;t a person and won&apos;t give financial, legal, or medical
           advice — what Vita&apos;s good at is asking the right questions and
           helping you make sense of your own answers.
+        </p>
+        <p className="paragraph ai-note">
+          Because Vita is AI, it can sometimes make mistakes. If something
+          doesn&apos;t sound quite right, correct it in your conversation.
         </p>
 
         <label className="checkbox-row">
@@ -532,18 +618,27 @@ const css = `
 .rlp-onb :focus-visible{outline:none}
 
 .rlp-onb .welcome{width:100%;background:var(--warm-surface);border:1px solid var(--warm-line);border-radius:var(--r-lg);box-shadow:var(--shadow-md);overflow:hidden}
-.rlp-onb .scene{height:140px;background:linear-gradient(var(--ill-sky-pale),var(--ill-sky) 42%,var(--ill-hill) 64%,var(--ill-hill-deep));position:relative}
-.rlp-onb .scene .sun-ill{position:absolute;right:40px;top:32px;width:50px;height:50px;border-radius:50%;background:radial-gradient(circle,#FBEAC0,var(--ill-sun));box-shadow:0 0 36px rgba(233,185,73,.55)}
-.rlp-onb .scene .cloud{position:absolute;width:70px;height:20px;background:rgba(255,255,255,.7);border-radius:20px;top:78px;right:66px}
-.rlp-onb .scene .cloud.two{width:48px;top:106px;right:154px;opacity:.6}
+/* Was a sky-and-hills gradient with a sun and two clouds, built from the
+   pre-rebrand --ill-* illustration palette (sky #A4CCE5, hill #5B9F4A) that has
+   no relation to Chorus. Now the brand cream and the Chorus circles — the same
+   treatment as the dashboard hero and the plan cover. Onboarding isn't a stage,
+   so it takes the brand colours directly rather than borrowing a stage pairing. */
+.rlp-onb .scene{height:140px;position:relative;overflow:hidden;background:var(--chorus-yellow)}
+.rlp-onb .scene .scene-gfx{position:absolute;height:var(--gfx-size,350%);left:var(--gfx-x,72%);top:var(--gfx-y,95%);transform:translate(-50%,-50%);pointer-events:none}
+.rlp-onb .onb-preview-note{width:100%;margin:0 0 16px;padding:8px 14px;box-sizing:border-box;border-radius:var(--r-sm);background:var(--info-surface);border:1px solid var(--info-line);color:var(--info-text);font-family:var(--font-sans);font-size:var(--fs-sm);text-align:center}
 .rlp-onb .welcome .body{padding:30px 32px 32px}
 
-.rlp-onb .vita{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.rlp-onb .vita{display:flex;align-items:center;gap:10px;margin:26px 0 14px}
 .rlp-onb .vita .name{font-family:var(--font-serif);font-size:var(--fs-title);font-weight:600;color:var(--color-vita)}
 
 .rlp-onb .hero-heading{font-family:var(--font-serif);font-size:var(--fs-display);font-weight:600;color:var(--ink);line-height:1.2;margin:0 0 18px}
 .rlp-onb .step-heading{font-family:var(--font-serif);font-size:var(--fs-h2);font-weight:600;color:var(--ink);line-height:1.3;margin:0 0 26px}
 .rlp-onb .paragraph{font-family:var(--font-sans);font-size:var(--fs-body);line-height:var(--lh-body);color:var(--text);margin:0 0 18px;max-width:58ch}
+.rlp-onb .onb-tuner{position:fixed;left:20px;bottom:20px;z-index:50;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--r-md);box-shadow:var(--shadow-md);padding:14px 16px;display:flex;flex-direction:column;gap:8px;width:250px;font-family:var(--font-sans)}
+.rlp-onb .onb-tuner-read{margin:0 0 2px;font-size:var(--fs-sm);color:var(--ink)}
+.rlp-onb .onb-tuner label{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-eyebrow);text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--text-muted)}
+.rlp-onb .onb-tuner input{width:100%;accent-color:var(--brand-primary)}
+.rlp-onb .ai-note{font-size:var(--fs-sm);color:var(--text-muted);padding-left:14px;border-left:2px solid color-mix(in srgb, var(--color-vita) 35%, transparent)}
 
 .rlp-onb .name-field{display:flex;flex-direction:column;gap:8px;margin:0 0 20px}
 .rlp-onb .name-label{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;color:var(--ink)}

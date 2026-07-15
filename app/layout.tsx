@@ -38,7 +38,28 @@ export default function RootLayout({
   return (
     <html lang="en" className={`h-full ${inter.variable} ${sourceSerif.variable}`}>
       <body className="min-h-full flex flex-col">
-        <ClerkProvider>
+        {/* Clerk's sign-in / sign-up forms are the FIRST Chorus screen an invited
+            member sees, and they were rendering in Clerk's default styling. The
+            logo comes from the Clerk dashboard; this maps the form itself onto
+            the brand — our fonts, Chorus green for the primary action, our radii
+            — so the door matches the house. */}
+        <ClerkProvider
+          appearance={{
+            variables: {
+              colorPrimary: "#00645F",
+              colorText: "#0A322D",
+              colorBackground: "#FFFFFF",
+              fontFamily: "var(--font-sans)",
+              borderRadius: "10px",
+            },
+            elements: {
+              card: { boxShadow: "var(--shadow-md)", border: "1px solid var(--border)" },
+              formButtonPrimary: { fontWeight: 600, textTransform: "none", fontSize: "15px" },
+              headerTitle: { fontFamily: "var(--font-serif)", fontWeight: 600 },
+              footerActionLink: { color: "var(--brand-primary)", fontWeight: 600 },
+            },
+          }}
+        >
           <UserDataProvider>
             {/* Mobile-only sticky nav backbone (≤880px). display:none on desktop,
                 so the desktop chrome (ProviderBand / session nav bar) is unchanged. */}

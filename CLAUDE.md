@@ -31,21 +31,30 @@ conversation works, not a production app. Built by a non-technical founder.
 - `/api/chat` — coach API route (streams Claude's responses)
 
 ## Design
-- Built on the **Aviva white-label design system**. Source of truth is
-  `tokens.css` (import once, globally, at the top of `globals.css`);
-  `aviva-rlp-design-system.html` is the rendered component reference.
-  **Always use the semantic CSS variables — never hardcode hex.**
-- Component contracts: consult design-reference/DESIGN_SYSTEM.md (written spec)
-  and design-reference/aviva-rlp-design-system.html (rendered reference) for
-  exact component structure, spacing, and states before building any UI —
-  especially conversation bubbles, session cards, buttons, and the five-stage arc.
-- Two layers: a **brand layer** (navy `--brand-primary`, yellow header
-  `--brand-band`) that swaps per provider, and a fixed **product layer**
-  (cream, orange accent, neutrals).
-- Buttons: primary actions use `--brand-primary` (navy) fill with
+- Branded **Chorus Life**. Source of truth is `tokens.css` (import once,
+  globally, at the top of `globals.css`). **Always use the semantic CSS
+  variables — never hardcode hex.** The eight brand colours are Dark Green
+  `#0A322D`, Green `#00645F`, Purple `#322D69`, Orange `#DC6437`, Blue
+  `#C3F5FF`, Yellow/cream `#FFEBC8`, Pink `#FFEBFF`, Lime `#D7FF73`. Pair the
+  two dark colours with the light ones — never dark on dark, and white on dark
+  reads badly.
+- Component contracts: consult design-reference/DESIGN_SYSTEM.md before building
+  any UI. NOTE: `aviva-rlp-design-system.html` and `aviva-rlp-home-screen.html`
+  are the ORIGINAL Aviva white-label reference, kept only as history — they show
+  the pre-Chorus brand (navy, yellow band) and are NOT a target to build to.
+- Two layers: a **structure layer** (Dark Green `--color-brand-primary`, used
+  for the band/avatar and the darkest ink) and an **interaction layer** (Green
+  `--color-interactive-primary` → `--brand-primary`, behind buttons and links),
+  over a fixed product layer (cream, orange accent, neutrals).
+- Buttons: primary actions use `--brand-primary` (Chorus **green**) fill with
   `--brand-on-primary` text. Orange `--accent` is reserved for the single
   current step only ("orange is the cursor"); button fills behind white text
   use `--accent-strong`, never bright `--accent` (contrast).
+- The brand graphic (`ChorusVectorGraphic`) is the supplied five-circle vector.
+  Use it as a large, cropped field behind a colour ground — never redraw or
+  approximate it. Per-stage ground/graphic pairings live in `lib/stageColors.ts`
+  (`stageHeroGroundFor` / `stageHeroGraphicFor`); read them from there rather
+  than hardcoding a pairing.
 - Vita: cream warm surfaces (`--warm-surface`) appear only where Vita speaks;
   everything else is white / `--bg` with hairline borders.
 - Type: serif (`--font-serif`, Source Serif 4) for things the user *feels* —
