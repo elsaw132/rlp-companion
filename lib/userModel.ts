@@ -44,6 +44,9 @@ export type ModelSource = {
     horizon?: string;
     motivation?: string | null;
     retirementStage?: RetirementStage;
+    // Optional and often absent. Only used as the last fallback for how far off
+    // retirement is, when the horizon band says "Not sure" (see lib/planHorizon).
+    dob?: string;
   };
   // The canonical profile's active facts (phase 2). Optional so older callers and
   // fixtures still satisfy the surface; when present, the RLP reads values

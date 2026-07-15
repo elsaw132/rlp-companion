@@ -19,6 +19,8 @@ import {
   STAGES,
   getModule,
   isRetired,
+  isWindingDown,
+  planTitleFor,
   type BuildResult,
   type BalancedAreaId,
   type BalancedGoalsResult,
@@ -31,6 +33,8 @@ import {
   type FirstYearInteraction,
 } from "@/lib/modules";
 import { RETIREMENT_PATHS } from "@/lib/flags";
+import { isFarHorizon } from "@/lib/planHorizon";
+import { ageFromDob } from "@/lib/planDate";
 import type { RetirementStage } from "@/lib/userData";
 import {
   buildUserModel,
@@ -157,6 +161,9 @@ export type PlanPaths = {
   paths: PlanPath[];
   // Strengths and resources to lean on across the goals.
   strengths: string[];
+  // Vita's short read on how they're carrying those strengths forward. Generated
+  // (see lib/planIntro); "" until it lands, and the document drops it.
+  strengthsRead: string;
 };
 
 // §7 — how the week feels.
@@ -289,6 +296,34 @@ export type RlpPlan = {
   week: PlanWeek | null;
   leavingWork: PlanLeavingWork | null;
   // ---- Retirement paths (Phase 5). All empty/null for working + flag-off. ----
+  // The artefact's own name, per cohort: the retired cohorts are building a
+  // Retirement RESET Plan. Computed here (like `orientation`) so the document
+  // never has to know the cohort. Falls back to the Life Plan name with the flag
+  // off, keeping today's plan byte-identical for everyone else.
+  title: string;
+  // Tab 6 — Vita's read of the finished plan. All "" on the deterministic plan:
+  // there is no honest non-generated version of these, so with nothing generated
+  // the tab simply shows the member's own open threads. Overlaid by RlpReveal.
+  reflections: {
+    balanceCallout: string;
+    balanceRead: string;
+    realismCallout: string;
+    realismNote: string;
+    strongCallout: string;
+    whatsStrong: string;
+    coherenceCallout: string;
+    coherence: string;
+  };
+  // Whether this is one of the two already-retired cohorts. Stated rather than
+  // inferred from `reset`, which is null whenever keep_change_leave came back
+  // thin — a retired member can legitimately have no reset to show, and the
+  // document still needs to know not to call this their "first year".
+  retired: boolean;
+  // True when they're more than ~10 years from retiring (see lib/planHorizon).
+  // Never true for the retired cohorts — they're in it, not far from it. Names
+  // the transition tab (a first year is a long way off, so the tab isn't "the
+  // year ahead"), and calibrates Vita's Reflections.
+  farHorizon: boolean;
   // A one-line orientation at the top of the plan, per cohort ("" = none).
   orientation: string;
   // Retired §8 replacement (keep / change / leave). null unless retired with a
@@ -790,7 +825,7 @@ export function buildRlpPlan(
         source: "unfinished" as const,
       })),
     ];
-  } else if (rs === "winding_down") {
+  } else if (isWindingDown(rs)) {
     // Two sources: a settled plan reads from the wind_down_exit fact; otherwise
     // fall back to the 4.1 readiness build ("completing the exit").
     const exit = windDownExitFromFacts(facts);
@@ -814,6 +849,18 @@ export function buildRlpPlan(
   const firstYear = buildFirstYear(fyResult);
   const scenes = buildScenes(prioritised, firstYear);
 
+  // The retired cohorts are never "far from retiring" — they're in it — and are
+  // never asked the horizon question, so this is pre-exit only. Computed here
+  // rather than at the point of use so the document and Vita's prompt can never
+  // disagree about how far off retirement is.
+  const farHorizon =
+    !(RETIREMENT_PATHS && isRetired(rs)) &&
+    isFarHorizon({
+      window: leavingWork?.window ?? null,
+      horizonBand: model.onboarding.horizon,
+      age: ageFromDob(source.getOnboarding().dob),
+    });
+
   const dateCreated = opts.dateCreated;
   const dateLastReviewed = opts.dateLastReviewed ?? dateCreated;
 
@@ -835,9 +882,22 @@ export function buildRlpPlan(
     values,
     movingTowards,
     prioritisedAreas: prioritised,
-    paths: { paths, strengths },
+    paths: { paths, strengths, strengthsRead: "" },
     week,
     leavingWork,
+    title: planTitleFor(rs),
+    reflections: {
+      balanceCallout: "",
+      balanceRead: "",
+      realismCallout: "",
+      realismNote: "",
+      strongCallout: "",
+      whatsStrong: "",
+      coherenceCallout: "",
+      coherence: "",
+    },
+    retired: RETIREMENT_PATHS && isRetired(rs),
+    farHorizon,
     orientation,
     reset,
     windDownExit,

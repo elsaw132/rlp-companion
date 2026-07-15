@@ -158,6 +158,11 @@ const KEYS = {
   planIntro: "plan-prose-v5",
   planSelfIntroEdits: "plan-self-intro-v2",
   planImages: "plan-images-v4",
+  // The day the plan was first opened — the plan's own birthday. It has to be
+  // stored: it was previously computed as "today" on every render, so a plan
+  // claimed to be created on whatever day you happened to look at it, and its
+  // review date moved with you.
+  planCreatedOn: "plan-created-on",
 };
 
 // Versioned key families where only the current version (per KEYS above) should
@@ -1032,6 +1037,15 @@ export function useUserData() {
   const savePlanSelfIntro = (text: string) =>
     setKey(KEYS.planSelfIntroEdits, text);
 
+  // The plan's creation date (local ISO, YYYY-MM-DD). null until the plan is
+  // first assembled; the reveal stamps it once and it never moves again.
+  const getPlanCreatedOn = (): string | null => {
+    const v = snapshot[KEYS.planCreatedOn];
+    return typeof v === "string" && v ? v : null;
+  };
+
+  const savePlanCreatedOn = (iso: string) => setKey(KEYS.planCreatedOn, iso);
+
   // Generated scene images, keyed by slot ("hero", "s1"…). Cached so each is
   // generated once, not per view.
   const getPlanImages = (): Record<string, string> => {
@@ -1175,6 +1189,8 @@ export function useUserData() {
     savePlanIntro,
     getPlanSelfIntro,
     savePlanSelfIntro,
+    getPlanCreatedOn,
+    savePlanCreatedOn,
     getPlanImages,
     savePlanImage,
     getCommitment,

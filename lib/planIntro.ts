@@ -1,8 +1,12 @@
 // The generated PROSE for the Retirement Life Plan — every connective and
 // summary sentence in the document, written once by Vita and cached.
 //
-// The plan SYNTHESISES rather than replays, in ONE voice: first person. The
-// member is speaking ("I", "my") throughout — it is their own keepsake. The
+// The plan SYNTHESISES rather than replays. Voice follows one rule — whose mouth
+// is it? Vita speaking about the plan is SECOND person ("you"); the member
+// speaking about themselves is FIRST person ("I") — chapterTitle, selfIntro and
+// weekRhythm only. (The 4.7 first-year narrative is likewise the member's, and is
+// written first-person by its own route.) Section headings are the document's
+// furniture and are always second person. The
 // values compass (§3) and the first-year narrative (§9) set the standard for
 // clean, grounded prose; everything else that used to be stitched from string
 // templates is generated here so it reads as written, never concatenated.
@@ -49,6 +53,10 @@ export type PlanProse = {
   weekRhythm: string;
   // §8 — the financial-confidence sentence (surface and signpost only).
   financeNote: string;
+  // §6 — a short, personal read on how they're carrying their strengths into
+  // retirement, and why that's worth something. The chips beneath it are just
+  // names; this is the only thing that says anything about them. "" to drop it.
+  strengthsRead: string;
   // §10 — things still in motion: what the member hasn't resolved and wants to
   // keep working out. First-person, generative, never framed as failures. [].
   openThreads: string[];
@@ -59,6 +67,25 @@ export type PlanProse = {
   resetActions: string[];
   // The signature web of real links. null when there isn't enough to draw.
   connections: ConnectionsGraph | null;
+
+  // ---- Tab 6, Vita's read. Each 2–3 tight sentences, or "" to be dropped. ----
+  // The band itself is fact (which areas carry a goal); this sentence is the only
+  // thing that INTERPRETS whether that spread serves them, and may forgive a
+  // legitimate concentration.
+  balanceCallout: string;
+  balanceRead: string;
+  // A means–ends check: does the plan protect the base its long-horizon goals
+  // depend on? Leverage, never deficit. "" when there's nothing real to say —
+  // this one is not sought out.
+  realismCallout: string;
+  realismNote: string;
+  // What's strong, led with. Rewards goals that FIT the person and honest
+  // timing, never volume.
+  strongCallout: string;
+  whatsStrong: string;
+  // The plan held against the member's OWN decision rules. "" when they set none.
+  coherenceCallout: string;
+  coherence: string;
 };
 
 // Kept as the cache/return name the data layer already uses.
@@ -80,7 +107,21 @@ export type PlanIntroRequest = {
   // a first move). Empty/absent for non-retired.
   resetItems?: { label: string; source: "change" | "unfinished" }[];
   coreValues?: { value: string; meaning?: string }[];
+  // Tab 6 material. The decision rules (4.5) are the standard Vita's coherence
+  // read holds the plan against — the least shame-prone check, because the
+  // standard is the member's own. The buckets let the realism read tie a
+  // load-bearing habit to a value they said they'd hold firm on.
+  principles?: string[];
+  nonNegotiables?: string[];
+  flexible?: string[];
+  // True when they're more than ~10 years from retiring (see lib/planHorizon).
+  // Flips Reflections from "is this complete and realistic" to "you're early,
+  // here's a direction forming". Never true for the retired cohorts.
+  farHorizon?: boolean;
   roles?: string[];
+  // §6 material — the character strengths, for strengthsRead. Without these the
+  // model has nothing to write that read from.
+  strengths?: string[];
   mostAliveRoles?: string[];
   energySources?: string[];
   aspirations?: string[];
@@ -188,12 +229,21 @@ export function coercePlanIntro(raw: unknown): PlanProse | null {
     insight: str(o, "insight"),
     selfIntro: str(o, "selfIntro"),
     balanceShape: str(o, "balanceShape"),
+    strengthsRead: str(o, "strengthsRead"),
     seasonsArc: str(o, "seasonsArc"),
     weekRhythm: str(o, "weekRhythm"),
     financeNote: str(o, "financeNote"),
     openThreads,
     resetActions,
     connections: coerceConnections(o.connections),
+    balanceCallout: str(o, "balanceCallout"),
+    balanceRead: str(o, "balanceRead"),
+    realismCallout: str(o, "realismCallout"),
+    realismNote: str(o, "realismNote"),
+    strongCallout: str(o, "strongCallout"),
+    whatsStrong: str(o, "whatsStrong"),
+    coherenceCallout: str(o, "coherenceCallout"),
+    coherence: str(o, "coherence"),
   };
   // Need at least a title or the self-intro to count as a real result.
   if (!intro.chapterTitle && !intro.selfIntro) return null;
