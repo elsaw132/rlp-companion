@@ -212,6 +212,13 @@ function DetailCard({ area }: { area: RevealArea }) {
 
       {area.stat ? (
         <div className="exw-stat">
+          {/* A did-you-know makes no claim about this person, so it says so —
+              rule E asks for it to be flagged verbally as well as visually. */}
+          {area.stat.mode === "did-you-know" && (
+            <p className="exw-dyk" style={{ color: fg }}>
+              Did you know&hellip;
+            </p>
+          )}
           <p className="exw-claim">
             {area.stat.leadIn && (
               <span className="exw-lead" style={{ color: fg }}>
@@ -262,6 +269,7 @@ const css = `
 .exw-card-name{font-family:var(--font-serif);font-size:17px;font-weight:600;color:var(--ink)}
 .exw-forward{font-family:var(--font-serif);font-size:15.5px;line-height:1.55;color:var(--text);margin:0}
 .exw-stat{border-top:1px solid var(--border);margin-top:12px;padding-top:12px}
+.exw-dyk{font-family:var(--font-sans);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin:0 0 4px}
 .exw-claim{font-family:var(--font-serif);font-size:14.5px;line-height:1.55;color:var(--ink);margin:0}
 .exw-lead{font-weight:600}
 .exw-src-tap{font-family:var(--font-sans);font-size:12.5px;font-weight:600;background:none;border:none;padding:0;margin-top:10px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
