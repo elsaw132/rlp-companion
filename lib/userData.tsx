@@ -103,6 +103,11 @@ const KEYS = {
   moduleFeedbackPrompted: "module-feedback-prompted",
   stageIntroSeen: "stage-intro-seen",
   stage1StartingSeen: "stage1-starting-seen",
+  // The pilot's "Act isn't built yet" callout, which stands in for Stage 5's
+  // intro until Act has sessions. Tracked separately from stageIntroSeen so
+  // that seeing it doesn't consume Stage 5's intro: whoever met the callout
+  // still gets the real Act intro on the day Act ships.
+  pilotCalloutSeen: "pilot-callout-seen",
   stage1Summary: "stage1-summary",
   stage1Reveal: "stage1-reveal",
   stage2Reveal: "stage2-reveal",
@@ -666,6 +671,12 @@ export function useUserData() {
 
   const markStage1StartingSeen = () => setKey(KEYS.stage1StartingSeen, true);
 
+  // ---- Pilot "Act isn't built yet" callout "seen" flag ----
+  const hasSeenPilotCallout = (): boolean =>
+    snapshot[KEYS.pilotCalloutSeen] === true;
+
+  const markPilotCalloutSeen = () => setKey(KEYS.pilotCalloutSeen, true);
+
   // ---- Onboarding ----
   const isOnboardingComplete = (): boolean =>
     snapshot[KEYS.onboardingComplete] === true;
@@ -1113,6 +1124,8 @@ export function useUserData() {
     markStageIntroSeen,
     hasSeenStage1Starting,
     markStage1StartingSeen,
+    hasSeenPilotCallout,
+    markPilotCalloutSeen,
     isOnboardingComplete,
     markOnboardingComplete,
     getOnboarding,

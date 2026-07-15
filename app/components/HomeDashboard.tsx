@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, stageSubtitleFor, isRetired, titleFor } from "@/lib/modules";
+import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, stageSubtitleFor, isRetired, titleFor, PILOT_CALLOUT } from "@/lib/modules";
 import {
   WINDING_STAGE1_INTRO_BODY,
   REVIEW_STAGE1_INTRO_HEADING,
@@ -104,7 +104,13 @@ export default function HomeDashboard() {
     // Tying it to the current stage (not the viewed one) means navigating back to
     // a finished stage never re-triggers it, and anyone already past a stage
     // won't suddenly see that stage's intro.
-    const currentStage = getActiveStageNumber(ids);
+    //
+    // The cohort has to be passed here, as it is everywhere else this is called:
+    // without it, 4.1 counts toward "what's left" for the retired cohorts, who
+    // can never see or complete it (it's hideFrom them). They would sit on stage
+    // 4 for good and never reach stage 5 — so the two cohorts most likely to
+    // finish would be the ones who never saw the end of the programme.
+    const currentStage = getActiveStageNumber(ids, retirementStage);
     const stage = STAGES.find((s) => s.number === currentStage);
     const params =
       typeof window !== "undefined"
@@ -129,11 +135,17 @@ export default function HomeDashboard() {
     const skipIntro =
       !!params &&
       (params.get("intro") === "skip" || params.get("stage") !== null);
-    if (
-      stage?.intro &&
-      !skipIntro &&
-      !userData.getStageIntrosSeen().includes(currentStage)
-    ) {
+    // While Act has no sessions to open, the pilot callout stands in for its
+    // intro. It keeps its own seen flag, so meeting the callout doesn't use up
+    // Act's real intro — that still has to land the day Act's sessions do.
+    const actIsEmpty =
+      currentStage === 5 &&
+      !!stage &&
+      visibleModules(stage, retirementStage).length === 0;
+    const introSeen = actIsEmpty
+      ? userData.hasSeenPilotCallout()
+      : userData.getStageIntrosSeen().includes(currentStage);
+    if ((stage?.intro || actIsEmpty) && !skipIntro && !introSeen) {
       setIntroStage(currentStage);
     }
     // The Stage 1 opening capture comes right after that intro and before module
@@ -173,27 +185,47 @@ export default function HomeDashboard() {
       // and the eyebrow name swapped to "Review" (via stageNameFor). Phase 4.
       const reviewStage1 =
         RETIREMENT_PATHS && isRetired(retirementStage) && stage.number === 1;
-      const introStageObj = stage.intro
-        ? {
-            ...stage,
-            name: stageNameFor(stage, retirementStage),
-            intro: {
-              ...stage.intro,
-              heading: reviewStage1
-                ? REVIEW_STAGE1_INTRO_HEADING
-                : stage.intro.heading,
-              body: reviewStage1
-                ? REVIEW_STAGE1_INTRO_BODY
-                : windingStage1
-                  ? WINDING_STAGE1_INTRO_BODY
-                  : stage.intro.body.map((p) => tailorCopy(p, retirementStage)),
-            },
-          }
-        : stage;
+      // Act with nothing in it: the pilot callout replaces its intro entirely,
+      // and its button goes back to the plan rather than on into a stage that
+      // has nothing to open. Keyed off Act's actual sessions, so it stops
+      // standing in of its own accord once they exist.
+      const actIsEmpty =
+        stage.number === 5 &&
+        visibleModules(stage, retirementStage).length === 0;
+      const introStageObj = actIsEmpty
+        ? { ...stage, name: stageNameFor(stage, retirementStage), intro: PILOT_CALLOUT }
+        : stage.intro
+          ? {
+              ...stage,
+              name: stageNameFor(stage, retirementStage),
+              intro: {
+                ...stage.intro,
+                // The heading is tailored too, not just the body: Stage 4's asks
+                // the retired cohorts to shape a reset rather than make a plan.
+                // No rule matches the other stages' headings, so they pass
+                // through untouched.
+                heading: reviewStage1
+                  ? REVIEW_STAGE1_INTRO_HEADING
+                  : tailorCopy(stage.intro.heading, retirementStage),
+                body: reviewStage1
+                  ? REVIEW_STAGE1_INTRO_BODY
+                  : windingStage1
+                    ? WINDING_STAGE1_INTRO_BODY
+                    : stage.intro.body.map((p) => tailorCopy(p, retirementStage)),
+              },
+            }
+          : stage;
       return (
         <StageIntro
           stage={introStageObj}
           onContinue={() => {
+            if (actIsEmpty) {
+              // "Back to my plan" — record the callout against its own flag, so
+              // Act's real intro is still waiting when Act's sessions land.
+              if (user) void userData.markPilotCalloutSeen();
+              router.push("/plan");
+              return;
+            }
             if (user) void userData.markStageIntroSeen(introStage);
             setIntroStage(null);
           }}
