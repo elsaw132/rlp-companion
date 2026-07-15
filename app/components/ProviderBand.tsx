@@ -68,7 +68,7 @@ export default function ProviderBand() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="logo" src="/chorus-life-logo.svg" alt={PROVIDER_NAME} width={95} height={30} />
         <span className="brand-divider" aria-hidden="true" />
-        <span className="descriptor">Your retirement coach</span>
+        <span className="descriptor">Your digital retirement coach</span>
       </Link>
 
       <div className="right">
