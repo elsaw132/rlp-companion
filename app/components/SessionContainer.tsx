@@ -550,7 +550,9 @@ function youtubeEmbedUrl(url: string): string {
     } else if (u.pathname.includes("/embed/")) {
       id = u.pathname.split("/embed/")[1] ?? "";
     }
-    return id ? `https://www.youtube.com/embed/${id}` : url;
+    // youtube-nocookie.com: the privacy-enhanced host — no tracking cookie is set
+    // unless the viewer actually plays the video. Same embed path and video id.
+    return id ? `https://www.youtube-nocookie.com/embed/${id}` : url;
   } catch {
     return url;
   }

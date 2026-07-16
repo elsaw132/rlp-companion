@@ -95,11 +95,29 @@ export type ConversationMessage = {
   text: string;
 };
 
+// The current version of the health-data consent wording. Stored alongside each
+// recorded consent so we always know which text a person agreed to; bump this
+// (and the copy in onboarding) if the wording ever changes.
+export const HEALTH_CONSENT_VERSION = "2026-07-health-v1";
+
+// The audit record that a person agreed to the health-data consent at
+// onboarding: whether they agreed, when, and against which version of the
+// wording. Persisted like everything else in the user_data store — it's the
+// standing evidence that consent was given.
+export type HealthConsent = {
+  agreed: boolean;
+  agreedAt: string;
+  version: string;
+};
+
 // ---- Logical keys (the former rlp_ keys, minus the user-id suffix) ----
 
 const KEYS = {
   onboarding: "onboarding",
   onboardingComplete: "onboarding-complete",
+  // The health-data consent audit record (agreed / when / wording version),
+  // captured at onboarding and kept as the standing evidence of consent.
+  healthConsent: "health-consent",
   preferredName: "preferred-name",
   completed: "completed",
   moduleFeedbackPrompted: "module-feedback-prompted",
@@ -779,6 +797,35 @@ export function useUserData() {
 
   const markOnboardingComplete = () => setKey(KEYS.onboardingComplete, true);
 
+  // ---- Health-data consent (audit record) ----
+  // The stored consent, or null if none has been recorded yet. Read to gate
+  // anything that depends on the person having agreed, and as the audit trail.
+  const getHealthConsent = (): HealthConsent | null => {
+    const v = snapshot[KEYS.healthConsent];
+    if (
+      v &&
+      typeof v === "object" &&
+      typeof (v as HealthConsent).agreed === "boolean" &&
+      typeof (v as HealthConsent).agreedAt === "string" &&
+      typeof (v as HealthConsent).version === "string"
+    ) {
+      return v as HealthConsent;
+    }
+    return null;
+  };
+
+  const hasHealthConsent = (): boolean => getHealthConsent()?.agreed === true;
+
+  // Stamp the agreement: agreed=true, the moment it was given, and the wording
+  // version it was given against. Written when the person ticks the health-data
+  // box and continues past the onboarding welcome.
+  const recordHealthConsent = () =>
+    setKey(KEYS.healthConsent, {
+      agreed: true,
+      agreedAt: new Date().toISOString(),
+      version: HEALTH_CONSENT_VERSION,
+    } satisfies HealthConsent);
+
   const getOnboarding = (): OnboardingAnswers => {
     const v = snapshot[KEYS.onboarding];
     return v && typeof v === "object" ? (v as OnboardingAnswers) : {};
@@ -1261,6 +1308,9 @@ export function useUserData() {
     markPilotCalloutSeen,
     isOnboardingComplete,
     markOnboardingComplete,
+    getHealthConsent,
+    hasHealthConsent,
+    recordHealthConsent,
     getOnboarding,
     saveOnboarding,
     hasPartner,

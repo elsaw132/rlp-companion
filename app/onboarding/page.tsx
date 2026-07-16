@@ -42,6 +42,17 @@ const MOTIVATION_OPTIONS = [
   "Just curious for now",
 ];
 
+// Health-data consent shown on the welcome step — a standalone agreement, kept
+// separate from the AI-disclaimer tick, and required before continuing. Held as
+// constants so the exact wording is unambiguous (and can't be nicked by the
+// react/no-unescaped-entities rule the way inline JSX apostrophes would be). If
+// this wording changes, bump HEALTH_CONSENT_VERSION in lib/userData.
+const HEALTH_CONSENT_HEADING = "Your health-related information";
+const HEALTH_CONSENT_BODY =
+  "As you work through the programme, Vita will ask about things like your energy, sleep, eating, how you're recovering, how ready you feel for retirement, your hearing and eyesight, and your hopes and fears. Some of this counts as health information, which the law treats with extra care. We store it securely and use it only to tailor your plan. We won't let a person read your responses unless you separately agree, and you can delete everything at any time.";
+const HEALTH_CONSENT_LABEL =
+  "I agree to Chorus Life collecting and using my health-related information as described above.";
+
 // Vita's register, chosen here and stored against the user. Each label maps to a
 // stable code value (CoachTone) the chat API turns into a tone directive. All
 // three are real choices; "Warm and friendly" is simply pre-selected.
@@ -74,6 +85,7 @@ function usePreviewData(real: ReturnType<typeof useUserData>) {
       isOnboardingComplete: () => false,
       saveOnboarding: async () => {},
       markOnboardingComplete: async () => {},
+      recordHealthConsent: async () => {},
       setPreferredName: async () => {},
     } as ReturnType<typeof useUserData>,
   };
@@ -91,6 +103,9 @@ export default function OnboardingPage() {
   // needs the handlers to know fixed step numbers.
   const [stepIndex, setStepIndex] = useState(0);
   const [understood, setUnderstood] = useState(false);
+  // The health-data consent tick — its own gate, separate from `understood`.
+  // Both must be ticked before the welcome step lets them continue.
+  const [healthConsent, setHealthConsent] = useState(false);
   const [name, setName] = useState("");
   const [nameInit, setNameInit] = useState(false);
   const [partner, setPartner] = useState("");
@@ -201,7 +216,14 @@ export default function OnboardingPage() {
               firstName={user?.firstName?.trim() || ""}
               understood={understood}
               setUnderstood={setUnderstood}
-              onContinue={goNext}
+              healthConsent={healthConsent}
+              setHealthConsent={setHealthConsent}
+              onContinue={async () => {
+                // Stamp the health-data consent as they leave the welcome — the
+                // button is gated on the tick, so reaching here means agreed.
+                await data.recordHealthConsent();
+                goNext();
+              }}
             />
           )}
 
@@ -385,11 +407,15 @@ function Welcome({
   firstName,
   understood,
   setUnderstood,
+  healthConsent,
+  setHealthConsent,
   onContinue,
 }: {
   firstName: string;
   understood: boolean;
   setUnderstood: (v: boolean) => void;
+  healthConsent: boolean;
+  setHealthConsent: (v: boolean) => void;
   onContinue: () => void;
 }) {
   const tuner = useSceneTuner();
@@ -452,10 +478,25 @@ function Welcome({
           </span>
         </label>
 
+        {/* Health-data consent — a standalone agreement, separate from the AI
+            disclaimer above. Both must be ticked before Get started enables. */}
+        <div className="consent-block">
+          <h2 className="consent-heading">{HEALTH_CONSENT_HEADING}</h2>
+          <p className="consent-body">{HEALTH_CONSENT_BODY}</p>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={healthConsent}
+              onChange={(e) => setHealthConsent(e.target.checked)}
+            />
+            <span className="lab">{HEALTH_CONSENT_LABEL}</span>
+          </label>
+        </div>
+
         <button
           type="button"
           className="btn btn-navy"
-          disabled={!understood}
+          disabled={!understood || !healthConsent}
           onClick={onContinue}
         >
           Get started →
@@ -650,6 +691,14 @@ const css = `
 .rlp-onb .checkbox-row input{width:20px;height:20px;margin-top:1px;accent-color:var(--brand-primary);flex-shrink:0;cursor:pointer}
 .rlp-onb .checkbox-row input:focus-visible{box-shadow:var(--focus-ring);border-radius:var(--r-xs)}
 .rlp-onb .checkbox-row .lab{font-family:var(--font-sans);font-size:var(--fs-sm);line-height:1.5;color:var(--text)}
+
+/* Health-data consent — its own block above the Get started button. Heading in
+   the sans section role, body at reading size, then the same warm checkbox-row
+   as the AI disclaimer for a consistent pair. */
+.rlp-onb .consent-block{margin:0 0 26px}
+.rlp-onb .consent-heading{font-family:var(--font-sans);font-size:var(--fs-section);font-weight:700;color:var(--ink);margin:0 0 8px}
+.rlp-onb .consent-body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:var(--lh-body);color:var(--text);margin:0;max-width:58ch}
+.rlp-onb .consent-block .checkbox-row{margin:14px 0 0}
 
 .rlp-onb .card-list{display:flex;flex-direction:column;gap:12px;width:100%;margin:0 0 28px}
 .rlp-onb .card{width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:18px 20px;min-height:56px;box-shadow:var(--shadow-sm);font-family:var(--font-sans);font-size:var(--fs-body);font-weight:500;color:var(--text);cursor:pointer;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
