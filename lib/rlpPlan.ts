@@ -79,7 +79,8 @@ export type PlanOpening = {
 // One goal as it sits in the balance overview (§2) and, when spotlit, in §5.
 export type PlanGoal = {
   label: string;
-  area: BalancedAreaId;
+  // Free-text area label now (the fixed five-area structure was retired in 4.3).
+  area: string;
   track: "do" | "be";
   // Spotlit (one of the prioritised handful), with its rank and the member's own
   // note on what it means and the season it belongs to.
@@ -95,7 +96,7 @@ export type PlanGoal = {
 };
 
 export type PlanArea = {
-  id: BalancedAreaId;
+  id: string;
   label: string;
   blurb: string;
   goals: PlanGoal[];
@@ -466,7 +467,7 @@ function buildBalance(goalsResult: BalancedGoalsResult | null): PlanArea[] {
 
   // Preserve the canonical area order from the result where present, else the
   // five-area default.
-  const order: { id: BalancedAreaId; label: string }[] =
+  const order: { id: string; label: string }[] =
     goalsResult?.areas?.length
       ? goalsResult.areas
       : BALANCED_AREAS.map((id) => ({ id, label: labels[id] ?? id }));

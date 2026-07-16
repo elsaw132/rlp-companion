@@ -684,7 +684,11 @@ export type BalancedGoalsResult = {
   // personal meaning, and `season` where it belongs.
   goals: {
     label: string;
-    area: BalancedAreaId;
+    // The area of the person's life this goal is about, in their own words — a free
+    // label ("Travel & adventure", "Our home"), not one of a fixed set.
+    area: string;
+    // Retained for back-compat with earlier saved results and downstream readers that
+    // branch on it; every goal drafted now is a concrete thing to DO.
     track: "do" | "be";
     springboard?: string;
     looksLike?: string;
@@ -696,11 +700,11 @@ export type BalancedGoalsResult = {
     note?: string;
     season?: string;
   }[];
-  // The five areas in order, with labels, so the recap and the "balanced
-  // retirement" overview render without the interaction config.
-  areas: { id: BalancedAreaId; label: string }[];
-  // Areas the person named as deliberately empty — a choice, not a gap to fill.
-  deliberateGaps: BalancedAreaId[];
+  // The distinct areas of life the goals touch, with labels — for the recap and
+  // downstream. Free-text labels now, not the fixed five.
+  areas: { id: string; label: string }[];
+  // Kept for shape compatibility; always empty now the fixed-area structure is gone.
+  deliberateGaps: string[];
   summaryLabel: string;
 };
 

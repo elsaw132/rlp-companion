@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type {
-  BalancedAreaId,
   BalancedGoalsInteraction,
   BalancedGoalsResult,
 } from "@/lib/modules";
@@ -16,98 +15,47 @@ import {
 import { useUserData } from "@/lib/userData";
 import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
-type Track = "do" | "be";
-
-// A goal is carried at up to three intensities. The person steps between them
-// without losing any: each is a complete phrasing with its own track and timing.
+// A goal is carried at up to three sizes; the person steps between them without
+// losing any. Each is a complete phrasing with its own rough timing (cadence).
 type Intensity = "quieter" | "original" | "bolder";
 const INTENSITY_ORDER: Intensity[] = ["quieter", "original", "bolder"];
 
-type Variant = {
-  label: string;
-  track: Track;
-  cadence?: string;
-  ordinaryWeek?: string;
-};
+type Variant = { label: string; cadence?: string };
 type Goal = {
   id: string;
-  area: BalancedAreaId;
-  // The one-line "why we suggested this", carried from the draft; absent on a
-  // goal the person adds.
+  // The area of the person's life this goal is about, in their own words — a free
+  // label ("Travel & adventure", "Our home"), not one of a fixed set.
+  area: string;
+  // The one-line "why we suggested this", carried from the draft; absent on a goal
+  // the person adds.
   why?: string;
-  // Which intensity is showing. "original" always exists; the others may not.
+  // Which size is showing. "original" always exists; bolder/quieter may not.
   level: Intensity;
   variants: Partial<Record<Intensity, Variant>> & { original: Variant };
 };
 
-// The phrasing currently in view — what gets edited, counted and committed.
+// The phrasing currently in view — what gets edited and committed.
 function activeVariant(g: Goal): Variant {
   return g.variants[g.level] ?? g.variants.original;
 }
 
-type Detail = { note?: string; season?: string };
-
-// The flattened goal the focus pass works with — just the active phrasing.
-type FocusGoal = { id: string; area: BalancedAreaId; label: string };
-
-// The coach-facing summary — the spotlit handful, ranked, each with its area,
-// meaning, season and what success looks like, then the balance across the five
-// areas including any the person left deliberately quiet.
+// The coach-facing summary — the person's chosen goals, each with the area of life
+// it is about and its rough timing.
 export function balancedGoalsSummaryText(result: BalancedGoalsResult): string {
-  const label = result.summaryLabel ?? "Your balanced retirement";
-  const areaLabel = (id: string) =>
-    result.areas.find((a) => a.id === id)?.label ?? id;
-  const focus = result.goals
-    .filter((g) => g.focus)
-    .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
-  const focusText = focus
+  const label = result.summaryLabel ?? "Your most important goals";
+  const lines = result.goals
+    .filter((g) => g.label.trim())
     .map((g) => {
-      const success =
-        g.track === "do"
-          ? [g.cadence ? `roughly: ${g.cadence}` : ""]
-          : [g.ordinaryWeek ? `in an ordinary week: ${g.ordinaryWeek}` : ""];
-      const bits = [
-        `area: ${areaLabel(g.area)}`,
-        g.track === "do" ? "a thing to do" : "a way to live",
-        g.note ? `what it means: ${g.note}` : "",
-        g.season ? `season: ${g.season}` : "",
-        ...success,
-      ]
-        .filter(Boolean)
-        .join("; ");
-      return `${g.rank}. ${g.label} (${bits})`;
-    })
-    .join(" ");
-
-  const balance = result.areas
-    .map((a) => {
-      const inArea = result.goals.filter((g) => g.area === a.id);
-      if (inArea.length === 0) {
-        return result.deliberateGaps.includes(a.id)
-          ? `${a.label} (left deliberately quiet)`
-          : `${a.label} (empty)`;
-      }
-      return `${a.label}: ${inArea.map((g) => g.label).join(", ")}`;
-    })
-    .join("; ");
-
-  const wider = result.goals.filter((g) => !g.focus);
-  const widerText = wider.length
-    ? ` Other goals they kept but didn't spotlight: ${wider
-        .map((g) => `${g.label} (${areaLabel(g.area)})`)
-        .join(", ")}.`
-    : "";
-
-  return `${label}. In the spotlight, most important first: ${focusText}. The balance across the five areas — ${balance}.${widerText}`;
+      const area = g.area ? `${g.area}: ` : "";
+      const when = g.cadence ? ` (${g.cadence})` : "";
+      return `${area}${g.label}${when}`;
+    });
+  if (!lines.length) return `${label}. (none set yet)`;
+  return `${label}. ${lines.join(" · ")}`;
 }
 
 function toVariant(v: GoalVariant): Variant {
-  return {
-    label: v.label,
-    track: v.track,
-    ...(v.cadence ? { cadence: v.cadence } : {}),
-    ...(v.ordinaryWeek ? { ordinaryWeek: v.ordinaryWeek } : {}),
-  };
+  return { label: v.label, ...(v.cadence ? { cadence: v.cadence } : {}) };
 }
 
 function mapSuggestions(suggestions: GoalSuggestion[]): Goal[] {
@@ -126,12 +74,9 @@ function mapSuggestions(suggestions: GoalSuggestion[]): Goal[] {
 
 type BalancedGoalsProps = {
   interaction: BalancedGoalsInteraction;
-  // Per-area material drawn from the person's earlier words — the anchor for the
-  // draft, sent to /api/balanced-goals so each goal lands in the right area.
   seed: BalancedSeed;
   sessionId: string;
-  // The rendered user-model block and onboarding line, the rich input for the
-  // draft. hasPartner filters partner-only framing.
+  // The rendered user-model block and onboarding line — the rich input for the draft.
   userModelText: string;
   onboardingContext: string;
   hasPartner: boolean;
@@ -140,7 +85,6 @@ type BalancedGoalsProps = {
 
 export default function BalancedGoals({
   interaction,
-  seed,
   sessionId,
   userModelText,
   onboardingContext,
@@ -151,89 +95,43 @@ export default function BalancedGoals({
   onCancel,
 }: BalancedGoalsProps) {
   const {
-    areas,
     draftingLabel,
     curationInstruction,
-    balanceHint,
-    trackDoLabel,
-    trackBeLabel,
     cadenceLabel,
     cadencePlaceholder,
-    ordinaryWeekLabel,
-    ordinaryWeekPlaceholder,
     bolderLabel,
     quieterLabel,
     rejectLabel,
     addGoalLabel,
     addGoalPlaceholder,
-    toFocusLabel,
-    focusInstruction,
-    absencePrompt,
-    maxFocus,
-    noteLabel,
-    notePlaceholder,
-    seasonLabel,
-    seasons,
-    deliberateGapLabel,
     summaryLabel,
   } = interaction;
 
   const userData = useUserData();
 
-  // Editing reopens straight onto the curation view from the saved goals; a
-  // fresh run uses any cached draft, or fetches one (the "loading" phase).
+  // Editing reopens straight onto the goals from the saved result; a fresh run uses
+  // any cached draft, or fetches one (the "loading" phase).
   const cachedSeed = initial ? null : userData.getGoalSeed(sessionId);
-
-  const [phase, setPhase] = useState<"loading" | "curate" | "focus">(
+  const [phase, setPhase] = useState<"loading" | "curate">(
     initial || cachedSeed ? "curate" : "loading"
   );
 
   const [goals, setGoals] = useState<Goal[]>(() => {
     if (initial) {
-      // A saved goal keeps only its chosen phrasing, so it reopens as a single
-      // "original" variant — the bolder/quieter swap was spent when it was kept.
+      // A saved goal keeps only its chosen phrasing — it reopens as a single
+      // "original", since the bolder/quieter dial was spent when it was kept.
       return initial.goals.map((g, i) => ({
         id: `g${i}`,
         area: g.area,
         level: "original" as Intensity,
         variants: {
-          original: {
-            label: g.label,
-            track: g.track,
-            ...(g.cadence ? { cadence: g.cadence } : {}),
-            ...(g.ordinaryWeek ? { ordinaryWeek: g.ordinaryWeek } : {}),
-          },
+          original: { label: g.label, ...(g.cadence ? { cadence: g.cadence } : {}) },
         },
       }));
     }
     if (cachedSeed) return mapSuggestions(cachedSeed.suggestions);
     return [];
   });
-
-  const [focusOrder, setFocusOrder] = useState<string[]>(() => {
-    if (!initial) return [];
-    return initial.goals
-      .map((g, i) => ({ i, rank: g.rank, focus: g.focus }))
-      .filter((g) => g.focus)
-      .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
-      .map((g) => `g${g.i}`);
-  });
-
-  const [detail, setDetail] = useState<Record<string, Detail>>(() => {
-    const seeded: Record<string, Detail> = {};
-    initial?.goals.forEach((g, i) => {
-      if (!g.focus) return;
-      seeded[`g${i}`] = {
-        ...(g.note ? { note: g.note } : {}),
-        ...(g.season ? { season: g.season } : {}),
-      };
-    });
-    return seeded;
-  });
-
-  const [gaps, setGaps] = useState<Set<BalancedAreaId>>(
-    () => new Set(initial?.deliberateGaps ?? [])
-  );
 
   // Draft the goals once, the first time a fresh run has no cached draft.
   const fetchedRef = useRef(false);
@@ -242,7 +140,6 @@ export default function BalancedGoals({
     fetchedRef.current = true;
     let cancelled = false;
     (async () => {
-      // A prefetch started during the intro may have already landed in the cache.
       const cached = userData.getGoalSeed(sessionId);
       const draft =
         cached ??
@@ -251,12 +148,7 @@ export default function BalancedGoals({
           onboarding: onboardingContext,
           hasPartner,
           retirementStage: userData.getRetirementStage(),
-          springboards: areas.map((a) => ({
-            area: a.id,
-            labels: seed.springboards
-              .filter((s) => s.areas.includes(a.id))
-              .map((s) => s.label),
-          })),
+          springboards: [],
         }));
       if (cancelled) return;
       if (draft && !cached) void userData.saveGoalSeed(sessionId, draft);
@@ -269,37 +161,19 @@ export default function BalancedGoals({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // A monotonic counter for ids of goals the person adds themselves. A ref so it
-  // survives re-renders and never collides with the drafted "g0, g1…" ids.
+  // A monotonic counter for ids of goals the person adds — a ref so it survives
+  // re-renders and never collides with the drafted "g0, g1…" ids.
   const nextIdRef = useRef(0);
   const makeId = () => `goal-added-${nextIdRef.current++}`;
-
-  const goalsInArea = (area: BalancedAreaId) =>
-    goals.filter((g) => g.area === area);
   const namedGoals = goals.filter((g) => activeVariant(g).label.trim());
-  const goalById = (id: string) => goals.find((g) => g.id === id);
-  // The flattened view the focus pass needs — just the active phrasing.
-  const flat = (g: Goal) => ({
-    id: g.id,
-    area: g.area,
-    label: activeVariant(g).label,
-  });
 
-  function addGoal(area: BalancedAreaId) {
-    const id = makeId();
+  function addGoal() {
     setGoals((prev) => [
       ...prev,
-      { id, area, level: "original", variants: { original: { label: "", track: "do" } } },
+      { id: makeId(), area: "", level: "original", variants: { original: { label: "" } } },
     ]);
-    // Adding to an area undoes any "deliberately quiet" mark on it.
-    setGaps((prev) => {
-      if (!prev.has(area)) return prev;
-      const next = new Set(prev);
-      next.delete(area);
-      return next;
-    });
   }
-  // Edit the phrasing currently in view, leaving the other intensities intact.
+  // Edit the phrasing currently in view, leaving the other sizes intact.
   function updateActiveVariant(id: string, patch: Partial<Variant>) {
     setGoals((prev) =>
       prev.map((g) =>
@@ -309,8 +183,11 @@ export default function BalancedGoals({
       )
     );
   }
-  // Step toward a bolder (+1) or quieter (-1) intensity, skipping any that the
-  // draft didn't supply. Stepping back lands on the original, untouched.
+  function updateArea(id: string, area: string) {
+    setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, area } : g)));
+  }
+  // Step toward a bolder (+1) or quieter (-1) size, skipping any the draft didn't
+  // supply. Stepping back lands on the original, untouched.
   function stepLevel(id: string, dir: -1 | 1) {
     setGoals((prev) =>
       prev.map((g) => {
@@ -325,74 +202,37 @@ export default function BalancedGoals({
   }
   function removeGoal(id: string) {
     setGoals((prev) => prev.filter((g) => g.id !== id));
-    setFocusOrder((prev) => prev.filter((g) => g !== id));
-    setDetail((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
   }
 
-  function toggleFocus(id: string) {
-    setFocusOrder((prev) =>
-      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
-    );
-  }
-  function moveFocus(index: number, dir: -1 | 1) {
-    setFocusOrder((prev) => {
-      const next = [...prev];
-      const target = index + dir;
-      if (target < 0 || target >= next.length) return prev;
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
-  }
-  function patchDetail(id: string, patch: Detail) {
-    setDetail((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
-  }
-  function toggleGap(area: BalancedAreaId) {
-    setGaps((prev) => {
-      const next = new Set(prev);
-      if (next.has(area)) next.delete(area);
-      else next.add(area);
-      return next;
-    });
-  }
-
-  const focusReady = focusOrder.length >= 1 && focusOrder.length <= maxFocus;
+  const enoughGoals = namedGoals.length >= 1;
 
   function buildResultObject(): BalancedGoalsResult {
     const named = namedGoals;
-    const rankById = new Map(
-      focusOrder
-        .filter((id) => named.some((g) => g.id === id))
-        .map((id, i) => [id, i + 1])
-    );
+    // The distinct areas of life these goals touch, for the recap and downstream.
+    const areaSeen = new Map<string, string>();
+    for (const g of named) {
+      const key = g.area.trim().toLowerCase();
+      if (key && !areaSeen.has(key)) areaSeen.set(key, g.area.trim());
+    }
     return {
       type: "balanced-goals",
-      goals: named.map((g) => {
-        const rank = rankById.get(g.id);
-        const d = detail[g.id] ?? {};
+      goals: named.map((g, i) => {
         const v = activeVariant(g);
         return {
           label: v.label.trim(),
-          area: g.area,
-          track: v.track,
-          ...(v.track === "do" && v.cadence?.trim()
-            ? { cadence: v.cadence.trim() }
-            : {}),
-          ...(v.track === "be" && v.ordinaryWeek?.trim()
-            ? { ordinaryWeek: v.ordinaryWeek.trim() }
-            : {}),
-          ...(rank ? { focus: true, rank } : {}),
-          ...(rank && d.note?.trim() ? { note: d.note.trim() } : {}),
-          ...(rank && d.season ? { season: d.season } : {}),
+          area: g.area.trim(),
+          // Every goal here is a concrete thing to DO — the "be"/way-of-living track
+          // was retired. Kept so downstream readers that branch on track still work.
+          track: "do" as const,
+          ...(v.cadence?.trim() ? { cadence: v.cadence.trim() } : {}),
+          // This is a small set of the person's MOST important goals — all are
+          // spotlit, ranked by the order shown.
+          focus: true,
+          rank: i + 1,
         };
       }),
-      areas: areas.map((a) => ({ id: a.id, label: a.label })),
-      deliberateGaps: areas
-        .map((a) => a.id)
-        .filter((id) => gaps.has(id) && named.every((g) => g.area !== id)),
+      areas: Array.from(areaSeen.values()).map((a) => ({ id: a, label: a })),
+      deliberateGaps: [],
       summaryLabel,
     };
   }
@@ -403,7 +243,7 @@ export default function BalancedGoals({
         <style>{balCss}</style>
         <div style={styles.draftCard}>
           <span style={styles.draftSun} aria-hidden="true">
-            ☀️
+            ☀
           </span>
           <p style={styles.draftText}>{draftingLabel}</p>
         </div>
@@ -414,178 +254,81 @@ export default function BalancedGoals({
   return (
     <section style={styles.wrap}>
       <style>{balCss}</style>
+      <p style={styles.instruction}>{curationInstruction}</p>
 
-      <BalanceOverview
-        areas={areas}
-        countFor={(id) =>
-          goalsInArea(id).filter((g) => activeVariant(g).label.trim()).length
-        }
+      <div style={styles.helperGroup}>
+        <HelperLine>
+          Push a goal bolder or gentler until it feels right — or set one aside.
+        </HelperLine>
+        <div style={styles.goalList}>
+          {goals.map((goal) => (
+            <CurateCard
+              key={goal.id}
+              goal={goal}
+              areaPlaceholder="What this is about…"
+              labelPlaceholder={addGoalPlaceholder}
+              cadenceLabel={cadenceLabel}
+              cadencePlaceholder={cadencePlaceholder}
+              bolderLabel={bolderLabel}
+              quieterLabel={quieterLabel}
+              rejectLabel={rejectLabel}
+              onUpdateVariant={updateActiveVariant}
+              onUpdateArea={updateArea}
+              onStep={stepLevel}
+              onRemove={removeGoal}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          className="bal-add"
+          style={styles.addOwnBtn}
+          onClick={addGoal}
+        >
+          <span aria-hidden="true" style={styles.addPlus}>
+            +
+          </span>
+          {addGoalLabel}
+        </button>
+      </div>
+
+      <FinishControls
+        mode={mode}
+        disabled={!enoughGoals}
+        onFinish={() => onFinish(buildResultObject())}
+        onCancel={onCancel}
+        hint={enoughGoals ? undefined : "Keep at least one goal to carry on."}
       />
-      <p style={styles.balanceHint}>{balanceHint}</p>
-
-      {phase === "curate" && (
-        <>
-          <p style={styles.instruction}>{curationInstruction}</p>
-
-          <div style={styles.helperGroup}>
-          <HelperLine>Tap to keep, reword, or set aside each goal.</HelperLine>
-          <div style={styles.areaSections}>
-            {areas.map((area) => (
-              <div key={area.id} style={styles.areaSection}>
-                <div>
-                  <h3 style={styles.areaTitle}>{area.label}</h3>
-                  <p style={styles.areaBlurb}>{area.blurb}</p>
-                </div>
-
-                {goalsInArea(area.id).map((goal) => (
-                  <CurateCard
-                    key={goal.id}
-                    goal={goal}
-                    labelPlaceholder={addGoalPlaceholder}
-                    trackDoLabel={trackDoLabel}
-                    trackBeLabel={trackBeLabel}
-                    cadenceLabel={cadenceLabel}
-                    cadencePlaceholder={cadencePlaceholder}
-                    ordinaryWeekLabel={ordinaryWeekLabel}
-                    ordinaryWeekPlaceholder={ordinaryWeekPlaceholder}
-                    bolderLabel={bolderLabel}
-                    quieterLabel={quieterLabel}
-                    rejectLabel={rejectLabel}
-                    onUpdateVariant={updateActiveVariant}
-                    onStep={stepLevel}
-                    onRemove={removeGoal}
-                  />
-                ))}
-
-                <button
-                  type="button"
-                  className="bal-add"
-                  style={styles.addOwnBtn}
-                  onClick={() => addGoal(area.id)}
-                >
-                  <span aria-hidden="true" style={styles.addPlus}>
-                    +
-                  </span>
-                  {addGoalLabel}
-                </button>
-              </div>
-            ))}
-          </div>
-          </div>
-
-          <div style={styles.stepControls}>
-            <button
-              type="button"
-              className="bal-continue"
-              style={styles.continueBtn}
-              onClick={() => setPhase("focus")}
-            >
-              {toFocusLabel}
-            </button>
-          </div>
-        </>
-      )}
-
-      {phase === "focus" && (
-        <FocusStep
-          instruction={focusInstruction}
-          absencePrompt={absencePrompt}
-          areas={areas}
-          goalsInArea={(area) => goalsInArea(area).map(flat)}
-          goalById={(id) => {
-            const g = goalById(id);
-            return g ? flat(g) : undefined;
-          }}
-          focusOrder={focusOrder}
-          detail={detail}
-          gaps={gaps}
-          maxFocus={maxFocus}
-          deliberateGapLabel={deliberateGapLabel}
-          noteLabel={noteLabel}
-          notePlaceholder={notePlaceholder}
-          seasonLabel={seasonLabel}
-          seasons={seasons}
-          areaLabelOf={(id) => areas.find((a) => a.id === id)?.label ?? id}
-          onToggle={toggleFocus}
-          onMove={moveFocus}
-          onDetail={patchDetail}
-          onToggleGap={toggleGap}
-          onBack={() => setPhase("curate")}
-          mode={mode}
-          canFinish={focusReady}
-          onFinish={() => onFinish(buildResultObject())}
-          onCancel={onCancel}
-        />
-      )}
     </section>
   );
 }
 
-// ---- the read-only balance picture across the five areas ----
-function BalanceOverview({
-  areas,
-  countFor,
-}: {
-  areas: { id: BalancedAreaId; label: string }[];
-  countFor: (id: BalancedAreaId) => number;
-}) {
-  return (
-    <div style={styles.strip} aria-label="The five areas of a balanced retirement">
-      {areas.map((a) => {
-        const count = countFor(a.id);
-        return (
-          <div
-            key={a.id}
-            style={{
-              ...styles.cell,
-              ...(count > 0 ? styles.cellFilled : null),
-            }}
-          >
-            <span style={styles.cellLabel}>{a.label}</span>
-            <span
-              style={{
-                ...styles.cellCount,
-                ...(count > 0 ? styles.cellCountOn : null),
-              }}
-            >
-              {count > 0 ? count : "—"}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ---- one drafted goal, on the curation surface ----
+// ---- one goal, on the curation surface: the area, the goal, its timing, and the
+// bolder/quieter dial ----
 function CurateCard({
   goal,
+  areaPlaceholder,
   labelPlaceholder,
-  trackDoLabel,
-  trackBeLabel,
   cadenceLabel,
   cadencePlaceholder,
-  ordinaryWeekLabel,
-  ordinaryWeekPlaceholder,
   bolderLabel,
   quieterLabel,
   rejectLabel,
   onUpdateVariant,
+  onUpdateArea,
   onStep,
   onRemove,
 }: {
   goal: Goal;
+  areaPlaceholder: string;
   labelPlaceholder: string;
-  trackDoLabel: string;
-  trackBeLabel: string;
   cadenceLabel: string;
   cadencePlaceholder: string;
-  ordinaryWeekLabel: string;
-  ordinaryWeekPlaceholder: string;
   bolderLabel: string;
   quieterLabel: string;
   rejectLabel: string;
   onUpdateVariant: (id: string, patch: Partial<Variant>) => void;
+  onUpdateArea: (id: string, area: string) => void;
   onStep: (id: string, dir: -1 | 1) => void;
   onRemove: (id: string) => void;
 }) {
@@ -594,101 +337,64 @@ function CurateCard({
   const canQuieter = INTENSITY_ORDER.slice(0, i).some((l) => goal.variants[l]);
   const canBolder = INTENSITY_ORDER.slice(i + 1).some((l) => goal.variants[l]);
   const levelNote =
-    goal.level === "bolder"
-      ? "Bolder version"
-      : goal.level === "quieter"
-        ? "Quieter version"
-        : null;
+    goal.level === "bolder" ? "Bolder" : goal.level === "quieter" ? "Gentler" : null;
 
   return (
     <div style={styles.goalCard}>
+      <input
+        type="text"
+        className="bal-input"
+        style={styles.areaField}
+        placeholder={areaPlaceholder}
+        value={goal.area}
+        onChange={(e) => onUpdateArea(goal.id, e.target.value)}
+        aria-label="Area of life this goal is about"
+      />
+      {goal.why && <p style={styles.whyLine}>{goal.why}</p>}
       {levelNote && <span style={styles.levelTag}>{levelNote}</span>}
 
       <AutoTextarea
-        className="bal-input bal-label-input"
+        className="bal-input"
         style={styles.labelInput}
         minRows={2}
-        value={v.label}
-        ariaLabel="Goal"
         placeholder={labelPlaceholder}
-        autoFocus={v.label === ""}
+        value={v.label}
         onChange={(val) => onUpdateVariant(goal.id, { label: val })}
+        ariaLabel="Goal"
       />
 
-      {goal.why && <p style={styles.whyLine}>Why we suggested this: {goal.why}</p>}
-
-      <div style={styles.trackRow}>
-        <button
-          type="button"
-          className="bal-track"
-          style={{
-            ...styles.trackBtn,
-            ...(v.track === "do" ? styles.trackSelected : null),
-          }}
-          aria-pressed={v.track === "do"}
-          onClick={() => onUpdateVariant(goal.id, { track: "do" })}
-        >
-          {trackDoLabel}
-        </button>
-        <button
-          type="button"
-          className="bal-track"
-          style={{
-            ...styles.trackBtn,
-            ...(v.track === "be" ? styles.trackSelected : null),
-          }}
-          aria-pressed={v.track === "be"}
-          onClick={() => onUpdateVariant(goal.id, { track: "be" })}
-        >
-          {trackBeLabel}
-        </button>
-      </div>
-
-      {v.track === "do" ? (
-        <Field
-          label={cadenceLabel}
-          placeholder={cadencePlaceholder}
-          value={v.cadence ?? ""}
-          onChange={(val) => onUpdateVariant(goal.id, { cadence: val })}
-        />
-      ) : (
-        <Field
-          label={ordinaryWeekLabel}
-          placeholder={ordinaryWeekPlaceholder}
-          value={v.ordinaryWeek ?? ""}
-          rows={2}
-          onChange={(val) => onUpdateVariant(goal.id, { ordinaryWeek: val })}
-        />
-      )}
+      <Field
+        label={cadenceLabel}
+        placeholder={cadencePlaceholder}
+        value={v.cadence ?? ""}
+        rows={2}
+        onChange={(val) => onUpdateVariant(goal.id, { cadence: val })}
+      />
 
       <div style={styles.actionRow}>
         <button
           type="button"
-          className="bal-ghost"
-          style={{
-            ...styles.ghostBtn,
-            ...(canQuieter ? null : styles.ghostBtnDisabled),
-          }}
+          className="bal-arrow"
+          style={{ ...styles.ghostBtn, ...(canQuieter ? null : styles.ghostBtnDisabled) }}
           disabled={!canQuieter}
           onClick={() => onStep(goal.id, -1)}
         >
-          ↓ {quieterLabel}
+          {"↓ "}
+          {quieterLabel}
         </button>
         <button
           type="button"
-          className="bal-ghost"
-          style={{
-            ...styles.ghostBtn,
-            ...(canBolder ? null : styles.ghostBtnDisabled),
-          }}
+          className="bal-arrow"
+          style={{ ...styles.ghostBtn, ...(canBolder ? null : styles.ghostBtnDisabled) }}
           disabled={!canBolder}
           onClick={() => onStep(goal.id, 1)}
         >
-          ↑ {bolderLabel}
+          {"↑ "}
+          {bolderLabel}
         </button>
         <button
           type="button"
-          className="bal-ghost bal-reject"
+          className="bal-remove"
           style={{ ...styles.ghostBtn, ...styles.rejectBtn }}
           onClick={() => onRemove(goal.id)}
         >
@@ -778,241 +484,6 @@ function AutoTextarea({
       autoFocus={autoFocus}
       onChange={(e) => onChange(e.target.value)}
     />
-  );
-}
-
-// ---- the focus pass ----
-function FocusStep({
-  instruction,
-  absencePrompt,
-  areas,
-  goalsInArea,
-  goalById,
-  focusOrder,
-  detail,
-  gaps,
-  maxFocus,
-  deliberateGapLabel,
-  noteLabel,
-  notePlaceholder,
-  seasonLabel,
-  seasons,
-  areaLabelOf,
-  onToggle,
-  onMove,
-  onDetail,
-  onToggleGap,
-  onBack,
-  mode,
-  canFinish,
-  onFinish,
-  onCancel,
-}: {
-  instruction: string;
-  absencePrompt: string;
-  areas: { id: BalancedAreaId; label: string }[];
-  goalsInArea: (area: BalancedAreaId) => FocusGoal[];
-  goalById: (id: string) => FocusGoal | undefined;
-  focusOrder: string[];
-  detail: Record<string, Detail>;
-  gaps: Set<BalancedAreaId>;
-  maxFocus: number;
-  deliberateGapLabel: string;
-  noteLabel: string;
-  notePlaceholder: string;
-  seasonLabel: string;
-  seasons: { id: string; label: string }[];
-  areaLabelOf: (id: BalancedAreaId) => string;
-  onToggle: (id: string) => void;
-  onMove: (index: number, dir: -1 | 1) => void;
-  onDetail: (id: string, patch: Detail) => void;
-  onToggleGap: (area: BalancedAreaId) => void;
-  onBack: () => void;
-  mode: "create" | "edit";
-  canFinish: boolean;
-  onFinish: () => void;
-  onCancel?: () => void;
-}) {
-  return (
-    <>
-      <button
-        type="button"
-        className="bal-back"
-        style={styles.backBtn}
-        onClick={onBack}
-      >
-        ← Back to the goals
-      </button>
-      <div>
-        <p style={styles.areaProgress}>Last step · the wrap-up</p>
-        <h3 style={styles.areaTitle}>The goals that matter most</h3>
-      </div>
-      <p style={styles.instruction}>{instruction}</p>
-      <p style={styles.absencePrompt}>{absencePrompt}</p>
-
-      <div style={styles.helperGroup}>
-      <HelperLine>Tap the few you&apos;d most want to keep.</HelperLine>
-      <div style={styles.areaSections}>
-        {areas.map((area) => {
-          const list = goalsInArea(area.id).filter((g) => g.label.trim());
-          if (list.length === 0) {
-            return (
-              <div key={area.id} style={styles.emptyAreaRow}>
-                <span style={styles.emptyAreaName}>{area.label}</span>
-                <span style={styles.emptyAreaWord}>nothing here</span>
-                <button
-                  type="button"
-                  className="bal-gap"
-                  style={{
-                    ...styles.gapBtn,
-                    ...(gaps.has(area.id) ? styles.gapBtnOn : null),
-                  }}
-                  aria-pressed={gaps.has(area.id)}
-                  onClick={() => onToggleGap(area.id)}
-                >
-                  {deliberateGapLabel}
-                </button>
-              </div>
-            );
-          }
-          return (
-            <div key={area.id} style={styles.pickGroup}>
-              <p style={styles.pickHeading}>{area.label}</p>
-              <div style={styles.pickChips}>
-                {list.map((goal) => {
-                  const selected = focusOrder.includes(goal.id);
-                  return (
-                    <button
-                      key={goal.id}
-                      type="button"
-                      className="bal-pick"
-                      style={{
-                        ...styles.pickChip,
-                        ...(selected ? styles.pickChipSelected : null),
-                      }}
-                      aria-pressed={selected}
-                      onClick={() => onToggle(goal.id)}
-                    >
-                      {selected && <span aria-hidden="true">★ </span>}
-                      {goal.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      </div>
-
-      {focusOrder.length > maxFocus && (
-        <p style={styles.capNotice}>
-          That&apos;s {focusOrder.length}. Narrow the spotlight to {maxFocus} —
-          let the few that matter most stand out.
-        </p>
-      )}
-
-      {focusOrder.length > 0 && (
-        <div style={styles.spotlight}>
-          <p style={styles.spotlightHeading}>In the spotlight</p>
-          {focusOrder.map((id, index) => {
-            const goal = goalById(id);
-            if (!goal) return null;
-            const d = detail[id] ?? {};
-            return (
-              <div key={id} style={styles.spotCard}>
-                <div style={styles.spotHead}>
-                  <span style={styles.rank}>{index + 1}</span>
-                  <span style={styles.goalLabel}>{goal.label}</span>
-                  <span style={styles.areaTag}>{areaLabelOf(goal.area)}</span>
-                  <div style={styles.rankControls}>
-                    <button
-                      type="button"
-                      className="bal-arrow rlp-tap"
-                      style={styles.arrow}
-                      aria-label={`Move ${goal.label} up`}
-                      disabled={index === 0}
-                      onClick={() => onMove(index, -1)}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="bal-arrow rlp-tap"
-                      style={styles.arrow}
-                      aria-label={`Move ${goal.label} down`}
-                      disabled={index === focusOrder.length - 1}
-                      onClick={() => onMove(index, 1)}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className="bal-remove rlp-tap"
-                      style={styles.removeBtn}
-                      aria-label={`Remove ${goal.label} from spotlight`}
-                      onClick={() => onToggle(id)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-
-                <div style={styles.field}>
-                  <span style={styles.subLabel}>{seasonLabel}</span>
-                  <div style={styles.seasonChips}>
-                    {seasons.map((season) => {
-                      const selected = d.season === season.label;
-                      return (
-                        <button
-                          key={season.id}
-                          type="button"
-                          className="bal-chip"
-                          style={{
-                            ...styles.chip,
-                            ...(selected ? styles.chipSelected : null),
-                          }}
-                          aria-pressed={selected}
-                          onClick={() =>
-                            onDetail(id, {
-                              season: selected ? undefined : season.label,
-                            })
-                          }
-                        >
-                          {season.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <Field
-                  label={noteLabel}
-                  placeholder={notePlaceholder}
-                  value={d.note ?? ""}
-                  rows={2}
-                  onChange={(v) => onDetail(id, { note: v })}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <FinishControls
-        mode={mode}
-        disabled={!canFinish}
-        onFinish={onFinish}
-        onCancel={onCancel}
-        hint={
-          canFinish
-            ? undefined
-            : focusOrder.length === 0
-              ? "Spotlight at least one goal to carry on."
-              : `Narrow the spotlight to ${maxFocus} to carry on.`
-        }
-      />
-    </>
   );
 }
 
@@ -1123,6 +594,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-muted)",
     margin: "4px 0 0",
   },
+  goalList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  },
   goalCard: {
     display: "flex",
     flexDirection: "column",
@@ -1132,6 +608,22 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid var(--border)",
     borderRadius: "var(--r-md)",
     boxShadow: "var(--shadow-sm)",
+  },
+  // The area-of-life label at the top of each card — reads as a tag, editable so an
+  // added goal can be named and a drafted one retitled.
+  areaField: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    padding: "2px 0",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "var(--accent-strong)",
+    background: "transparent",
+    border: "none",
+    boxSizing: "border-box",
   },
   labelInput: {
     width: "100%",
@@ -1520,69 +1012,29 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 // Read-only recap shown above Vita's first message and kept visible through the
-// conversation — the "balanced retirement" overview: the spotlit handful, then
-// the five areas with the goals in each. The neutral card wrapper is the caller's.
+// conversation — the person's most important goals, each with the area of life it is
+// about and its rough timing. The neutral card wrapper is the caller's.
 export function BalancedGoalsSummary({
   result,
 }: {
   result: BalancedGoalsResult;
 }) {
-  const areaLabel = (id: string) =>
-    result.areas.find((a) => a.id === id)?.label ?? id;
-  const focus = result.goals
-    .filter((g) => g.focus)
-    .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+  const goals = result.goals.filter((g) => g.label.trim());
   return (
     <>
       <p style={summaryStyles.heading}>{result.summaryLabel}</p>
-
-      {focus.length > 0 && (
-        <div style={summaryStyles.goals}>
-          {focus.map((g) => (
-            <div key={g.label} style={summaryStyles.goalRow}>
-              <span style={summaryStyles.rank}>{g.rank}</span>
-              <div style={summaryStyles.goalBody}>
-                <p style={summaryStyles.goalLabel}>
-                  {g.label}
-                  <span style={summaryStyles.area}> · {areaLabel(g.area)}</span>
-                  {g.season && (
-                    <span style={summaryStyles.season}> · {g.season}</span>
-                  )}
-                </p>
-                {g.note && <p style={summaryStyles.note}>{g.note}</p>}
-                {g.track === "do" && g.cadence && (
-                  <p style={summaryStyles.detail}>Roughly: {g.cadence}</p>
-                )}
-                {g.track === "be" && g.ordinaryWeek && (
-                  <p style={summaryStyles.detail}>
-                    In an ordinary week: {g.ordinaryWeek}
-                  </p>
-                )}
-              </div>
+      <div style={summaryStyles.goals}>
+        {goals.length ? (
+          goals.map((g, i) => (
+            <div key={i} style={summaryStyles.goalBody}>
+              {g.area && <span style={summaryStyles.area}>{g.area}</span>}
+              <span style={summaryStyles.goalLabel}>{g.label}</span>
+              {g.cadence && <span style={summaryStyles.detail}>{g.cadence}</span>}
             </div>
-          ))}
-        </div>
-      )}
-
-      <div style={summaryStyles.byArea}>
-        {result.areas.map((a) => {
-          const inArea = result.goals.filter((g) => g.area === a.id);
-          const deliberate = result.deliberateGaps.includes(a.id);
-          return (
-            <div key={a.id} style={summaryStyles.areaLine}>
-              <span style={summaryStyles.areaName}>{a.label}</span>
-              {inArea.length > 0 ? (
-                <span style={summaryStyles.areaGoals}>
-                  {inArea.map((g) => g.label).join(", ")}
-                </span>
-              ) : (
-                <span style={summaryStyles.areaEmpty}>
-                  {deliberate ? "deliberately quiet" : "—"}
-                </span>
-              )}
-            </div>
-          );
-        })}
+          ))
+        ) : (
+          <span style={summaryStyles.areaEmpty}>—</span>
+        )}
       </div>
     </>
   );

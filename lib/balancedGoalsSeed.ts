@@ -8,9 +8,7 @@
 // sorted into the five balanced-retirement areas. Anything that goes wrong
 // falls back to a small generic set so the surface always renders.
 
-import type { BalancedAreaId } from "@/lib/modules";
 import type { RetirementStage } from "@/lib/userData";
-import { BALANCED_AREAS } from "@/lib/userModel";
 import { fetchSeedWithRetry } from "@/lib/seedRetry";
 
 // One intensity of a goal — a complete, standalone phrasing that reads clearly
@@ -33,7 +31,9 @@ export type GoalVariant = {
 // "quieter" are the same goal one notch more or less ambitious, for the one-tap
 // swap. The person can step between them without losing the original.
 export type GoalSuggestion = {
-  area: BalancedAreaId;
+  // The area of the person's life this goal is about, in their own words — a free
+  // label ("Travel & adventure", "Our home"), not one of a fixed set.
+  area: string;
   // One short line on why it was suggested, tied to something they said.
   why: string;
   original: GoalVariant;
@@ -75,31 +75,6 @@ export async function fetchBalancedGoalsDraft(
   );
 }
 
-// The five valid area ids, as a lookup so off-area model output is dropped.
-const VALID_AREAS = new Set<string>(BALANCED_AREAS);
-
-// The model is told to use the five exact ids, but occasionally labels an area with
-// a close synonym ("grow"/"learn" for think, "health" for move, "people" for
-// connect). Map those back rather than silently dropping a perfectly good goal —
-// otherwise a stray label can thin the board or, if enough are mislabelled, collapse
-// it to the generic fallback. Canonical ids map to themselves.
-const AREA_SYNONYMS: Record<string, BalancedAreaId> = {
-  restore: "restore", rest: "restore", recharge: "restore", recovery: "restore", relax: "restore", downtime: "restore",
-  move: "move", body: "move", active: "move", movement: "move", fitness: "move", health: "move", exercise: "move",
-  think: "think", grow: "think", growth: "think", learn: "think", learning: "think", mind: "think", create: "think", creativity: "think", make: "think", making: "think",
-  connect: "connect", connection: "connect", people: "connect", relationships: "connect", relationship: "connect", social: "connect", family: "connect",
-  contribute: "contribute", contribution: "contribute", give: "contribute", giving: "contribute", purpose: "contribute", help: "contribute", helping: "contribute", community: "contribute",
-};
-
-// Normalise a model-written area to one of the five canonical ids, or "" if it's
-// unrecognisable.
-function normalizeArea(raw: unknown): BalancedAreaId | "" {
-  const key = typeof raw === "string" ? raw.trim().toLowerCase() : "";
-  if (!key) return "";
-  if (VALID_AREAS.has(key)) return key as BalancedAreaId;
-  return AREA_SYNONYMS[key] ?? "";
-}
-
 // ---- Fallback (generic, never empty) ----
 // Only used when the model call fails entirely or there's nothing to draw on.
 // Deliberately modest and common so it reads as a reasonable starting point the
@@ -107,127 +82,85 @@ function normalizeArea(raw: unknown): BalancedAreaId | "" {
 export const FALLBACK_BALANCED_GOALS: BalancedGoalsSeed = {
   suggestions: [
     {
-      area: "restore",
-      why: "a gentle anchor for rest in the week",
+      area: "A big trip",
+      why: "retirement is the time for the trips you've put off",
       original: {
-        track: "be",
-        label: "Keep one slow morning a week that belongs to nobody else",
-        ordinaryWeek: "an unhurried morning with nothing booked in",
+        track: "do",
+        label: "Take one proper trip you've always meant to make — somewhere that needs real time",
+        cadence: "a big trip in year one",
       },
       quieter: {
-        track: "be",
-        label: "Keep one slow morning a month that belongs to nobody else",
-        ordinaryWeek: "an unhurried morning now and then",
+        track: "do",
+        label: "Take a two-week trip somewhere you've always wanted to go",
+        cadence: "once in the first year",
       },
       bolder: {
-        track: "be",
-        label: "Keep a slow morning most days, and one whole slow day each week",
-        ordinaryWeek: "unhurried mornings, and a full day with nothing booked",
+        track: "do",
+        label: "Spend a month or more travelling somewhere that's always felt out of reach",
+        cadence: "a long trip in the first two years",
       },
     },
     {
-      area: "move",
-      why: "keeping an active body in the picture",
+      area: "Something to master",
+      why: "a real skill worth getting properly good at",
       original: {
         track: "do",
-        label: "Walk somewhere new most weeks, building up the distance over the first year",
-        cadence: "most weeks",
+        label: "Take up something you've always wanted to learn and get properly good at it",
+        cadence: "a course this year, then keeping it up",
       },
       quieter: {
         track: "do",
-        label: "Take a short walk somewhere new when the mood takes you",
-        cadence: "now and then",
+        label: "Start a class in something you've always wanted to learn",
+        cadence: "a course in the first year",
       },
       bolder: {
         track: "do",
-        label: "Walk somewhere new every week and work up to a long-distance route by year's end",
-        cadence: "every week, building to a big walk",
+        label: "Learn it seriously — a full course, and a real milestone to work toward this year",
+        cadence: "regularly, with a milestone in year one",
       },
     },
     {
-      area: "think",
-      why: "a curious mind likes something to work at",
+      area: "A project of your own",
+      why: "something to build, finish, and be proud of",
       original: {
         track: "do",
-        label: "Take up one thing you've wanted to learn and stay with it for a season",
-        cadence: "a little each week",
-      },
-      quieter: {
-        track: "be",
-        label: "Keep something you've wanted to learn ticking along, with no pressure to keep it up",
-        ordinaryWeek: "a little time with it whenever it appeals",
-      },
-      bolder: {
-        track: "do",
-        label: "Take up something you've wanted to learn and work toward a real milestone in it this year",
-        cadence: "several times a week",
-      },
-    },
-    {
-      area: "connect",
-      why: "the relationships worth protecting",
-      original: {
-        track: "be",
-        label: "See the people who matter often enough that it never feels like catching up",
-        ordinaryWeek: "a regular call or visit with someone close",
-      },
-      quieter: {
-        track: "be",
-        label: "Stay in easy touch with the people who matter",
-        ordinaryWeek: "a message or call when you think of them",
-      },
-      bolder: {
-        track: "be",
-        label: "Be the one who keeps everyone close — regular visits and something you all do together",
-        ordinaryWeek: "frequent visits and a standing get-together",
-      },
-    },
-    {
-      area: "contribute",
-      why: "a way to feel useful beyond the day-to-day",
-      original: {
-        track: "do",
-        label: "Give a few hours to something beyond yourself once it's up and running",
-        cadence: "a few hours a month",
+        label: "Take on a project you've wanted to do and see it all the way through",
+        cadence: "over the first year",
       },
       quieter: {
         track: "do",
-        label: "Lend a hand to something beyond yourself when you're asked",
-        cadence: "once in a while",
+        label: "Finish one project you've had in mind, done to your own standard",
+        cadence: "in the first year",
       },
       bolder: {
         track: "do",
-        label: "Take on a regular role with something beyond yourself",
-        cadence: "most weeks",
+        label: "Take on the ambitious version of a project you care about, start to finish",
+        cadence: "a major push over the first two years",
       },
     },
   ],
 };
 
 // ---- Coercion ----
-// Clean one intensity into a GoalVariant, or null if it has no usable label.
+// Clean one size into a GoalVariant, or null if it has no usable label. Every goal is
+// now a concrete thing to DO, so the track is always "do" with a rough cadence.
 function coerceVariant(raw: unknown): GoalVariant | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   const label = typeof o.label === "string" ? o.label.trim() : "";
   if (!label) return null;
-
-  const track = o.track === "be" ? "be" : "do";
   const cadence = typeof o.cadence === "string" ? o.cadence.trim() : "";
-  const ordinaryWeek =
-    typeof o.ordinaryWeek === "string" ? o.ordinaryWeek.trim() : "";
-
   return {
-    track,
+    track: "do",
     label,
-    ...(track === "do" && cadence ? { cadence } : {}),
-    ...(track === "be" && ordinaryWeek ? { ordinaryWeek } : {}),
+    ...(cadence ? { cadence } : {}),
   };
 }
 
-// Validate and clean whatever the model returned into the seed shape, dropping
-// off-area entries and any goal with no usable original, and capping the set so
-// the surface stays glanceable.
+// Validate and clean whatever the model returned into the seed shape: a small set of
+// goals, each with a free-text area label, a usable original, and its bolder/quieter
+// sizes. Drops any goal with no usable original, and caps at four so the surface stays
+// a short, strong set.
 export function coerceBalancedGoals(raw: unknown): BalancedGoalsSeed {
   if (!raw || typeof raw !== "object") return FALLBACK_BALANCED_GOALS;
   const arr = (raw as { suggestions?: unknown }).suggestions;
@@ -237,11 +170,9 @@ export function coerceBalancedGoals(raw: unknown): BalancedGoalsSeed {
   for (const item of arr) {
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
-    const area = normalizeArea(o.area);
-    if (!area) continue;
-
     const original = coerceVariant(o.original);
     if (!original) continue;
+    const area = typeof o.area === "string" ? o.area.trim() : "";
     const why = typeof o.why === "string" ? o.why.trim() : "";
     const bolder = coerceVariant(o.bolder);
     const quieter = coerceVariant(o.quieter);
@@ -255,5 +186,5 @@ export function coerceBalancedGoals(raw: unknown): BalancedGoalsSeed {
     });
   }
 
-  return out.length ? { suggestions: out.slice(0, 8) } : FALLBACK_BALANCED_GOALS;
+  return out.length ? { suggestions: out.slice(0, 4) } : FALLBACK_BALANCED_GOALS;
 }

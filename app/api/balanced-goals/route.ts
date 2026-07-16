@@ -3,7 +3,6 @@ import {
   coerceBalancedGoals,
   FALLBACK_BALANCED_GOALS,
 } from "@/lib/balancedGoalsSeed";
-import { BALANCED_AREAS, type BalancedArea } from "@/lib/userModel";
 
 // Drafts the goals for Module 4.3. The session sends the curated user model (the
 // picture built up across Stages 1–3), the onboarding line, and the per-area
@@ -31,49 +30,32 @@ const anthropic = new Anthropic({
   maxRetries: 3,
 });
 
-const AREA_GUIDE: Record<BalancedArea, string> = {
-  restore: "Restore — rest, recovery and the things that recharge them",
-  move: "Move — keeping an active, capable body",
-  think: "Think — a curious, engaged mind: learning, making, creating",
-  connect: "Connect — the people and relationships that matter most",
-  contribute: "Contribute — giving something beyond themselves",
-};
-
 function systemPrompt(): string {
-  return `You are drafting goals for someone working through the "Plan" stage of a guided retirement life-planning programme. You already know them well from the earlier stages. They are about to see a small set of goals you've drafted FOR them, which they will then curate — keep, edit, swap for a bolder or quieter version, reject, or add their own. Your job is to make that first draft so well-judged and personal that most of it can stand.
+  return `You are drafting AMBITIOUS goals for someone working through the "Plan" stage of a guided retirement life-planning programme. You already know them well from the earlier stages. This screen is called "Your most important goals". It is NOT about covering every part of their life or keeping some balance — it is about finding the FEW areas, from everything they've told you, where they could set themselves a real, concrete, stretching goal for their retirement, and drafting one strong goal for each.
 
-A full retirement keeps five areas in some balance. Draft goals across these five:
-${BALANCED_AREAS.map((a) => `- ${AREA_GUIDE[a]} (id: "${a}")`).join("\n")}
+HOW MANY — A FEW, STRONG
+- Pick the 3 or 4 areas of THEIR life most alive with possibility — the things they lit up about, kept returning to, or clearly care most about — and draft ONE goal for each. Never more than 4. Fewer, bolder goals beat a long list.
 
-HOW MANY
-- A small, strong set: roughly 5 to 8 goals total, about one or two per area WHERE there's real signal for that area.
-- If an area has nothing to draw on, leave it empty. An empty area is fine — a thin, generic goal is worse than none.
+EVERY GOAL IS SOMETHING THEY CAN ACHIEVE
+- Each goal is a concrete thing to DO or accomplish — something they could one day say they have done. NEVER a way of living, a habit, or a vague intention. "Be more present", "stay connected", "keep learning", "stay active" are NOT goals here — those are covered elsewhere in the programme; leave them out entirely.
+- Give each goal a real shape with a stretch built in. GOOD: "Walk the full Annapurna Circuit with Harry, training together over the year before". TOO VAGUE / NOT A GOAL: "travel more", "stay fit", "cook".
 
-WHICH AREA A GOAL SITS IN
-- Each goal sits in exactly one area. Use the per-area material supplied below to decide: a goal built from someone's Move material is a Move goal, a goal built from their Connect material is a Connect goal. Do not re-sort or invent the mapping.
+BUILD ONLY ON WHAT THEY TOLD YOU
+- Use their actual activities, people, places and ambitions, named specifically ("the Croatian island-hopping trip you keep coming back to", not "a holiday"). Never invent an ambition, hobby or person they didn't mention.
 
-MAKE EACH GOAL SPECIFIC AND PERSONAL
-- Use their real material — the actual activities, people, places, dreams and values they named. A goal must sound like it was written for THIS person, not anyone.
-- GOOD (specific, personal): "Walk the full Annapurna Circuit with Harry in year two, training together in the lead-up". TOO VAGUE (never do this): "Travel more", "Stay active", "See friends".
-- Never invent facts about their life. Build only on what they actually told you.
+LEAD WITH AMBITION, THEN LET THEM DIAL IT
+- Retirement is the time to aim high, and this screen exists to encourage a few BOLD goals. The main ("original") version of each goal should already be a proper, exciting stretch. Then draft a "bolder" version (even more ambitious — a bigger milestone, further, sooner) and a "quieter" version (a gentler on-ramp to the same thing). All three are the SAME goal at different sizes, and all three are concrete things to DO.
+- Each version is COMPLETE and reads fully on its own — never a fragment or a "…but smaller". Someone seeing only the quieter version must understand the whole goal.
 
-TWO KINDS OF GOAL
-- A "do" goal is a thing to do or achieve: phrase it specifically, with a gentle stretch built into the wording, and give a rough "when / how often" in "cadence" (e.g. "most weeks", "once a year", "the first summer").
-- A "be" goal is a way to live: phrase it as what it looks like in an ordinary week in "ordinaryWeek". Never force it into a number or metric.
+EACH GOAL CARRIES
+- "area": the area of THEIR life this goal is about, in a few natural words in their own terms — e.g. "Travel & adventure", "Our home", "Cooking", "Time with the grandchildren", "Mentoring". This is a free label, NOT a fixed category. One short phrase.
+- "why": ONE short, warm line on why this one, tied to something they actually said (e.g. "you kept coming back to the longer trips"). Never a verdict.
+- "original", "bolder", "quieter": each an object {"label": the goal as a short, vivid phrase with a stretch built in; "cadence": a rough when or how-often — "over the first summer", "a course this year, then every week", "one big trip a year"}.
 
-THREE INTENSITIES — DRAFT ALL THREE FOR EVERY GOAL
-- For each goal, draft "original" (the version they'll see first), plus "bolder" (one notch more ambitious) and "quieter" (one notch gentler). The person can step between them with a single tap, so give all three on every goal.
-- Each version is a COMPLETE, standalone goal that reads clearly on its own. Someone seeing ONLY the quieter version must understand the whole goal — never write a fragment, a trailing "...but less often", or a tweak that only makes sense beside the others.
-- Each version is its own little object: it carries its own "track", and its own timing — a "do" version gives "cadence", a "be" version gives "ordinaryWeek". The bolder version usually asks more (more often, further, a real milestone); the quieter version asks less.
-- A version may switch track if that's the honest way to make it gentler or bolder (e.g. a quieter "do" goal might become a "be" goal). Keep all three recognisably the same goal.
+JSON shape:
+{"suggestions":[{"area":"Travel & adventure","why":"you kept coming back to the longer, immersive trips","original":{"label":"Spend a full month island-hopping across Croatia with Harry","cadence":"a big trip in year one"},"bolder":{"label":"Take three months to travel the length of the Mediterranean coast by train and boat","cadence":"a long trip in the first two years"},"quieter":{"label":"Take one two-week island-hopping trip to Croatia with Harry","cadence":"once in the first year"}}]}
 
-EACH GOAL ALSO CARRIES
-- "why": ONE short line on why you suggested it, tied to something they actually said (e.g. "you kept coming back to the grandchildren"). Plain, warm, never a verdict. This sits on the goal, not on a version.
-
-JSON shape (every goal has area, why, original, bolder, quieter; each version is {track,label,+cadence or ordinaryWeek}):
-{"suggestions":[{"area":"move","why":"...","original":{"track":"do","label":"...","cadence":"..."},"bolder":{"track":"do","label":"...","cadence":"..."},"quieter":{"track":"be","label":"...","ordinaryWeek":"..."}},{"area":"connect","why":"...","original":{"track":"be","label":"...","ordinaryWeek":"..."},"bolder":{"track":"be","label":"...","ordinaryWeek":"..."},"quieter":{"track":"be","label":"...","ordinaryWeek":"..."}}]}
-
-Voice: warm, specific, plain. Never use these words: reflect, explore, unpack, journey, growth, share, deep dive. Never use the word "genuinely". Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"). Speak directly and in the affirmative.
+Draft 3 or 4 goals — never more. Voice: warm, specific, plain. Never use these words: reflect, explore, unpack, journey, growth, share, deep dive. Never use the word "genuinely". Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"). Speak directly and in the affirmative.
 
 Respond with ONLY the JSON object described above — no markdown, no preamble, no commentary.`;
 }
@@ -86,20 +68,9 @@ export async function POST(request: Request) {
     return Response.json({ seed: FALLBACK_BALANCED_GOALS });
   }
 
-  const springboardBlock = (body.springboards ?? [])
-    .filter((s) => s.labels && s.labels.length > 0)
-    .map((s) => {
-      const area = s.area as BalancedArea;
-      const heading = AREA_GUIDE[area] ?? s.area;
-      return `${heading}:\n${s.labels.map((l) => `  - ${l}`).join("\n")}`;
-    })
-    .join("\n\n");
-
   const context = [
     body.onboarding && body.onboarding.trim() && `ABOUT THEM:\n${body.onboarding.trim()}`,
     body.userModel && body.userModel.trim(),
-    springboardBlock &&
-      `WHAT THEY PLACED IN EACH AREA EARLIER (use this to decide which area a goal belongs to):\n${springboardBlock}`,
   ]
     .filter(Boolean)
     .join("\n\n");

@@ -373,7 +373,12 @@ function GoalCard({
   const [tapped, setTapped] = useState(false);
   const open = printing || tapped;
   const setOpen = setTapped;
-  const theme = AREA_THEME[goal.area];
+  // Area is a free-text label now (4.3 dropped the fixed five), so fall back to a
+  // neutral theme when it isn't one of the legacy area ids.
+  const theme =
+    (AREA_THEME as Record<string, { base: string; sel: string; fg: string }>)[
+      goal.area
+    ] ?? { base: "var(--muted-surface)", sel: "var(--brand-primary-tint)", fg: "var(--ink)" };
   const season = seasonLabel43(goal.season);
 
   return (
@@ -1053,7 +1058,7 @@ export default function RlpPlanDocument({
           route to it.
         </p>
         {orderedGoals.map((g, i) => (
-          <GoalCard key={i} goal={g} path={pathFor(g.label)} areaLabel={areaLabels[g.area]} printing={unfolded} />
+          <GoalCard key={i} goal={g} path={pathFor(g.label)} areaLabel={(areaLabels as Record<string, string>)[g.area] ?? g.area} printing={unfolded} />
         ))}
       </section>
       )}

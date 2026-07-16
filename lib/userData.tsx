@@ -156,9 +156,10 @@ const KEYS = {
   seed: (id: string) => `seed:${id}`,
   // The goals Vita drafted for the balanced-goals module (4.3), persisted so a
   // refresh never re-drafts them — distinct from the Stage 3 `seed` shape.
-  // v2: the draft shape changed to nested intensity variants. The old key is
-  // left unread so any cached flat-shape drafts are simply re-fetched.
-  goalSeed: (id: string) => `goal-seed-v2:${id}`,
+  // v2: the draft shape changed to nested intensity variants. v3: the module was
+  // reformulated to a small set of bold do-goals with free-text area labels (no
+  // fixed five areas, no "be" goals), so v2's caches are left unread and re-drafted.
+  goalSeed: (id: string) => `goal-seed-v3:${id}`,
   // The path Vita drafted for each spotlighted goal in the goal-paths module
   // (4.4), persisted so a refresh never re-drafts it.
   goalPathSeed: (id: string) => `goal-path-v1:${id}`,

@@ -12,34 +12,41 @@ const goal = (area: string, label = "A real personal goal") => ({
   original: variant(label),
 });
 
-describe("coerceBalancedGoals — area normalisation", () => {
-  it("keeps goals whose area is a close synonym, mapped to the canonical id", () => {
+describe("coerceBalancedGoals — free-text areas", () => {
+  it("keeps the area label verbatim (no fixed-category mapping) and forces track 'do'", () => {
     const raw = {
       suggestions: [
-        goal("grow", "Book a cookery school course"), // grow → think
-        goal("health", "Keep running through the year"), // health → move
-        goal("people", "Protect the daily school pick-ups"), // people → connect
-        goal("purpose", "Set up a mentoring practice"), // purpose → contribute
-        goal("MOVE", "Ski each winter"), // case-insensitive canonical
+        goal("Travel & adventure", "Spend a month island-hopping in Croatia"),
+        goal("Our home", "Renovate the house into a dream home"),
+        // a "be"-style variant is coerced to a concrete do goal
+        { area: "Cooking", why: "you love it", original: { track: "be", label: "Master cooking" } },
       ],
     };
     const out = coerceBalancedGoals(raw);
     expect(out).not.toBe(FALLBACK_BALANCED_GOALS);
     expect(out.suggestions.map((s) => s.area)).toEqual([
-      "think",
-      "move",
-      "connect",
-      "contribute",
-      "move",
+      "Travel & adventure",
+      "Our home",
+      "Cooking",
     ]);
-    // the real labels survive — nothing silently dropped
-    expect(out.suggestions.map((s) => s.original.label)).toContain(
-      "Book a cookery school course"
-    );
+    expect(out.suggestions.every((s) => s.original.track === "do")).toBe(true);
   });
 
-  it("still returns the generic fallback when EVERY area is unrecognisable", () => {
-    const raw = { suggestions: [goal("banana"), goal("xyzzy")] };
+  it("caps the set at four", () => {
+    const raw = {
+      suggestions: Array.from({ length: 7 }, (_, i) => goal(`Area ${i}`, `Goal ${i}`)),
+    };
+    expect(coerceBalancedGoals(raw).suggestions).toHaveLength(4);
+  });
+
+  it("keeps a goal even with a blank area (the person names it later)", () => {
+    const out = coerceBalancedGoals({ suggestions: [goal("", "Do the big trip")] });
+    expect(out.suggestions).toHaveLength(1);
+    expect(out.suggestions[0].area).toBe("");
+  });
+
+  it("drops goals with no usable original label", () => {
+    const raw = { suggestions: [{ area: "X", why: "", original: { label: "  " } }] };
     expect(coerceBalancedGoals(raw)).toBe(FALLBACK_BALANCED_GOALS);
   });
 
