@@ -66,7 +66,7 @@ const FAQS = [
   },
   {
     q: "Who is Vita?",
-    a: "Vita is your coach through Chorus — an AI, not a person. It asks questions, listens, and reflects back what it hears so your plan stays in your own words. Because it's AI it can occasionally misunderstand, which is why it checks with you and lets you correct it any time. Your conversations stay private to you, and aren't used to train Vita or any other AI unless you choose to share them at the end.",
+    a: "Vita is your coach through Chorus — an AI, not a person. It asks questions, listens, and reflects back what it hears so your plan stays in your own words. Because it's AI it can occasionally misunderstand, which is why it checks with you and lets you correct it any time. Your conversations stay private to you. During the pilot they aren't used to train Vita or any other AI, and no one on our team reads your individual responses.",
   },
   {
     q: "What do I end up with?",
@@ -82,11 +82,11 @@ const FAQS = [
   },
   {
     q: "Can anyone at Chorus see what I share?",
-    a: "Not unless you choose to let us. What you type and your conversations with Vita stay private to you. When you finish, you'll be offered the option to share them to help improve Chorus — and only then could our team see them.",
+    a: "Not during the pilot. What you type and your conversations with Vita stay private to you, and no one on our team reads your individual responses. When the pilot ends, we'll email you to ask whether you're happy for our team to review your responses to help improve Vita — or whether you'd like us to delete everything. Nothing is reviewed by a person unless you say yes.",
   },
   {
     q: "Is my information used to train the AI?",
-    a: "No. What you type and your conversations with Vita aren't used to train Vita or any other AI — unless you choose, at the end, to share them with us to help improve Chorus. That choice is entirely yours.",
+    a: "No. What you type and your conversations with Vita aren't used to train Vita or any other AI. During the pilot we don't look at your individual responses at all. When the pilot ends, we'll email you to ask whether you're happy for our team to review your responses to help improve Vita — or whether you'd like us to delete everything. That choice is entirely yours.",
   },
 ];
 
@@ -314,11 +314,11 @@ export default function HowItWorks() {
               </b>
             </p>
             <p>
-              There&rsquo;s one exception, and it&rsquo;s entirely your choice.
-              When you finish, you&rsquo;ll be offered the option to share your
-              responses with us to help improve Chorus. Only if you say yes can our
-              team see them — if you&rsquo;d rather not, that&rsquo;s completely
-              fine, and it makes no difference to your plan.
+              During the pilot, we won&rsquo;t look at your individual responses.
+              When the pilot ends, we&rsquo;ll email you to ask whether you&rsquo;re
+              happy for our team to review your responses to help improve Vita — or
+              whether you&rsquo;d like us to delete everything. Nothing is reviewed
+              by a person unless you say yes.
             </p>
             <p className="more">
               Full detail lives on the{" "}
