@@ -1,9 +1,28 @@
-// Turns a user's six Stage 2 module outputs into a StatContext (the plain facts
-// triggers test against), then selects which stats fire in the reveal — applying
-// the spec's selection logic: filter by trigger, drop areas with none, prefer
-// unseen stats (rotation), keep the reveal balanced, and stay sparse (a soft cap
-// so a few areas are stat-free breathing room). Pure functions — no I/O — so the
-// client gathers builds and the server need never re-read them.
+// Turns a user's six Stage 2 module outputs into a StatContext (the picks a
+// trigger tests and an anchor names), then selects which stats fire in the
+// reveal. Pure functions — no I/O — so the client gathers builds and the server
+// need never re-read them.
+//
+// Selection follows the v0.4 spec's two connective modes, which is where a
+// mismatched stat stops being unlikely and starts being impossible:
+//
+//   Mode 1 — personal bridge. The stat's anchor resolves to a specific, named
+//            item in this person's picks, and the connective names that item.
+//   Mode 2 — "Did you know…". The stat is eligible at area level but there's no
+//            specific item to anchor to, so it runs as a standalone general fact
+//            that makes NO claim about the user. It cannot mismatch, because it
+//            asserts no connection at all.
+//   Blank  — neither is available. A stat-free area is breathing room, not a
+//            gap; a calm blank always beats a forced bridge.
+//
+// The order is Mode 1 → Mode 2 → blank, per area. Never force a bridge to reach
+// a stat.
+//
+// What used to be here and is deliberately gone: the Balance rule (≥2
+// encouraging, alarming ≤ half) and the floor that made every area carry a stat.
+// Rule A retired or reframed every alarming stat, so balancing registers has
+// nothing left to balance — the pool is warm by construction rather than by
+// arithmetic. And the floor directly contradicted "sparse beats relentless".
 
 import {
   type BuildResult,
@@ -12,6 +31,7 @@ import {
   type SlidersResult,
 } from "@/lib/modules";
 import {
+  STAGE2_VOCAB,
   STATS,
   type Stat,
   type StatContext,
@@ -28,6 +48,24 @@ const STAT_AREAS: Stage2Area[] = [
   "vitality",
 ];
 
+// How a chosen stat is presented. The mode is decided here, not by the model, so
+// a did-you-know can never quietly acquire a personal claim downstream.
+export type StatMode = "bridge" | "did-you-know";
+
+export type SelectedStat = {
+  stat: Stat;
+  mode: StatMode;
+  // The single item the connective must name. Non-null exactly when
+  // mode === "bridge".
+  anchor: string | null;
+  // The same item as a list — what the reveal has now "spent", so a later area
+  // doesn't name it again.
+  anchorItems: string[];
+  // Picks the area's forward line must not name, because they collide with an
+  // example inside this stat's locked claim (see Stat.exampleCollisions).
+  suppressFromForwardLine: string[];
+};
+
 // ---- reading the real build shapes ----
 
 function asComposite(b: BuildResult | null): BuildResult[] | null {
@@ -39,7 +77,7 @@ function picksOf(b: BuildResult | null | undefined): string[] {
 }
 
 // The 0–100 position of a slider identified by its summaryLabel, or null if that
-// slider isn't present. Used for the "thin function" / "low lever" reads.
+// slider isn't present.
 function sliderPosition(
   results: BuildResult[] | null,
   summaryLabel: string
@@ -56,6 +94,11 @@ function sliderPosition(
   return null;
 }
 
+// Keep only the picks that are in a known vocabulary, preserving the order the
+// person picked them — so `one()` and `two()` name what they reached for first.
+const only = (picks: string[], vocab: string[]): string[] =>
+  picks.filter((p) => vocab.includes(p));
+
 const hasAny = (list: string[], wanted: string[]): boolean =>
   list.some((p) => wanted.includes(p));
 
@@ -68,242 +111,169 @@ const LOW = (pos: number | null): boolean => pos !== null && pos < 50;
 export function buildStatContext(
   getBuild: (moduleId: string) => BuildResult | null
 ): StatContext {
-  // 2.1 — active
-  const activePicks = picksOf(asComposite(getBuild("2.1"))?.[0]);
-  const walking = hasAny(activePicks, [
-    "Walking",
-    "Walking the dog",
-    "Hiking or rambling",
-  ]);
+  const V = STAGE2_VOCAB;
 
-  // 2.2 — cognitive
-  const cognitivePicks = picksOf(getBuild("2.2"));
-  const languages = cognitivePicks.includes("Learning a language");
-  const puzzles = cognitivePicks.includes(
-    "Puzzles, crosswords & brain games"
-  );
-  const newSkillAmbition = hasAny(cognitivePicks, [
-    "Learning a language",
-    "Playing or listening to music",
-    "Photography",
-    "Painting, drawing & crafts",
-    "Knitting, sewing & textiles",
-    "Computers, coding & gadgets",
-  ]);
+  // 2.1 — active. Composite; results[0] is the activity picker.
+  const activities = picksOf(asComposite(getBuild("2.1"))?.[0]);
 
-  // 2.3 — social
+  // 2.2 — cognitive. A plain role-picker of curiosities.
+  const curiosities = picksOf(getBuild("2.2"));
+
+  // 2.3 — social. Composite; results[0] is the people picker, then the sliders.
   const social = asComposite(getBuild("2.3"));
-  const socialPicks = picksOf(social?.[0]);
-  const hasGroup = hasAny(socialPicks, [
-    "A community or faith group",
-    "People around a hobby",
-  ]);
+  const people = picksOf(social?.[0]);
   const thinTalk = LOW(sliderPosition(social, "Someone to talk to"));
-  const thinPracticalHelp = LOW(sliderPosition(social, "Practical help"));
-  const thinHabit = LOW(sliderPosition(social, "Healthy-habit company"));
-  const thinCasualContact = LOW(
-    sliderPosition(social, "Everyday casual contact")
-  );
-  // "Thin overall" = two or more of the four crisis/support functions read thin.
-  const thinOverall =
-    [thinTalk, thinPracticalHelp, thinHabit, thinCasualContact].filter(Boolean)
-      .length >= 2;
-  const closeTiesStrong =
-    hasAny(socialPicks, ["Partner", "Close friends"]) && !thinTalk;
 
-  // 2.4 — purpose
-  const purposePicks = picksOf(getBuild("2.4"));
-  const caring = hasAny(purposePicks, [
-    "Caring for someone",
-    "Helping raise grandchildren",
-    "Supporting a neighbour",
-    "Mentoring informally",
-  ]);
-  const contribution = hasAny(purposePicks, [
-    "Volunteering",
-    "Leading a local group",
-    "Organising community events",
-    "Helping a cause you care about",
-    "A bit of paid work",
-  ]);
+  // 2.4 — purpose. A plain role-picker of sources of meaning.
+  const meanings = picksOf(getBuild("2.4"));
 
-  // 2.5 — vitality
+  // 2.5 — vitality. Composite: [0] energisers, [1] drains, [2..5] sliders,
+  // [6] the lever picker.
   const vitality = asComposite(getBuild("2.5"));
   const energisers = picksOf(vitality?.[0]);
   const drains = picksOf(vitality?.[1]);
   const lever = picksOf(vitality?.[6])[0] ?? null;
-  const outdoors = hasAny(energisers, [
-    "Time outdoors",
-    "Daylight in the morning",
-  ]);
-  const fullDiary = hasAny(drains, ["A full diary", "Overcommitting", "Rushing"]);
-  const sleepRaised =
-    lever === "Sleep" || LOW(sliderPosition(vitality, "Sleep"));
-  const energyFlagged =
-    LOW(sliderPosition(vitality, "Daytime energy")) || drains.includes("A nap");
 
   return {
-    walking,
-    languages,
-    puzzles,
-    newSkillAmbition,
-    hasGroup,
-    thinOverall,
-    thinPracticalHelp,
-    thinCasualContact,
-    closeTiesStrong,
-    caring,
-    contribution,
-    outdoors,
-    fullDiary,
-    sleepRaised,
-    energyFlagged,
+    activities,
+    walkingPicks: only(activities, V.WALKING),
+    balancePicks: only(activities, V.BALANCE_ACTIVITIES),
+    capabilityPicks: only(activities, V.CAPABILITY_ACTIVITIES),
+
+    curiosities,
+    languagePicks: only(curiosities, V.LANGUAGES),
+    puzzlePicks: only(curiosities, V.PUZZLES),
+    newSkillPicks: only(curiosities, V.NEW_SKILLS),
+
+    people,
+    closeTiePicks: only(people, V.CLOSE_TIES),
+    groupPicks: only(people, V.GROUPS),
+    // Close ties are "strong" when they have some AND the talk-to function isn't
+    // reading thin — having a partner listed doesn't help if there's no one to
+    // talk to.
+    closeTiesStrong: hasAny(people, ["Partner", "Close friends"]) && !thinTalk,
+    thinCasualContact: LOW(sliderPosition(social, "Everyday casual contact")),
+
+    meanings,
+    caringPicks: only(meanings, V.CARING),
+    contributionPicks: only(meanings, V.CONTRIBUTION),
+
+    energisers,
+    drains,
+    lever,
+    outdoorPicks: only(energisers, V.OUTDOORS),
+    sedentaryDrainPicks: only(drains, V.SEDENTARY_DRAINS),
+    // Sleep shows up on either side of the sort — "Good sleep" energises, "Screens
+    // late" drains — and both are the person raising sleep as a live subject.
+    sleepPicks: [...only(energisers, V.SLEEP_ITEMS), ...only(drains, V.SLEEP_ITEMS)],
+    sleepRaised: lever === "Sleep" || LOW(sliderPosition(vitality, "Sleep")),
+    energyFlagged:
+      LOW(sliderPosition(vitality, "Daytime energy")) || drains.includes("A nap"),
   };
 }
 
 // ---- selection ----
 
-const EVIDENCE_WEIGHT: Record<Stat["evidence"], number> = {
-  robust: 10,
-  solid: 6,
-  "solid-but-contested": 3,
-  directional: 0,
-};
+// Sparse beats relentless. Only five areas can carry a stat at all, so this is a
+// guard rather than a live constraint — but it states the spec's target (3–5)
+// where a future area would otherwise widen the reveal silently.
+const MAX_STATS = 5;
 
-// Is this an always-on stat (fires for everyone) vs. a conditional one matched to
-// a specific choice? A conditional match is more personal, so it ranks higher —
-// this is the spec's "match the stat to what the user chose" principle.
-function isConditional(stat: Stat): boolean {
-  // A stat whose trigger would still pass with every context flag false is
-  // effectively always-on. Conditional stats depend on a real flag being set.
-  const allFalse: StatContext = {
-    walking: false,
-    languages: false,
-    puzzles: false,
-    newSkillAmbition: false,
-    hasGroup: false,
-    thinOverall: false,
-    thinPracticalHelp: false,
-    thinCasualContact: false,
-    closeTiesStrong: false,
-    caring: false,
-    contribution: false,
-    outdoors: false,
-    fullDiary: false,
-    sleepRaised: false,
-    energyFlagged: false,
-  };
-  return !stat.trigger(allFalse);
+// Lower sorts first: unseen stats before seen ones (rotation, so a return visit
+// finds fresh material), then the area's explicit priority order. Deterministic,
+// so a revisit before save is stable.
+function rank(stat: Stat, seen: Set<string>): number {
+  return (seen.has(stat.id) ? 1000 : 0) + stat.priority;
 }
 
-// A higher score means "prefer this stat". Conditional-match dominates, then
-// freshness (unseen first → rotation), then evidence strength (robust over
-// contested for tiebreak). Deterministic, so a revisit before save is stable.
-function score(stat: Stat, seen: Set<string>): number {
-  let s = 0;
-  if (isConditional(stat)) s += 100;
-  if (!seen.has(stat.id)) s += 50;
-  s += EVIDENCE_WEIGHT[stat.evidence];
-  return s;
+// Everything this person picked that an area's copy could draw on. Used to decide
+// whether a stat's example collision is real for them, and exported so the client
+// builds its forward-line context from the same source.
+export function areaPicks(ctx: StatContext, area: Stage2Area): string[] {
+  switch (area) {
+    case "active":
+      return ctx.activities;
+    case "cognitive":
+      return ctx.curiosities;
+    case "social":
+      return [...ctx.people, ...ctx.meanings];
+    case "purpose":
+      return ctx.meanings;
+    case "vitality":
+      return [...ctx.energisers, ...ctx.drains];
+    case "senses":
+      return [];
+  }
 }
 
-// Every stat-bearing area shows a fact — Senses is the only deliberately
-// stat-free area, and it isn't in STAT_AREAS at all. So the cap equals the
-// number of stat areas: all of them appear, and the Balance rule is satisfied by
-// swapping the stat WITHIN an area, never by dropping an area to breathing room.
-const SOFT_CAP = STAT_AREAS.length;
-const MIN_STATS = STAT_AREAS.length;
-
-// Lower sorts first — used to choose which chosen stat to swap away when the
-// encouraging floor needs help: take from an alarming area before a mixed one.
-const REGISTER_RANK: Record<Stat["register"], number> = {
-  alarming: 0,
-  mixed: 1,
-  encouraging: 2,
-};
-
-// Select the stats that fire in this reveal — exactly one per stat-bearing area
-// (all five; only Senses is stat-free), in reveal order. Applies the spec's
-// selection logic: filter by trigger, prefer unseen (rotation) and
-// matched-conditional stats, then the Balance rule (≥2 encouraging; alarming ≤
-// half). Because every area carries both a non-alarming and an encouraging
-// option, balance is satisfied by swapping the stat WITHIN its area — never by
-// dropping an area, so each area always carries a fact.
-export function selectStats(ctx: StatContext, seen: string[]): Stat[] {
+// Select the stats that fire in this reveal — at most one per area, in reveal
+// order, each tagged with the mode it must be rendered in.
+export function selectStats(ctx: StatContext, seen: string[]): SelectedStat[] {
   const seenSet = new Set(seen);
-  const by = (s: Stat) => score(s, seenSet);
+  const chosen: SelectedStat[] = [];
 
-  // Eligible stats per area, best-scoring first. Areas with none are dropped.
-  const eligibleByArea = new Map<Stage2Area, Stat[]>();
+  // Items already named by an earlier area in THIS reveal. A person who picked
+  // "Volunteering" as their source of meaning would otherwise hear about it on
+  // the social card and again on the purpose card — both bridges honest, both
+  // subject-matched, and the pair reading like nobody was watching. Spending an
+  // item here makes a later area reach for its next real one instead.
+  const named = new Set<string>();
+
   for (const area of STAT_AREAS) {
-    const el = STATS.filter((s) => s.area === area && s.trigger(ctx)).sort(
-      (a, b) => by(b) - by(a)
+    const picks = areaPicks(ctx, area);
+    // Rule D: eligible only when the user's model actually contains the subject.
+    const eligible = STATS.filter((s) => s.area === area && s.trigger(ctx)).sort(
+      (a, b) => rank(a, seenSet) - rank(b, seenSet)
     );
-    if (el.length) eligibleByArea.set(area, el);
-  }
 
-  // Rank areas by their strongest stat, then keep the strongest few.
-  const areasByStrength = [...eligibleByArea.keys()].sort(
-    (a, b) => by(eligibleByArea.get(b)![0]) - by(eligibleByArea.get(a)![0])
-  );
-  const cap = Math.max(MIN_STATS, Math.min(areasByStrength.length, SOFT_CAP));
-
-  // chosen: area → the stat currently picked for it (start with each area's best).
-  const chosen = new Map<Stage2Area, Stat>();
-  for (const area of areasByStrength.slice(0, cap)) {
-    chosen.set(area, eligibleByArea.get(area)![0]);
-  }
-
-  const reg = (s: Stat) => s.register;
-  const countReg = (r: Stat["register"]) =>
-    [...chosen.values()].filter((s) => reg(s) === r).length;
-  const altIn = (area: Stage2Area, want: (s: Stat) => boolean) =>
-    eligibleByArea.get(area)!.find(want);
-
-  // Balance — alarming may be no more than half the shown stats. Prefer to
-  // soften an offending area to a non-alarming stat; drop it only if it has none.
-  while (countReg("alarming") > Math.floor(chosen.size / 2)) {
-    const worst = [...chosen.entries()]
-      .filter(([, s]) => reg(s) === "alarming")
-      .sort((a, b) => by(a[1]) - by(b[1]))[0];
-    if (!worst) break;
-    const [area] = worst;
-    const alt = altIn(area, (s) => reg(s) !== "alarming");
-    if (alt) chosen.set(area, alt);
-    else if (chosen.size > MIN_STATS) chosen.delete(area);
-    else break;
-  }
-
-  // Balance — at least two clearly encouraging stats. First try to turn a chosen
-  // area's pick encouraging (alarming areas first, then mixed). If no chosen area
-  // can, pull in an unchosen area that offers an encouraging stat.
-  let guard = 0;
-  while (countReg("encouraging") < 2 && guard++ < STAT_AREAS.length * 2) {
-    const swapArea = [...chosen.entries()]
-      .filter(
-        ([area, s]) =>
-          reg(s) !== "encouraging" &&
-          !!altIn(area, (e) => reg(e) === "encouraging")
-      )
-      .sort((a, b) => REGISTER_RANK[reg(a[1])] - REGISTER_RANK[reg(b[1])])[0];
-    if (swapArea) {
-      const [area] = swapArea;
-      chosen.set(area, altIn(area, (e) => reg(e) === "encouraging")!);
-      continue;
+    // Mode 1 — the first eligible stat left with an unspent item to name.
+    let pick: SelectedStat | null = null;
+    for (const stat of eligible) {
+      const fresh = stat.anchor(ctx).filter((item) => !named.has(item));
+      if (fresh.length) {
+        // Exactly one item, always. A roster ("the photography and history and
+        // puzzles you picked") reads as a list being played back rather than a
+        // person being noticed, and it spends items other areas could have used.
+        const items = fresh.slice(0, 1);
+        pick = {
+          stat,
+          mode: "bridge",
+          anchor: items[0],
+          anchorItems: items,
+          // Only suppress what they actually picked — an example collision that
+          // isn't in their data is not a collision.
+          suppressFromForwardLine: (stat.exampleCollisions ?? []).filter((c) =>
+            picks.includes(c)
+          ),
+        };
+        break;
+      }
     }
-    const newArea = areasByStrength.find(
-      (a) => !chosen.has(a) && !!altIn(a, (e) => reg(e) === "encouraging")
-    );
-    if (!newArea) break;
-    const dropArea = [...chosen.entries()]
-      .filter(([, s]) => reg(s) !== "encouraging")
-      .sort((a, b) => by(a[1]) - by(b[1]))[0]?.[0];
-    if (dropArea && chosen.size >= cap) chosen.delete(dropArea);
-    chosen.set(newArea, altIn(newArea, (e) => reg(e) === "encouraging")!);
+
+    // Mode 2 — no unspent item, but an area-level fit and a stat willing to run
+    // as a standalone fact. Note this is also where an area lands when its only
+    // bridges were to items already named — a general fact beats a repeat.
+    if (!pick) {
+      const carrier = eligible.find((s) => s.didYouKnow);
+      if (carrier) {
+        pick = {
+          stat: carrier,
+          mode: "did-you-know",
+          anchor: null,
+          anchorItems: [],
+          suppressFromForwardLine: (carrier.exampleCollisions ?? []).filter((c) =>
+            picks.includes(c)
+          ),
+        };
+      }
+    }
+
+    // Otherwise the area stays blank, which is a legitimate outcome.
+    if (pick) {
+      for (const item of pick.anchorItems) named.add(item);
+      chosen.push(pick);
+    }
   }
 
-  // Return in reveal (area) order, not score order.
-  return STAT_AREAS.flatMap((area) =>
-    chosen.has(area) ? [chosen.get(area)!] : []
-  );
+  return chosen.slice(0, MAX_STATS);
 }

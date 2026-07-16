@@ -20,7 +20,13 @@ import {
   STAGE2_AREA_ORDER,
   type Stage2Synthesis,
 } from "@/lib/stage2Reveal";
-import { buildStatContext, selectStats } from "@/lib/stage2Selection";
+import {
+  areaPicks,
+  buildStatContext,
+  selectStats,
+  type SelectedStat,
+  type StatMode,
+} from "@/lib/stage2Selection";
 import type { Stage2Area } from "@/lib/stage2Stats";
 import StageReveal from "./StageReveal";
 import { stageColorFor } from "@/lib/stageColors";
@@ -74,23 +80,27 @@ export default function ExploreReveal() {
 
   // A plain, factual description of what they chose in an area — the raw material
   // the generation call turns into a forward-looking line. Never shown directly.
-  function forwardContextFor(area: Stage2Area): string {
+  function forwardContextFor(area: Stage2Area, suppress: string[] = []): string {
+    // Items withheld because they collide with an example inside the fired stat's
+    // locked claim — see Stat.exampleCollisions. Withholding them here means Vita
+    // never sees them, rather than being asked not to mention them.
+    const keep = (picks: string[]) => picks.filter((p) => !suppress.includes(p));
     switch (area) {
       case "active": {
-        const picks = picksOf(composite("2.1")?.[0]);
+        const picks = keep(picksOf(composite("2.1")?.[0]));
         return picks.length
           ? `Active things they'd like in their week: ${picks.join(", ")}.`
           : "They didn't pick specific activities.";
       }
       case "cognitive": {
-        const picks = picksOf(userData.getBuild("2.2"));
+        const picks = keep(picksOf(userData.getBuild("2.2")));
         return picks.length
           ? `Curiosities and interests they chose: ${picks.join(", ")}.`
           : "They didn't pick specific interests.";
       }
       case "social": {
         const results = composite("2.3");
-        const people = picksOf(results?.[0]);
+        const people = keep(picksOf(results?.[0]));
         const thin = thinFunctions(results);
         return [
           people.length
@@ -104,15 +114,15 @@ export default function ExploreReveal() {
           .join(" ");
       }
       case "purpose": {
-        const picks = picksOf(userData.getBuild("2.4"));
+        const picks = keep(picksOf(userData.getBuild("2.4")));
         return picks.length
           ? `Sources of meaning and contribution they chose: ${picks.join(", ")}.`
           : "They didn't pick specific sources of meaning.";
       }
       case "vitality": {
         const results = composite("2.5");
-        const energisers = picksOf(results?.[0]);
-        const drains = picksOf(results?.[1]);
+        const energisers = keep(picksOf(results?.[0]));
+        const drains = keep(picksOf(results?.[1]));
         const lever = picksOf(results?.[6])[0];
         return [
           energisers.length ? `What energises them: ${energisers.join(", ")}.` : "",
@@ -149,18 +159,27 @@ export default function ExploreReveal() {
     areaLabel: string;
     forwardContext: string;
     statId: string | null;
+    statMode: StatMode | null;
+    statAnchor: string | null;
+    statAvoidItems: string[] | null;
   }[] {
     const ctx = buildStatContext((id) => userData.getBuild(id));
     const chosen = selectStats(ctx, userData.getSeenStats());
-    const statByArea = new Map<Stage2Area, string>();
-    for (const s of chosen) statByArea.set(s.area, s.id);
+    const byArea = new Map<Stage2Area, SelectedStat>();
+    for (const s of chosen) byArea.set(s.stat.area, s);
 
-    return STAGE2_AREA_ORDER.map(({ area, label }) => ({
-      area,
-      areaLabel: label,
-      forwardContext: forwardContextFor(area),
-      statId: statByArea.get(area) ?? null,
-    }));
+    return STAGE2_AREA_ORDER.map(({ area, label }) => {
+      const sel = byArea.get(area);
+      return {
+        area,
+        areaLabel: label,
+        forwardContext: forwardContextFor(area, sel?.suppressFromForwardLine ?? []),
+        statId: sel?.stat.id ?? null,
+        statMode: sel?.mode ?? null,
+        statAnchor: sel?.anchor ?? null,
+        statAvoidItems: sel?.mode === "did-you-know" ? areaPicks(ctx, area) : null,
+      };
+    });
   }
 
   async function generate() {

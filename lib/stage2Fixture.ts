@@ -4,12 +4,23 @@
 // via useUserData. This fixture exists for tracing/testing the data path and as
 // a worked example of the real build shapes the selection code consumes.
 //
-// The person here: walks the dog (2.1 → walking), is learning a language
-// (2.2 → bilingual stat C1, and a learnable-skill ambition C6), has close ties
-// but thin everyday casual contact (2.3 → weak-ties stat S4), volunteers
-// (2.4 → contribution), gets energy from morning daylight (2.5 → outdoors V2),
+// Because it is the worked example, it has to be honest about the shapes. Every
+// role-picker in Stage 2 is declared `starrable: false` in lib/modules.ts, so no
+// Stage 2 picker ever produces a starred entry — `starred` is required by
+// RolePickerResult, and a real Stage 2 build always leaves it empty. There is
+// therefore no "which one are you most drawn to" signal anywhere in Stage 2;
+// anything needing a preference order has to get it from somewhere else.
+//
+// The person here: walks the dog and gardens (2.1), is learning a language and
+// does photography (2.2), has close ties but thin everyday casual contact (2.3),
+// volunteers (2.4), gets energy from morning daylight and time outdoors (2.5),
 // and has decided on a regular vision/hearing-check rhythm (2.6 → stat-free
 // senses, shown as a plan).
+//
+// Which stats that produces is deliberately not written down here: selection
+// rotates against the seen-set, so a first visit and a second visit legitimately
+// differ, and a comment naming specific stats would be wrong within one visit.
+// test/stage2-scratch-style runs are the way to see what it currently yields.
 
 import type { BuildResult, ScreeningCommitment } from "@/lib/modules";
 
@@ -21,7 +32,7 @@ export const STAGE2_FIXTURE_BUILDS: Record<string, BuildResult> = {
       {
         type: "role-picker",
         picked: ["Walking the dog", "Gardening"],
-        starred: ["Walking the dog"],
+        starred: [],
       },
     ],
   },
@@ -30,7 +41,7 @@ export const STAGE2_FIXTURE_BUILDS: Record<string, BuildResult> = {
   "2.2": {
     type: "role-picker",
     picked: ["Learning a language", "Photography"],
-    starred: ["Learning a language"],
+    starred: [],
   },
 
   // 2.3 — social. Composite; results[0] is the people picker, then the four
@@ -42,7 +53,7 @@ export const STAGE2_FIXTURE_BUILDS: Record<string, BuildResult> = {
       {
         type: "role-picker",
         picked: ["Partner", "Close friends"],
-        starred: ["Partner"],
+        starred: [],
       },
       {
         type: "sliders",
@@ -71,7 +82,7 @@ export const STAGE2_FIXTURE_BUILDS: Record<string, BuildResult> = {
   "2.4": {
     type: "role-picker",
     picked: ["Volunteering", "Helping a cause you care about"],
-    starred: ["Volunteering"],
+    starred: [],
   },
 
   // 2.5 — vitality. Composite with seven steps in this exact order:

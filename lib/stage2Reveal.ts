@@ -11,12 +11,24 @@
 import type { Stage2Area } from "@/lib/stage2Stats";
 
 // The locked half of an area's stat — copied verbatim from the library by the
-// API route, never touched by Vita. `leadIn` is the one generated sentence that
-// ties the locked claim to this person's choices; the claim then follows.
+// API route, never touched by Vita.
+//
+// `mode` is decided by selection (lib/stage2Selection.ts), never by the model:
+//   "bridge"       — a specific item in this person's picks was found, and
+//                    `leadIn` is the one generated sentence naming it.
+//   "did-you-know" — no specific item to name, so the finding is introduced as a
+//                    general fact and flagged as one in the UI. It still gets a
+//                    `leadIn`: Vita writes a warm framing of the FACT, making no
+//                    claim about this person. A bare claim under a label would be
+//                    a research citation, not a coach — the mode changes what the
+//                    copy may assert, never whether there is any.
+export type RevealStatMode = "bridge" | "did-you-know";
+
 export type RevealStat = {
   id: string;
   claim: string;
   sourceDisplay: string;
+  mode: RevealStatMode;
   leadIn: string;
 };
 
