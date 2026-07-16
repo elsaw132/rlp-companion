@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { coerceDedupedCards } from "@/lib/seasonsCardsSeed";
+import { coerceCuratedCards } from "@/lib/seasonsCardsSeed";
 import type { SeasonCard } from "@/lib/userModel";
 
-// The cards from the reported 4.2 board — three genuine near-duplicate pairs plus
-// several distinct cards that must survive untouched.
-const CARDS: SeasonCard[] = [
+// The raw cards from the reported 4.2 board — verbatim fact labels, inconsistent in
+// voice, altitude and register (what the curation call is handed).
+const RAW: SeasonCard[] = [
   { label: "Learner", category: "Aspiration" },
   { label: "Master cooking", category: "Aspiration" },
   {
@@ -15,18 +15,14 @@ const CARDS: SeasonCard[] = [
     label: "Renovate our home to truly make it a dream home",
     category: "Aspiration",
   },
-  {
-    label: "As much travel as possible, including longer immersive trips",
-    category: "Aspiration",
-  },
-  {
-    label: "Home renovation done bit by bit, making it a dream home",
-    category: "Aspiration",
-  },
-  { label: "Moving towards mastery in cooking", category: "Aspiration" },
   { label: "learn a language through a class", category: "Aspiration" },
   {
     label: "start a regular class to build casual social contact",
+    category: "Aspiration",
+  },
+  { label: "joining a community team to create things", category: "Aspiration" },
+  {
+    label: "mentoring mid-career women navigating having children",
     category: "Aspiration",
   },
   {
@@ -35,103 +31,92 @@ const CARDS: SeasonCard[] = [
   },
 ];
 
-describe("coerceDedupedCards", () => {
-  it("collapses each duplicate group to its first (clearest) member, in input order, preserving categories", () => {
+describe("coerceCuratedCards", () => {
+  it("passes through a well-formed curated set (rewritten labels), preserving order and category", () => {
     const raw = {
-      duplicateGroups: [
-        ["Master cooking", "Moving towards mastery in cooking"],
-        [
-          "Travel as much as possible, including the longer trips",
-          "As much travel as possible, including longer immersive trips",
-        ],
-        [
-          "Renovate our home to truly make it a dream home",
-          "Home renovation done bit by bit, making it a dream home",
-        ],
+      cards: [
+        { label: "Keep learning new things", category: "Aspiration" },
+        { label: "Master cooking", category: "Aspiration" },
+        {
+          label: "Travel as much as possible, including the longer trips",
+          category: "Aspiration",
+        },
+        { label: "Renovate our home into a dream home", category: "Aspiration" },
+        { label: "Learn a language", category: "Aspiration" },
+        { label: "Build regular, casual social contact", category: "Aspiration" },
+        { label: "Join a community team to create things", category: "Aspiration" },
+        { label: "Mentor mid-career women", category: "People" },
+        // the tea ritual has been dropped by the model
       ],
     };
-    const { cards } = coerceDedupedCards(raw, CARDS);
+    const { cards } = coerceCuratedCards(raw, RAW);
     expect(cards.map((c) => c.label)).toEqual([
-      "Learner",
+      "Keep learning new things",
       "Master cooking",
       "Travel as much as possible, including the longer trips",
-      "Renovate our home to truly make it a dream home",
-      "learn a language through a class",
-      "start a regular class to build casual social contact",
-      "intentional quiet time with a cup of tea in the morning",
+      "Renovate our home into a dream home",
+      "Learn a language",
+      "Build regular, casual social contact",
+      "Join a community team to create things",
+      "Mentor mid-career women",
     ]);
-    // Category rides along with the kept card.
-    expect(cards.find((c) => c.label === "Master cooking")?.category).toBe(
-      "Aspiration"
+    expect(cards.find((c) => c.label === "Mentor mid-career women")?.category).toBe(
+      "People"
     );
   });
 
-  it("keeps the label the model lists FIRST in a group, whatever the input order", () => {
+  it("defaults a missing/blank category to Aspiration and drops blank-label cards", () => {
     const raw = {
-      // The reworded one listed first — it is the one kept, not the input-first one.
-      duplicateGroups: [
-        [
-          "As much travel as possible, including longer immersive trips",
-          "Travel as much as possible, including the longer trips",
-        ],
+      cards: [
+        { label: "Learn a language" }, // no category
+        { label: "   ", category: "Aspiration" }, // blank label → dropped
+        { label: "Master cooking", category: "  " }, // blank category → default
       ],
     };
-    const { cards } = coerceDedupedCards(raw, CARDS);
-    const travel = cards.filter((c) => c.label.toLowerCase().includes("travel"));
-    expect(travel).toHaveLength(1);
-    expect(travel[0].label).toBe(
-      "As much travel as possible, including longer immersive trips"
-    );
+    const { cards } = coerceCuratedCards(raw, RAW);
+    expect(cards).toEqual([
+      { label: "Learn a language", category: "Aspiration" },
+      { label: "Master cooking", category: "Aspiration" },
+    ]);
   });
 
-  it("never invents: a grouped label not present in the input is ignored", () => {
+  it("de-duplicates the curated output case-insensitively by label", () => {
     const raw = {
-      duplicateGroups: [
-        ["Master cooking", "Become a Michelin chef"], // second isn't a real card
+      cards: [
+        { label: "Learn a language", category: "Aspiration" },
+        { label: "learn a language", category: "Aspiration" },
       ],
     };
-    const { cards } = coerceDedupedCards(raw, CARDS);
-    // The group collapses to a single real member, so nothing is dropped.
-    expect(cards).toHaveLength(CARDS.length);
-    expect(cards.some((c) => c.label === "Become a Michelin chef")).toBe(false);
+    const { cards } = coerceCuratedCards(raw, RAW);
+    expect(cards).toEqual([{ label: "Learn a language", category: "Aspiration" }]);
   });
 
-  it("never drops a distinct card the model didn't group", () => {
-    const raw = { duplicateGroups: [] };
-    const { cards } = coerceDedupedCards(raw, CARDS);
-    expect(cards).toEqual(CARDS);
+  it("caps the curated set at 12", () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      label: `Card ${i}`,
+      category: "Aspiration",
+    }));
+    const bigInput = many.map((c) => ({ ...c }));
+    const { cards } = coerceCuratedCards({ cards: many }, bigInput);
+    expect(cards).toHaveLength(12);
   });
 
-  it("falls back to the untouched input on a malformed response", () => {
-    expect(coerceDedupedCards(null, CARDS).cards).toEqual(CARDS);
-    expect(coerceDedupedCards({}, CARDS).cards).toEqual(CARDS);
-    expect(coerceDedupedCards("nonsense", CARDS).cards).toEqual(CARDS);
-    expect(
-      coerceDedupedCards({ duplicateGroups: "not an array" }, CARDS).cards
-    ).toEqual(CARDS);
-  });
-
-  it("de-duplicates within a group and ignores single-member groups", () => {
+  it("falls back to the raw input when the model returns MORE cards than given (runaway invention)", () => {
     const raw = {
-      duplicateGroups: [
-        ["Master cooking", "Master cooking"], // same label twice → not a real pair
-        ["Learner"], // singleton → ignored
+      cards: [
+        ...RAW.map((c) => ({ label: c.label, category: c.category })),
+        { label: "Something the person never said", category: "Aspiration" },
       ],
     };
-    const { cards } = coerceDedupedCards(raw, CARDS);
-    expect(cards).toEqual(CARDS);
+    const { cards } = coerceCuratedCards(raw, RAW);
+    expect(cards).toEqual(RAW);
   });
 
-  it("never returns an empty board even if a group would drop everything", () => {
-    const two: SeasonCard[] = [
-      { label: "A", category: "Aspiration" },
-      { label: "B", category: "Aspiration" },
-    ];
-    // A malformed group listing both as duplicates keeps the first, drops the second.
-    const { cards } = coerceDedupedCards(
-      { duplicateGroups: [["A", "B"]] },
-      two
-    );
-    expect(cards).toEqual([{ label: "A", category: "Aspiration" }]);
+  it("falls back to the raw input on empty or malformed responses", () => {
+    expect(coerceCuratedCards({ cards: [] }, RAW).cards).toEqual(RAW);
+    expect(coerceCuratedCards(null, RAW).cards).toEqual(RAW);
+    expect(coerceCuratedCards({}, RAW).cards).toEqual(RAW);
+    expect(coerceCuratedCards("nonsense", RAW).cards).toEqual(RAW);
+    expect(coerceCuratedCards({ cards: "not an array" }, RAW).cards).toEqual(RAW);
   });
 });

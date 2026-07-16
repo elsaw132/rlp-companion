@@ -110,7 +110,7 @@ import {
   weekShapeGoalInputs,
   transitionShape,
 } from "@/lib/weekShapeSeed";
-import { fetchSeasonsCardsDedup } from "@/lib/seasonsCardsSeed";
+import { fetchSeasonsCards } from "@/lib/seasonsCardsSeed";
 import { FinishControls, type InteractionMode } from "./InteractionShell";
 import type {
   ContentBlock,
@@ -885,25 +885,27 @@ export default function SessionContainer({
   }, [interaction, sessionId]);
 
   // The seasons board (4.2) seeds its cards deterministically from the person's
-  // aspirations, activities and people across the whole programme — but the same
-  // wish captured twice in different words shows up as near-duplicate cards. While
-  // the person reads the intro, tidy the raw cards with one Claude call that groups
-  // the same-intent ones, into the cache the surface reads. The board still renders
-  // the raw cards if this hasn't landed, and the tidy never invents or drops a
-  // distinct card, so nothing is lost either way.
-  const seasonsDedupPrefetchedRef = useRef(false);
+  // aspirations, activities and people across the whole programme — captured
+  // verbatim in the person's own words, so the raw labels are inconsistent and
+  // some don't belong on a board about how priorities shift across the decades.
+  // While the person reads the intro, curate them with one Claude call (clean,
+  // consistent voice; the aspiration not the tactic; vague made real; trivial
+  // dropped; duplicates merged), into the cache the surface reads. The board still
+  // renders the raw cards if this hasn't landed, and curation never invents a new
+  // wish or returns more cards than it was given, so nothing is fabricated.
+  const seasonsCardsPrefetchedRef = useRef(false);
   useEffect(() => {
     if (interaction?.type !== "seasons-board") return;
-    if (seasonsDedupPrefetchedRef.current || userData.getSeasonsCardsSeed(sessionId))
+    if (seasonsCardsPrefetchedRef.current || userData.getSeasonsCardsSeed(sessionId))
       return;
     const rawCards = seasonCardsFromFacts(
       resolveSeedItems(sessionId, userData.getActiveFacts())
     );
-    // Fewer than two cards can't have a duplicate — skip the call entirely.
-    if (rawCards.length < 2) return;
-    seasonsDedupPrefetchedRef.current = true;
+    // Nothing to curate — skip the call entirely.
+    if (rawCards.length === 0) return;
+    seasonsCardsPrefetchedRef.current = true;
     void (async () => {
-      const seed = await fetchSeasonsCardsDedup(rawCards);
+      const seed = await fetchSeasonsCards(rawCards);
       if (seed) void userData.saveSeasonsCardsSeed(sessionId, seed);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
