@@ -230,24 +230,59 @@ function transitionHorizonName(rs: RetirementStage | null): string {
 export function fearHorizonsFor(
   hasPartner: boolean,
   retirementStage: RetirementStage | null = null
-): { name: string; fears: string[] }[] {
+): { sourceIndices: number[]; name: string; fears: string[] }[] {
   const transitionName = transitionHorizonName(retirementStage);
+  // sourceIndices carry each display group's STABLE identity — its base index in
+  // FEAR_HORIZONS — kept separate from the reframed display `name`. Cards are
+  // grouped by this identity, never by the mutable label, so a stage rename can
+  // never leave a card without a home. See fearHorizonIndexOf.
   const horizons = FEAR_HORIZONS.map((h, i) => ({
+    sourceIndices: [i],
     name: i === 0 ? transitionName : h.name,
     fears: hasPartner ? h.fears : h.fears.filter((f) => !PARTNER_FEARS.has(f)),
   }));
   // Established: a long-settled retiree is past any "transition", so the first
   // horizon folds into "Life in retirement now" — leaving TWO horizons, which is
   // what the 3.5 primer for this cohort says ("life in retirement now, and the
-  // longer view").
+  // longer view"). The merged group keeps BOTH source indices, so cards from
+  // either original horizon still land in it.
   if (retirementStage === "established") {
     const [first, second, third] = horizons;
     return [
-      { name: "Life in retirement now", fears: [...first.fears, ...second.fears] },
+      {
+        sourceIndices: [...first.sourceIndices, ...second.sourceIndices],
+        name: "Life in retirement now",
+        fears: [...first.fears, ...second.fears],
+      },
       third,
     ];
   }
   return horizons;
+}
+
+// Resolve a stored fear-card horizon reference to its stable base index (0..2),
+// or null if it can't be placed. Three shapes resolve here: a numeric index
+// (what new seeds store), a base display name ("The transition" — older stored
+// seeds), and a stage-reframed name ("Since work ended" — what the seeding model
+// may echo). Keying on this index instead of the display string is what stops a
+// card, and its personalisation, from being lost when the name is reframed.
+export function fearHorizonIndexOf(
+  ref: number | string | null | undefined,
+  retirementStage: RetirementStage | null = null
+): number | null {
+  if (typeof ref === "number") {
+    return ref >= 0 && ref < FEAR_HORIZONS.length ? ref : null;
+  }
+  if (typeof ref !== "string") return null;
+  const needle = ref.trim().toLowerCase();
+  if (!needle) return null;
+  const base = FEAR_HORIZON_NAMES.findIndex((n) => n.toLowerCase() === needle);
+  if (base !== -1) return base;
+  // A reframed display name for this stage maps back to its source group.
+  for (const g of fearHorizonsFor(true, retirementStage)) {
+    if (g.name.toLowerCase() === needle) return g.sourceIndices[0];
+  }
+  return null;
 }
 
 // The seed shape is keyed by the interaction type it feeds, so the seeding phase
@@ -277,7 +312,11 @@ export type Stage3Seed =
       hopes: string;
       // A moderate handful of candidate fear cards per horizon, drawn from the
       // bank (or lightly personalised where their picture gives a clear hook).
-      horizons: { horizon: string; fears: string[] }[];
+      // Each group carries its STABLE identity (horizonIndex, 0..2); the display
+      // name is derived per retirement stage at render time, never stored here.
+      // `horizon` (a base display name) is a legacy field on seeds written before
+      // the index existed — readers resolve either via fearHorizonIndexOf.
+      horizons: { horizonIndex?: number; horizon?: string; fears: string[] }[];
     }
   | { type: "bigger-picture"; threads: string[]; draft: string };
 
@@ -350,7 +389,7 @@ export const FALLBACK_SEEDS: Record<Stage3SeedType, Stage3Seed> = {
     hopes: "",
     horizons: [
       {
-        horizon: "The transition",
+        horizonIndex: 0,
         fears: [
           "Losing the sense of purpose work gave me",
           "Missing the people and routine of work",
@@ -358,7 +397,7 @@ export const FALLBACK_SEEDS: Record<Stage3SeedType, Stage3Seed> = {
         ],
       },
       {
-        horizon: "Life in retirement",
+        horizonIndex: 1,
         fears: [
           "Becoming isolated or lonely",
           "Boredom — days that blur together",
@@ -366,7 +405,7 @@ export const FALLBACK_SEEDS: Record<Stage3SeedType, Stage3Seed> = {
         ],
       },
       {
-        horizon: "The longer view",
+        horizonIndex: 2,
         fears: [
           "Declining health or energy",
           "Losing my independence",
@@ -480,7 +519,11 @@ function valueCards(v: unknown, max: number): SeedCard[] {
     .slice(0, max);
 }
 
-export function coerceSeed(type: Stage3SeedType, raw: unknown): Stage3Seed {
+export function coerceSeed(
+  type: Stage3SeedType,
+  raw: unknown,
+  retirementStage: RetirementStage | null = null
+): Stage3Seed {
   const fallback = FALLBACK_SEEDS[type];
   if (!raw || typeof raw !== "object") return fallback;
   const obj = raw as Record<string, unknown>;
@@ -536,23 +579,35 @@ export function coerceSeed(type: Stage3SeedType, raw: unknown): Stage3Seed {
     case "hopes-fears": {
       const fb = fallback as Extract<Stage3Seed, { type: "hopes-fears" }>;
       const hopes = typeof obj.hopes === "string" ? obj.hopes.trim() : "";
-      // Index the model's horizons by name (case-insensitive) so we can rebuild
-      // them in the fixed order, regardless of how the model ordered or named
-      // them. Anything that isn't one of the three known horizons is dropped.
-      const byName = new Map<string, string[]>();
+      // Index the model's horizons by their STABLE base index (0..2), resolving
+      // the stage-reframed display name the model was given back to its source
+      // group. Keying on the index rather than the mutable display name is what
+      // keeps the first group's cards — and their personalisation — from being
+      // dropped when that group's name is reframed for this retirement stage.
+      const byIndex = new Map<number, string[]>();
       if (Array.isArray(obj.horizons)) {
         for (const h of obj.horizons) {
           if (!h || typeof h !== "object") continue;
-          const name = (h as { horizon?: unknown }).horizon;
-          if (typeof name !== "string") continue;
-          byName.set(name.trim().toLowerCase(), strArray((h as { fears?: unknown }).fears, 6));
+          const rec = h as {
+            horizon?: unknown;
+            horizonIndex?: unknown;
+            fears?: unknown;
+          };
+          const idx =
+            typeof rec.horizonIndex === "number"
+              ? rec.horizonIndex
+              : fearHorizonIndexOf(
+                  typeof rec.horizon === "string" ? rec.horizon : null,
+                  retirementStage
+                );
+          if (idx === null || idx < 0 || idx >= FEAR_HORIZONS.length) continue;
+          byIndex.set(idx, strArray(rec.fears, 6));
         }
       }
-      const horizons = FEAR_HORIZON_NAMES.map((name) => {
-        const fears = byName.get(name.toLowerCase()) ?? [];
-        const fallbackFears =
-          fb.horizons.find((x) => x.horizon === name)?.fears ?? [];
-        return { horizon: name, fears: fears.length ? fears : fallbackFears };
+      const horizons = FEAR_HORIZONS.map((_, i) => {
+        const fears = byIndex.get(i) ?? [];
+        const fallbackFears = fb.horizons[i]?.fears ?? [];
+        return { horizonIndex: i, fears: fears.length ? fears : fallbackFears };
       });
       return { type, hopes, horizons };
     }

@@ -201,7 +201,11 @@ export async function POST(request: Request) {
     // coerceSeed returns the generic FALLBACK_SEEDS reference when the model's
     // output was unusable (empty/malformed). Detect that by identity so we can
     // swap in the person's-own-values fallback and flag it for the client.
-    const coerced = coerceSeed(seedType, JSON.parse(slice));
+    const coerced = coerceSeed(
+      seedType,
+      JSON.parse(slice),
+      body.retirementStage ?? null
+    );
     if (coerced === FALLBACK_SEEDS[seedType]) {
       return Response.json({ seed: fallbackSeed, fromFallback: true });
     }

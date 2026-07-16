@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { HopesFearsInteraction, HopesFearsResult } from "@/lib/modules";
 import {
   FEAR_HORIZONS,
+  FEAR_HORIZON_NAMES,
+  fearHorizonIndexOf,
   fearHorizonsFor,
   PARTNER_FEARS,
   type Stage3Seed,
@@ -23,7 +25,10 @@ type Reaction = "on-my-mind" | "not-me" | "newly-recognised";
 
 type CardState = {
   label: string;
-  horizon: string;
+  // Stable base-horizon identity (0..2), NOT a display name — the group heading
+  // is derived from the retirement stage at render time. Grouping by this index
+  // is what keeps a card visible even when its group's name is reframed.
+  horizonIndex: number;
   reaction: Reaction | null;
   note: string;
   weighs: boolean;
@@ -84,27 +89,39 @@ export default function HopesFears({
   // and the first horizon's name reframed for their retirement stage (Phase 6),
   // so it doesn't read as a change still ahead of someone already through it.
   const userData = useUserData();
-  const horizons = fearHorizonsFor(hasPartner, userData.getRetirementStage());
+  const rs = userData.getRetirementStage();
+  const horizons = fearHorizonsFor(hasPartner, rs);
 
   const [cards, setCards] = useState<CardState[]>(() => {
     if (initial) {
-      return initial.fears.map((f) => ({
-        label: f.label,
-        horizon: f.horizon,
-        reaction: f.reaction,
-        note: f.note ?? "",
-        weighs: f.weighs ?? false,
-      }));
+      return initial.fears
+        .map((f): CardState | null => {
+          const idx = fearHorizonIndexOf(f.horizon, rs);
+          if (idx === null) return null;
+          return {
+            label: f.label,
+            horizonIndex: idx,
+            reaction: f.reaction,
+            note: f.note ?? "",
+            weighs: f.weighs ?? false,
+          };
+        })
+        .filter((c): c is CardState => c !== null);
     }
     const seeded: CardState[] = [];
     for (const h of hfSeed?.horizons ?? []) {
+      // New seeds carry a stable horizonIndex; older ones carry a base name.
+      // Resolve either to the index, and drop a card only if it truly can't be
+      // placed (never silently, off-screen, blocking the finish button).
+      const idx = h.horizonIndex ?? fearHorizonIndexOf(h.horizon, rs);
+      if (idx === null || idx === undefined) continue;
       for (const label of h.fears) {
         // Defensive: keep partner-only worries off the surface for a solo
         // person even if a stale or generic seed still carries them.
         if (!hasPartner && PARTNER_FEARS.has(label)) continue;
         seeded.push({
           label,
-          horizon: h.horizon,
+          horizonIndex: idx,
           reaction: null,
           note: "",
           weighs: false,
@@ -140,24 +157,26 @@ export default function HopesFears({
     return cards.some((c) => c.label.toLowerCase() === label.toLowerCase());
   }
 
-  function addFromPalette(label: string, horizon: string) {
+  function addFromPalette(label: string, horizonIndex: number) {
     if (hasCard(label)) return;
     setCards((prev) => [
       ...prev,
-      { label, horizon, reaction: "on-my-mind", note: "", weighs: false },
+      { label, horizonIndex, reaction: "on-my-mind", note: "", weighs: false },
     ]);
   }
 
-  function addCustom(horizon: string) {
-    const label = (customDraft[horizon] ?? "").trim();
+  // draftKey identifies the custom-input box (keyed by display name, a UI-local
+  // concern); horizonIndex is the stable identity stamped on the new card.
+  function addCustom(draftKey: string, horizonIndex: number) {
+    const label = (customDraft[draftKey] ?? "").trim();
     if (!label) return;
     if (!hasCard(label)) {
       setCards((prev) => [
         ...prev,
-        { label, horizon, reaction: "on-my-mind", note: "", weighs: false },
+        { label, horizonIndex, reaction: "on-my-mind", note: "", weighs: false },
       ]);
     }
-    setCustomDraft((prev) => ({ ...prev, [horizon]: "" }));
+    setCustomDraft((prev) => ({ ...prev, [draftKey]: "" }));
   }
 
   const allReacted = cards.length === 0 || cards.every((c) => c.reaction !== null);
@@ -178,7 +197,9 @@ export default function HopesFears({
           const weighs = landed && c.weighs ? true : undefined;
           return {
             label: c.label,
-            horizon: c.horizon,
+            // Store the stable base name (not the stage-reframed one) so the
+            // summary, which groups against FEAR_HORIZONS, always matches.
+            horizon: FEAR_HORIZON_NAMES[c.horizonIndex] ?? "",
             reaction: c.reaction as Reaction,
             ...(note ? { note } : {}),
             ...(weighs ? { weighs } : {}),
@@ -213,7 +234,7 @@ export default function HopesFears({
       {horizons.map((horizon) => {
         const cardsHere = cards
           .map((c, i) => ({ c, i }))
-          .filter(({ c }) => c.horizon === horizon.name);
+          .filter(({ c }) => horizon.sourceIndices.includes(c.horizonIndex));
         const remaining = horizon.fears.filter((f) => !hasCard(f));
         return (
           <div key={horizon.name} style={styles.horizonBlock}>
@@ -292,7 +313,7 @@ export default function HopesFears({
                     type="button"
                     className="hf-palette"
                     style={styles.paletteChip}
-                    onClick={() => addFromPalette(option, horizon.name)}
+                    onClick={() => addFromPalette(option, horizon.sourceIndices[0])}
                   >
                     + {option}
                   </button>
@@ -314,14 +335,15 @@ export default function HopesFears({
                   }))
                 }
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") addCustom(horizon.name);
+                  if (e.key === "Enter")
+                    addCustom(horizon.name, horizon.sourceIndices[0]);
                 }}
               />
               <button
                 type="button"
                 className="hf-add"
                 style={styles.addBtn}
-                onClick={() => addCustom(horizon.name)}
+                onClick={() => addCustom(horizon.name, horizon.sourceIndices[0])}
                 disabled={!(customDraft[horizon.name] ?? "").trim()}
               >
                 Add
