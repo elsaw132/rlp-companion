@@ -47,6 +47,7 @@ import type { BalancedGoalsSeed } from "@/lib/balancedGoalsSeed";
 import type { GoalPathsSeed } from "@/lib/goalPathsSeed";
 import type { TradeOffsSeed } from "@/lib/tradeOffsSeed";
 import type { WeekShapeSeed } from "@/lib/weekShapeSeed";
+import type { SeasonsCardsSeed } from "@/lib/seasonsCardsSeed";
 import type { FirstYearSeed } from "@/lib/firstYearSeed";
 import type { PlanIntro } from "@/lib/planIntro";
 import { stripStructuredLeak } from "@/lib/coachText";
@@ -147,6 +148,10 @@ const KEYS = {
   // the trade-offs module (4.5), persisted so a refresh never re-drafts them.
   tradeOffSeed: (id: string) => `trade-off-v1:${id}`,
   weekShapeSeed: (id: string) => `week-shape-v2:${id}`,
+  // The de-duplicated seasons-board cards Vita tidied for "The chapters of
+  // retirement" (4.2), so near-identical cards collapse to one and a refresh
+  // never re-runs the tidy.
+  seasonsCardsSeed: (id: string) => `seasons-cards-v1:${id}`,
   // The assembled first-year draft Vita built for "Your first year" (4.7), kept in
   // sync with the working timeline so a mid-session refresh resumes it.
   firstYearSeed: (id: string) => `first-year-v1:${id}`,
@@ -1058,6 +1063,24 @@ export function useUserData() {
   const clearWeekShapeSeed = (id: string) =>
     removeKey(KEYS.weekShapeSeed(id));
 
+  const getSeasonsCardsSeed = (id: string): SeasonsCardsSeed | null => {
+    const v = snapshot[KEYS.seasonsCardsSeed(id)];
+    if (
+      v &&
+      typeof v === "object" &&
+      Array.isArray((v as SeasonsCardsSeed).cards)
+    ) {
+      return v as SeasonsCardsSeed;
+    }
+    return null;
+  };
+
+  const saveSeasonsCardsSeed = (id: string, seed: SeasonsCardsSeed) =>
+    setKey(KEYS.seasonsCardsSeed(id), seed);
+
+  const clearSeasonsCardsSeed = (id: string) =>
+    removeKey(KEYS.seasonsCardsSeed(id));
+
   const getFirstYearSeed = (id: string): FirstYearSeed | null => {
     const v = snapshot[KEYS.firstYearSeed(id)];
     if (
@@ -1262,6 +1285,9 @@ export function useUserData() {
     getWeekShapeSeed,
     saveWeekShapeSeed,
     clearWeekShapeSeed,
+    getSeasonsCardsSeed,
+    saveSeasonsCardsSeed,
+    clearSeasonsCardsSeed,
     getFirstYearSeed,
     saveFirstYearSeed,
     clearFirstYearSeed,

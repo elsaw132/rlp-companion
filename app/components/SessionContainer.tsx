@@ -110,6 +110,7 @@ import {
   weekShapeGoalInputs,
   transitionShape,
 } from "@/lib/weekShapeSeed";
+import { fetchSeasonsCardsDedup } from "@/lib/seasonsCardsSeed";
 import { FinishControls, type InteractionMode } from "./InteractionShell";
 import type {
   ContentBlock,
@@ -879,6 +880,31 @@ export default function SessionContainer({
         ),
       });
       if (draft) void userData.saveWeekShapeSeed(sessionId, draft);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interaction, sessionId]);
+
+  // The seasons board (4.2) seeds its cards deterministically from the person's
+  // aspirations, activities and people across the whole programme — but the same
+  // wish captured twice in different words shows up as near-duplicate cards. While
+  // the person reads the intro, tidy the raw cards with one Claude call that groups
+  // the same-intent ones, into the cache the surface reads. The board still renders
+  // the raw cards if this hasn't landed, and the tidy never invents or drops a
+  // distinct card, so nothing is lost either way.
+  const seasonsDedupPrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (interaction?.type !== "seasons-board") return;
+    if (seasonsDedupPrefetchedRef.current || userData.getSeasonsCardsSeed(sessionId))
+      return;
+    const rawCards = seasonCardsFromFacts(
+      resolveSeedItems(sessionId, userData.getActiveFacts())
+    );
+    // Fewer than two cards can't have a duplicate — skip the call entirely.
+    if (rawCards.length < 2) return;
+    seasonsDedupPrefetchedRef.current = true;
+    void (async () => {
+      const seed = await fetchSeasonsCardsDedup(rawCards);
+      if (seed) void userData.saveSeasonsCardsSeed(sessionId, seed);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interaction, sessionId]);
@@ -1810,9 +1836,16 @@ export default function SessionContainer({
   // (manifest-scoped, status=active) rather than the lossy user-model re-derivation:
   // 4.2's seasons board takes a flat set of cards; 4.3's springboards come from the
   // recurring_activity facts grouped by balanced area.
+  // The board reads Vita's tidied (de-duplicated) cards once they've landed in the
+  // cache, and falls back to the raw fact-sourced cards until then — so it always
+  // renders, just with the near-duplicates still showing if the tidy hasn't
+  // finished. The tidy only groups same-intent cards; it never drops a distinct one.
   const seededCards =
     interaction?.type === "seasons-board"
-      ? seasonCardsFromFacts(resolveSeedItems(sessionId, userData.getActiveFacts()))
+      ? (userData.getSeasonsCardsSeed(sessionId)?.cards ??
+        seasonCardsFromFacts(
+          resolveSeedItems(sessionId, userData.getActiveFacts())
+        ))
       : [];
   const balancedSeed: BalancedSeed | null =
     interaction?.type === "balanced-goals"
