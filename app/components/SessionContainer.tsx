@@ -1364,35 +1364,79 @@ export default function SessionContainer({
   async function fetchSeedDraft(): Promise<Stage3Seed | null> {
     if (!interaction || !isSeededType(interaction.type)) return null;
     const idx = stageModuleIds.indexOf(sessionId);
-    const priorBuilds = stageModuleIds
+    const priorBuildResults = stageModuleIds
       .slice(0, idx === -1 ? 0 : idx)
-      .flatMap((id) => {
-        const b = userData.getBuild(id);
-        return b ? [summarizeBuild(b)] : [];
-      })
+      .map((id) => userData.getBuild(id))
+      .filter((b): b is BuildResult => b !== null);
+    const priorBuilds = priorBuildResults
+      .map(summarizeBuild)
       .filter(Boolean)
       .join("\n");
 
-    try {
+    // The values the person actually chose earlier in Stage 3 (ranking order
+    // first, then any "that's me" values from triage). Sent so the server can
+    // fall back to THEIR values on value-definitions if the AI seed fails —
+    // never a generic stand-in they never picked.
+    const carryValues: string[] = [];
+    const seenValue = new Set<string>();
+    const addValue = (label: string) => {
+      const key = label.trim().toLowerCase();
+      if (!key || seenValue.has(key)) return;
+      seenValue.add(key);
+      carryValues.push(label.trim());
+    };
+    const ranking = priorBuildResults.find((b) => b.type === "priority-choices");
+    const triage = priorBuildResults.find((b) => b.type === "value-triage");
+    if (ranking?.type === "priority-choices") ranking.ranked.forEach(addValue);
+    if (triage?.type === "value-triage")
+      triage.sorted.filter((s) => s.tray === "me").forEach((s) => addValue(s.label));
+
+    const body = JSON.stringify({
+      seedType: interaction.type,
+      onboardingContext: userData.buildOnboardingContext(),
+      // The structured picks the seed grounds itself in now come from the
+      // resolver's seed view (manifest-scoped, status=active) — replacing the
+      // buildStage3Context registry and the uncapped takeaway prose.
+      priorReflections: "",
+      carryForward: resolveSeedText(sessionId, userData.getActiveFacts()),
+      priorBuilds,
+      carryValues,
+      hasPartner: userData.hasPartner(),
+      retirementStage: userData.getRetirementStage(),
+    });
+
+    // One structured attempt. Returns the seed and whether the server had to fall
+    // back to generic content (a failed or empty AI seed).
+    const attempt = async (): Promise<{
+      seed: Stage3Seed | null;
+      fromFallback: boolean;
+    }> => {
       const res = await fetch("/api/stage3-seed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          seedType: interaction.type,
-          onboardingContext: userData.buildOnboardingContext(),
-          // The structured picks the seed grounds itself in now come from the
-          // resolver's seed view (manifest-scoped, status=active) — replacing the
-          // buildStage3Context registry and the uncapped takeaway prose.
-          priorReflections: "",
-          carryForward: resolveSeedText(sessionId, userData.getActiveFacts()),
-          priorBuilds,
-          hasPartner: userData.hasPartner(),
-          retirementStage: userData.getRetirementStage(),
-        }),
+        body,
       });
       if (!res.ok) throw new Error(`Seed request failed: ${res.status}`);
-      const data = (await res.json()) as { seed: Stage3Seed | null };
-      return data.seed ?? null;
+      const data = (await res.json()) as {
+        seed: Stage3Seed | null;
+        fromFallback?: boolean;
+      };
+      return { seed: data.seed ?? null, fromFallback: data.fromFallback ?? false };
+    };
+
+    try {
+      let result = await attempt();
+      // Don't silently accept a fallback: give it one more real try before the
+      // surface is built (and completed) on generic content.
+      if (result.fromFallback) {
+        try {
+          const retry = await attempt();
+          if (!retry.fromFallback) result = retry;
+        } catch {
+          // Keep the first result — the fallback is still safe to render.
+        }
+      }
+      return result.seed;
     } catch {
       return null;
     }

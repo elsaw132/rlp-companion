@@ -386,6 +386,33 @@ export const FALLBACK_SEEDS: Record<Stage3SeedType, Stage3Seed> = {
   },
 };
 
+// A per-person fallback for the value-definitions surface. When the AI seed
+// can't be used, we still show the person THEIR OWN values (carried from earlier
+// Stage 3 builds) with blank threat/protectors to fill in — never a generic
+// stand-in value they never chose. An empty list falls back to FALLBACK_SEEDS.
+export function valueDefinitionsFallback(values: string[]): Stage3Seed {
+  const seen = new Set<string>();
+  const cleaned = values
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter((v) => {
+      const key = v.toLowerCase();
+      if (!v || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 5);
+  if (!cleaned.length) return FALLBACK_SEEDS["value-definitions"];
+  return {
+    type: "value-definitions",
+    values: cleaned.map((value) => ({
+      value,
+      description: "",
+      threat: "",
+      protectors: [],
+    })),
+  };
+}
+
 // ---- Coercion ----
 // Validate and clean whatever the model returned into the seed shape for this
 // module type, falling back per-field (and ultimately to FALLBACK_SEEDS) so a

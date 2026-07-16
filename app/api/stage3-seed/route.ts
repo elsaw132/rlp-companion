@@ -4,9 +4,11 @@ import {
   coerceSeed,
   isSeededType,
   FALLBACK_SEEDS,
+  valueDefinitionsFallback,
   VIA_STRENGTHS,
   VALUE_SET,
   fearHorizonsFor,
+  type Stage3Seed,
   type Stage3SeedType,
 } from "@/lib/stage3Seed";
 import type { RetirementStage } from "@/lib/userData";
@@ -27,6 +29,10 @@ type SeedRequest = {
   // modules (e.g. the values they confirmed in 3.2), so 3.3/3.4 seed from the
   // real picks rather than re-inferring them.
   priorBuilds: string;
+  // The values the person actually chose in earlier Stage 3 work (ranking +
+  // triage), sent so a failed AI seed can fall back to THEIR values on the
+  // value-definitions surface rather than a generic stand-in they never picked.
+  carryValues?: string[];
   // Whether the person flagged a partner at onboarding. Used by the hopes-fears
   // seed to keep partner-only worries out of the bank for someone planning alone.
   hasPartner?: boolean;
@@ -85,6 +91,20 @@ Return each horizon with its EXACT name from above and its chosen fears. JSON sh
 JSON shape: {"threads":["..."],"draft":""}`,
 };
 
+// Output budget per surface. Most seeds are small, but value-definitions returns
+// the largest payload by far — a description, a full-sentence threat, and three
+// protectors for EACH of the person's values — so it needs a much bigger budget.
+// At the old shared 900 cap it truncated mid-JSON every time (the response failed
+// to parse and the surface silently fell back to generic content).
+const MAX_TOKENS_BY_TYPE: Record<Stage3SeedType, number> = {
+  "mirror-cards": 900,
+  "value-triage": 900,
+  "priority-choices": 1200,
+  "value-definitions": 2000,
+  "hopes-fears": 1200,
+  "bigger-picture": 900,
+};
+
 function systemPrompt(
   seedType: Stage3SeedType,
   hasPartner: boolean,
@@ -136,16 +156,25 @@ export async function POST(request: Request) {
     .filter(Boolean)
     .join("\n\n");
 
-  // Nothing to work from — return the generic fallback rather than asking the
-  // model to invent a life.
+  // The safety-net seed for when the AI seed can't be used. For value-definitions
+  // this is built from the person's OWN values (passed in carryValues) so a
+  // failure shows their real values to fill in — never a stand-in they never
+  // chose. Every other surface keeps its generic fallback.
+  const fallbackSeed: Stage3Seed =
+    seedType === "value-definitions"
+      ? valueDefinitionsFallback(body.carryValues ?? [])
+      : FALLBACK_SEEDS[seedType];
+
+  // Nothing to work from — return the fallback rather than asking the model to
+  // invent a life. Flagged so the client knows this isn't a real AI seed.
   if (!context.trim()) {
-    return Response.json({ seed: FALLBACK_SEEDS[seedType] });
+    return Response.json({ seed: fallbackSeed, fromFallback: true });
   }
 
   try {
     const response = await anthropic.messages.create({
       model: HAIKU_MODEL,
-      max_tokens: 900,
+      max_tokens: MAX_TOKENS_BY_TYPE[seedType],
       system: systemPrompt(
         seedType,
         body.hasPartner ?? false,
@@ -169,7 +198,14 @@ export async function POST(request: Request) {
     const end = text.lastIndexOf("}");
     const slice = start !== -1 && end !== -1 ? text.slice(start, end + 1) : text;
 
-    return Response.json({ seed: coerceSeed(seedType, JSON.parse(slice)) });
+    // coerceSeed returns the generic FALLBACK_SEEDS reference when the model's
+    // output was unusable (empty/malformed). Detect that by identity so we can
+    // swap in the person's-own-values fallback and flag it for the client.
+    const coerced = coerceSeed(seedType, JSON.parse(slice));
+    if (coerced === FALLBACK_SEEDS[seedType]) {
+      return Response.json({ seed: fallbackSeed, fromFallback: true });
+    }
+    return Response.json({ seed: coerced, fromFallback: false });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       console.error(
@@ -178,6 +214,6 @@ export async function POST(request: Request) {
     } else {
       console.error("[stage3-seed] Unexpected error:", error);
     }
-    return Response.json({ seed: FALLBACK_SEEDS[seedType] });
+    return Response.json({ seed: fallbackSeed, fromFallback: true });
   }
 }
