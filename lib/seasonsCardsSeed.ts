@@ -1,24 +1,23 @@
 // Module 4.2 ("The chapters of retirement") card-curation contract.
 //
-// The seasons board seeds its cards from the person's aspirations, activities and
-// people across every earlier session (seasonCardsFromFacts in lib/resolverInputs).
-// Those facts are captured VERBATIM, in the person's own words (see takeawayPrompt),
-// which is right for Vita's memory but wrong as tidy board cards: the labels come
-// out inconsistent — some lowercase, some "-ing" fragments, some naming the tactic
-// ("learn a language THROUGH A CLASS") rather than the aspiration, some too thin
-// ("Learner"), and some a different register entirely (a daily tea ritual on a board
-// about how PRIORITIES shift across the decades).
+// The seasons board's cards are the person's own priorities across the whole
+// programme. The naive builder (seasonCardsFromFacts) read only a few categories,
+// aspiration-first, and hard-capped at 12 — so anyone with a full aspiration list
+// had their most central, most-repeated themes (the people they love, the things
+// they actually do) crowded out entirely. seasonCandidatesFromFacts instead gathers
+// the FULL picture — aspirations, the activities they do, hopes, goals, what they
+// want to keep, and the people in their life — plus their roles and values as signal.
 //
-// One structured Claude call (/api/seasons-cards) curates the raw facts into a clean,
-// consistent set of cards for the board: one voice (capitalised, verb-led), the
-// aspiration not the tactic, vague cards made real WITHOUT inventing new wishes,
-// trivial/wrong-register cards dropped, and same-intent cards merged. It rewrites
-// wording (unlike the old dedup-only pass), but only ever cleans up and sharpens what
-// the person actually said — it never adds an aspiration they didn't express, never
-// returns more cards than it was given, and falls back to the untouched raw cards on
-// any failure, so the board always renders.
+// One structured Claude call (/api/seasons-cards) selects and phrases a balanced set
+// of ~8–12 board cards from that pool: one consistent voice, the aspiration not the
+// tactic, the central people and recurring themes always represented, one card per
+// priority (merged across wording, category and altitude), trivial daily routines
+// dropped. It rewrites and selects, but only ever from what the person actually said —
+// it never invents a priority. On any failure it returns nothing, and the board falls
+// back to the (narrow) seasonCardsFromFacts set so it always renders.
 
 import type { SeasonCard } from "@/lib/userModel";
+import type { SeasonCandidate } from "@/lib/resolverInputs";
 
 // The cached result the board reads: the curated cards, in the shape the board
 // already consumes.
@@ -26,16 +25,24 @@ export type SeasonsCardsSeed = {
   cards: SeasonCard[];
 };
 
+// The full input the curation call chooses from: the priority pool plus the role and
+// value signals that keep the central people and values on the board.
+export type SeasonsCardsInput = {
+  candidates: SeasonCandidate[];
+  roles: string[];
+  values: string[];
+};
+
 // Call the curation route. Returns the curated card set, or null on any failure so
-// the caller keeps the raw cards.
+// the caller falls back to the raw cards.
 export async function fetchSeasonsCards(
-  cards: SeasonCard[]
+  input: SeasonsCardsInput
 ): Promise<SeasonsCardsSeed | null> {
   try {
     const res = await fetch("/api/seasons-cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cards }),
+      body: JSON.stringify(input),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { seed: SeasonsCardsSeed | null };
@@ -45,18 +52,17 @@ export async function fetchSeasonsCards(
   }
 }
 
-// Validate and clean whatever the model returned into the seed shape. The model
-// returns a curated list of cards (rewritten labels), each with a category. Safety,
-// in priority order:
-//   - well-formed only: a card with no usable label is dropped;
-//   - no runaway invention: the curated set can only be smaller than or equal to the
-//     input (curation merges/drops/rewrites, never adds) — a larger set means the
-//     model went off-script, so we fall back to the untouched input;
-//   - never fail open: an empty or malformed result returns the raw input unchanged.
-export function coerceCuratedCards(
-  raw: unknown,
-  input: SeasonCard[]
-): SeasonsCardsSeed {
+// Maximum cards on the board — a sortable, uncluttered set.
+const MAX_CARDS = 12;
+
+// Validate and clean whatever the model returned into the seed shape, or null when it
+// gave us nothing usable (the caller then falls back to the raw cards). The model
+// SELECTS and rewrites from a large candidate pool, so unlike the old dedup pass we
+// can't check labels against an input set — faithfulness ("never invent") is enforced
+// by the prompt. Here we only keep the result well-formed: non-empty labels, de-duped,
+// and capped at MAX_CARDS. Each card carries a category the model assigned (kept in the
+// data model; the board no longer renders it as a tag).
+export function coerceCuratedCards(raw: unknown): SeasonsCardsSeed | null {
   const obj =
     raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const arr = Array.isArray(obj.cards) ? obj.cards : [];
@@ -76,10 +82,8 @@ export function coerceCuratedCards(
         ? o.category.trim()
         : "Aspiration";
     out.push({ label, category });
-    if (out.length >= 12) break;
+    if (out.length >= MAX_CARDS) break;
   }
 
-  // Empty, or more cards than we fed in → the model went off-script; keep the raw set.
-  if (!out.length || out.length > input.length) return { cards: input };
-  return { cards: out };
+  return out.length ? { cards: out } : null;
 }

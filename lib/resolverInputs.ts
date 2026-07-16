@@ -139,6 +139,80 @@ function conciseCardLabel(text: string): string {
   return head || text.trim();
 }
 
+// ---- 4.2 season-board CANDIDATES (the curation input) --------------------------
+// The narrow, aspiration-first + 12-cap seasonCardsFromFacts above starved the board:
+// for anyone with a full aspiration list, their most central, most-repeated themes —
+// the people they love, the activities they actually do — never made the cut, because
+// aspirations filled every slot first. This assembles the FULL picture the /api/seasons-cards
+// curation call chooses from: a broad, de-duplicated pool of the priority-bearing facts
+// (what they reach for, what they do, hope for, want to keep, and the people in their
+// life), plus their roles and values as SIGNAL so the curation makes sure the central
+// people and values are represented even when they surface only indirectly. The LLM
+// then selects and phrases a balanced ~12; the fallback board (seasonCardsFromFacts)
+// still renders if that call hasn't landed. Dream-walled by category whitelist:
+// one_off_dream is not a candidate source, so 4.2's no-dreams rule holds.
+export type SeasonCandidate = { label: string; source: string };
+export type SeasonCandidates = {
+  candidates: SeasonCandidate[];
+  roles: string[];
+  values: string[];
+};
+
+// The categories that carry a person's priorities, each with a plain-language "source"
+// hint the curation prompt reads. Order shapes only the pool listing, not the board.
+const CANDIDATE_SOURCES: { category: StoredFact["category"]; source: string }[] = [
+  { category: "aspiration", source: "aspiration" },
+  { category: "recurring_activity", source: "activity they do" },
+  { category: "hope", source: "hope" },
+  { category: "goal", source: "goal" },
+  { category: "relationship", source: "person in their life" },
+];
+
+export function seasonCandidatesFromFacts(facts: StoredFact[]): SeasonCandidates {
+  const active = facts.filter((f) => f.status === "active");
+  const candidates: SeasonCandidate[] = [];
+  const seen = new Set<string>();
+  const add = (rawLabel: unknown, source: string) => {
+    const label = conciseCardLabel(String(rawLabel ?? ""));
+    const key = label.toLowerCase();
+    if (!label || seen.has(key)) return;
+    seen.add(key);
+    candidates.push({ label, source });
+  };
+
+  for (const { category, source } of CANDIDATE_SOURCES) {
+    for (const f of active) {
+      if (f.category === category) add(f.data?.label, source);
+    }
+  }
+  // Only the "keep" side of the retired stock-take is a priority to carry forward;
+  // the "change"/"leave" items are deliberately left out.
+  for (const label of keepChangeLeaveFromFacts(active).keep) {
+    add(label, "wants to keep");
+  }
+
+  const labelsOf = (category: StoredFact["category"]) => {
+    const out: string[] = [];
+    const s = new Set<string>();
+    for (const f of active) {
+      if (f.category !== category) continue;
+      const label = String(f.data?.label ?? "").trim();
+      const key = label.toLowerCase();
+      if (label && !s.has(key)) {
+        s.add(key);
+        out.push(label);
+      }
+    }
+    return out;
+  };
+
+  return {
+    candidates,
+    roles: labelsOf("role"),
+    values: labelsOf("value"),
+  };
+}
+
 // The plan's core values, read straight from the canonical profile: the user's
 // VERBATIM description (never the 3.6 LLM re-distillation) plus the 3.4 threat and
 // protectors, ordered by the Stage-3 ranking (value_priority facts). Prefers the

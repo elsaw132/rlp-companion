@@ -148,12 +148,12 @@ const KEYS = {
   // the trade-offs module (4.5), persisted so a refresh never re-drafts them.
   tradeOffSeed: (id: string) => `trade-off-v1:${id}`,
   weekShapeSeed: (id: string) => `week-shape-v2:${id}`,
-  // The curated seasons-board cards Vita cleaned up for "The chapters of
-  // retirement" (4.2) — consistent voice, the aspiration not the tactic, trivial
-  // and duplicate cards removed — so a refresh never re-runs the curation. v2:
-  // the pass grew from dedup-only to full curation, so v1's dedup-only caches are
-  // left unread and simply re-curated.
-  seasonsCardsSeed: (id: string) => `seasons-cards-v2:${id}`,
+  // The curated seasons-board cards Vita chose for "The chapters of retirement"
+  // (4.2) — a balanced set of the person's real priorities across chapters, in a
+  // consistent voice — so a refresh never re-runs the curation. v3: sourcing widened
+  // from the narrow aspiration-capped set to the full candidate pool (people and
+  // activities included), so v1/v2 caches are left unread and simply re-curated.
+  seasonsCardsSeed: (id: string) => `seasons-cards-v3:${id}`,
   // The assembled first-year draft Vita built for "Your first year" (4.7), kept in
   // sync with the working timeline so a mid-session refresh resumes it.
   firstYearSeed: (id: string) => `first-year-v1:${id}`,

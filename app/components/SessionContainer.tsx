@@ -155,6 +155,7 @@ import {
   springboardsFromFacts,
   springboardAreasFromFacts,
   seasonCardsFromFacts,
+  seasonCandidatesFromFacts,
   recurringSeedFromFacts,
 } from "@/lib/resolverInputs";
 
@@ -884,28 +885,26 @@ export default function SessionContainer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interaction, sessionId]);
 
-  // The seasons board (4.2) seeds its cards deterministically from the person's
-  // aspirations, activities and people across the whole programme — captured
-  // verbatim in the person's own words, so the raw labels are inconsistent and
-  // some don't belong on a board about how priorities shift across the decades.
-  // While the person reads the intro, curate them with one Claude call (clean,
-  // consistent voice; the aspiration not the tactic; vague made real; trivial
-  // dropped; duplicates merged), into the cache the surface reads. The board still
-  // renders the raw cards if this hasn't landed, and curation never invents a new
-  // wish or returns more cards than it was given, so nothing is fabricated.
+  // The seasons board (4.2) draws its cards from the person's real priorities across
+  // the whole programme. The narrow, aspiration-first seasonCardsFromFacts used to
+  // starve it — the people and activities that matter most got crowded out. While the
+  // person reads the intro, gather the FULL candidate pool (aspirations, the activities
+  // they do, hopes, goals, what they want to keep, the people in their life) plus their
+  // roles and values as signal, and curate it with one Claude call into a balanced,
+  // consistently-phrased set, cached for the surface. Curation selects and phrases only
+  // from what the person actually said (never invents); if it hasn't landed, the board
+  // falls back to the raw seasonCardsFromFacts set, so it always renders.
   const seasonsCardsPrefetchedRef = useRef(false);
   useEffect(() => {
     if (interaction?.type !== "seasons-board") return;
     if (seasonsCardsPrefetchedRef.current || userData.getSeasonsCardsSeed(sessionId))
       return;
-    const rawCards = seasonCardsFromFacts(
-      resolveSeedItems(sessionId, userData.getActiveFacts())
-    );
+    const input = seasonCandidatesFromFacts(userData.getActiveFacts());
     // Nothing to curate — skip the call entirely.
-    if (rawCards.length === 0) return;
+    if (input.candidates.length === 0) return;
     seasonsCardsPrefetchedRef.current = true;
     void (async () => {
-      const seed = await fetchSeasonsCards(rawCards);
+      const seed = await fetchSeasonsCards(input);
       if (seed) void userData.saveSeasonsCardsSeed(sessionId, seed);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

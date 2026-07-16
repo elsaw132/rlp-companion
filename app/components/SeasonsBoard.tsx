@@ -155,9 +155,6 @@ export default function SeasonsBoard({
           <div key={`${item.label}-${index}`} style={styles.card}>
             <div style={styles.cardHead}>
               <span style={styles.cardLabel}>{item.label}</span>
-              {item.category && (
-                <span style={styles.cardCategory}>{item.category}</span>
-              )}
               {item.own && (
                 <button
                   type="button"
