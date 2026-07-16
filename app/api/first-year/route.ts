@@ -15,7 +15,7 @@ import {
 // year. The person reacts to the draft. Anything that goes wrong falls back to a
 // grounded assembly so the surface always renders.
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,

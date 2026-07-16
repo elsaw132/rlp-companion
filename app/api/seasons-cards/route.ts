@@ -14,7 +14,7 @@ import type { SeasonCandidate } from "@/lib/resolverInputs";
 // and capped; anything that goes wrong returns nothing so the board falls back to its
 // raw cards and always renders.
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,

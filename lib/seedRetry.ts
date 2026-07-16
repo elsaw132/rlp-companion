@@ -1,14 +1,21 @@
 // Shared retry for the Stage-4 draft fetches (goals, goal-paths, trade-offs, week
 // shape, first year, seasons cards). Each of these surfaces asks its /api route for
-// an AI-drafted "seed" while the person reads the intro. A single slow response, a
-// timeout, an overloaded model, a network blip, or a route-signalled failure
-// ({seed:null}) used to drop the person onto a generic fallback with no recovery.
+// an AI-drafted "seed" while the person reads the intro.
 //
-// This retries transient failures a few times with backoff before giving up. It
-// returns the drafted seed on the first attempt that comes back valid, or null only
-// after every attempt fails — the caller then shows its own fallback. A route that
-// returns a real seed for genuinely-empty input (handled before the model call) comes
-// back valid on the first try, so no retry is wasted.
+// These drafts are SLOW on purpose — a rich profile takes ~35s of model generation,
+// close to the route's timeout. So the retry has to be careful: retrying a FAST
+// failure (a quick 5xx, a network blip, an overloaded-and-refused call) is worth it,
+// but retrying a SLOW failure — one that already ran near the timeout — just stacks
+// another 35s+ wait and almost never succeeds. So we only retry when the failed
+// attempt came back QUICKLY; a slow failure gives up immediately and lets the caller
+// show its fallback. Returns the drafted seed on the first valid attempt, or null.
+// A route that returns a real seed for genuinely-empty input comes back valid on the
+// first try, so no retry is wasted.
+
+// Only a failure faster than this is worth retrying; a slower one means the backend
+// itself is slow, so another attempt would just double the wait.
+const FAST_FAILURE_MS = 12_000;
+
 export async function fetchSeedWithRetry<T>(
   url: string,
   input: unknown,
@@ -17,6 +24,7 @@ export async function fetchSeedWithRetry<T>(
 ): Promise<T | null> {
   const total = Math.max(1, attempts);
   for (let i = 0; i < total; i++) {
+    const startedAt = Date.now();
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -28,12 +36,14 @@ export async function fetchSeedWithRetry<T>(
         if (data.seed && isValid(data.seed)) return data.seed;
       }
     } catch {
-      // network error — fall through to the backoff and retry
+      // network error — a retry candidate, subject to the speed check below
     }
-    // Back off a little between attempts (400ms, 800ms, …), never after the last.
-    if (i < total - 1) {
-      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
-    }
+    // Give up rather than retry if this attempt was slow (near the timeout) — another
+    // attempt would only stack the wait — or if this was the last attempt.
+    const wasSlow = Date.now() - startedAt > FAST_FAILURE_MS;
+    if (wasSlow || i >= total - 1) break;
+    // Brief backoff before retrying a fast failure (400ms, 800ms, …).
+    await new Promise((r) => setTimeout(r, 400 * (i + 1)));
   }
   return null;
 }
