@@ -1043,6 +1043,10 @@ const homeCss = `
 @media (max-width:880px){
   .rlp-home .sidebar{display:none}
   .rlp-home .main{padding:24px 18px 80px}
+  /* On phones and tablets the help/guidance pill drops below the text rather than
+     sitting alongside it, so the paragraph gets full width. */
+  .rlp-home .info{flex-direction:column;align-items:flex-start}
+  .rlp-home .info .lk{margin-left:0;align-self:flex-start}
   /* On phones the hero goes square-ish: the card spans nearly full width with the
      graphic reduced to hints peeking behind it (positioned in the mobile tab of the
      positioner). The card still sizes to its text, so it grows rather than clips. */
