@@ -96,19 +96,29 @@ export default function UnderstandReveal() {
       .map((k) => k.label)
       .filter((l) => !starred.includes(l));
 
-    // Core values — ordered by the 3.3 ranking where there is one, each carrying
-    // the description the person wrote in their own words (from 3.4).
+    // Core values. The values the person MARKED as most core in 3.2 (triage.core)
+    // are authoritative — those are the ones they explicitly chose. The 3.3
+    // ranking only supplies the ORDER: it's seeded from an AI pass that can omit
+    // or truncate a marked value, so we never let it decide WHICH values appear,
+    // or a value the person marked (e.g. one they'd flagged as core) would vanish
+    // from their profile. We order the marked-core set by the ranking, then append
+    // any marked value the ranking didn't cover. Each carries the description the
+    // person wrote in their own words (from 3.4). Falls back to the ranking, then
+    // 3.4, only when 3.2's core is unavailable (older data).
     const descByValue = new Map(
       (definitions?.values ?? []).map((v) => [v.value, v.description])
     );
-    const orderedLabels =
-      priorities?.ranked?.length
-        ? priorities.ranked
-        : definitions?.values?.length
-          ? definitions.values.map((v) => v.value)
-          : (triage?.core ?? []);
+    const markedCore = (triage?.core ?? []).filter(Boolean);
+    const ranking = (priorities?.ranked ?? []).filter(Boolean);
+    const orderedLabels = markedCore.length
+      ? [
+          ...ranking.filter((label) => markedCore.includes(label)),
+          ...markedCore.filter((label) => !ranking.includes(label)),
+        ]
+      : ranking.length
+        ? ranking
+        : (definitions?.values ?? []).map((v) => v.value).filter(Boolean);
     const coreValues = orderedLabels
-      .filter((label) => !!label)
       .slice(0, 5)
       .map((label) => {
         const meaning = descByValue.get(label);

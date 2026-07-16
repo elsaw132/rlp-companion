@@ -1410,6 +1410,22 @@ export default function SessionContainer({
     if (triage?.type === "value-triage")
       triage.sorted.filter((s) => s.tray === "me").forEach((s) => addValue(s.label));
 
+    // The values the person MARKED as most core in 3.2 — the authoritative set the
+    // 3.3 ranking and 3.4 definitions must weigh/define, never an AI re-inference.
+    // Ordered by the 3.3 ranking where one already exists (so 3.4's cards follow
+    // the order the person landed on), else by their 3.2 selection order. Same
+    // ordering the reveal uses, so the whole values thread stays consistent.
+    const markedCore =
+      triage?.type === "value-triage" ? triage.core.filter(Boolean) : [];
+    const rankedOrder =
+      ranking?.type === "priority-choices" ? ranking.ranked.filter(Boolean) : [];
+    const coreValues = markedCore.length
+      ? [
+          ...rankedOrder.filter((l) => markedCore.includes(l)),
+          ...markedCore.filter((l) => !rankedOrder.includes(l)),
+        ]
+      : [];
+
     const body = JSON.stringify({
       seedType: interaction.type,
       onboardingContext: userData.buildOnboardingContext(),
@@ -1420,6 +1436,7 @@ export default function SessionContainer({
       carryForward: resolveSeedText(sessionId, userData.getActiveFacts()),
       priorBuilds,
       carryValues,
+      coreValues,
       hasPartner: userData.hasPartner(),
       retirementStage: userData.getRetirementStage(),
     });

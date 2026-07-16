@@ -78,15 +78,18 @@ describe("Stage 4 heading and plan name follow the cohort", () => {
     for (const rs of RETIRED) expect(intro(4, rs).heading).toBe("Now let's shape your reset");
   });
 
-  it("the artefact is named as the code names it, per cohort", () => {
+  it("the document is named per cohort, but the Stage 4 label is always Plan", () => {
+    // The Stage 4 LABEL is "Plan" for everyone...
+    for (const rs of [...PRE, ...RETIRED]) {
+      expect(stageNameFor(stage(4), rs)).toBe("Plan");
+    }
+    // ...but the plan DOCUMENT keeps its per-cohort name in the intro copy.
     for (const rs of PRE) {
       expect(intro(4, rs).body[2]).toContain("Retirement Life Plan");
-      expect(stageNameFor(stage(4), rs)).toBe("Plan");
     }
     for (const rs of RETIRED) {
       expect(intro(4, rs).body[2]).toContain("Retirement Reset Plan");
       expect(intro(4, rs).body[2]).not.toContain("Retirement Life Plan");
-      expect(stageNameFor(stage(4), rs)).toBe("Retirement Reset Plan");
     }
   });
 });

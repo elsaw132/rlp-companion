@@ -71,8 +71,8 @@ describe("Review stage — flag ON", () => {
       );
       // ...and 4.1 is gone from Plan for them.
       expect(m.getModule("4.1", stage)).toBeNull();
-      // Plan is renamed (label only).
-      expect(m.stageNameFor(m.STAGES[3], stage)).toBe("Retirement Reset Plan");
+      // Stage 4 is "Plan" for every cohort — no retirement-stage rename.
+      expect(m.stageNameFor(m.STAGES[3], stage)).toBe("Plan");
     }
 
     // Working keeps Imagine + 4.1; no work-life module.
