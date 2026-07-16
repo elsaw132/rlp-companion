@@ -54,28 +54,65 @@ export type BalancedGoalsDraftInput = {
   springboards: { area: string; labels: string[] }[];
 };
 
-// Call the drafting route. Returns the drafted seed, or null on any failure so
-// the caller can fall back. Shared so the surface and an earlier prefetch (run
-// while the person reads the intro) use exactly the same request.
+// Call the drafting route, retrying transient failures before giving up. A single
+// slow response, a timeout, an overloaded model, or a garbage draft used to strand
+// the person on the generic fallback with no recovery; now the route SIGNALS those
+// (a null seed / non-ok) and we retry a few times with backoff. Returns the drafted
+// seed, or null only after every attempt fails — the caller then shows the generic
+// set. A genuinely-empty profile is NOT a failure: the route returns the fallback
+// seed directly (suggestions present), so it comes back on the first try without a
+// wasted retry. Shared so the surface and the intro prefetch behave identically.
 export async function fetchBalancedGoalsDraft(
-  input: BalancedGoalsDraftInput
+  input: BalancedGoalsDraftInput,
+  opts: { attempts?: number } = {}
 ): Promise<BalancedGoalsSeed | null> {
-  try {
-    const res = await fetch("/api/balanced-goals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { seed: BalancedGoalsSeed | null };
-    return data.seed && data.seed.suggestions.length > 0 ? data.seed : null;
-  } catch {
-    return null;
+  const attempts = Math.max(1, opts.attempts ?? 3);
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch("/api/balanced-goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { seed: BalancedGoalsSeed | null };
+        if (data.seed && data.seed.suggestions.length > 0) return data.seed;
+      }
+    } catch {
+      // network error — fall through to the backoff and retry
+    }
+    // Back off a little between attempts (400ms, 800ms, …), never after the last.
+    if (i < attempts - 1) {
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
   }
+  return null;
 }
 
 // The five valid area ids, as a lookup so off-area model output is dropped.
 const VALID_AREAS = new Set<string>(BALANCED_AREAS);
+
+// The model is told to use the five exact ids, but occasionally labels an area with
+// a close synonym ("grow"/"learn" for think, "health" for move, "people" for
+// connect). Map those back rather than silently dropping a perfectly good goal —
+// otherwise a stray label can thin the board or, if enough are mislabelled, collapse
+// it to the generic fallback. Canonical ids map to themselves.
+const AREA_SYNONYMS: Record<string, BalancedAreaId> = {
+  restore: "restore", rest: "restore", recharge: "restore", recovery: "restore", relax: "restore", downtime: "restore",
+  move: "move", body: "move", active: "move", movement: "move", fitness: "move", health: "move", exercise: "move",
+  think: "think", grow: "think", growth: "think", learn: "think", learning: "think", mind: "think", create: "think", creativity: "think", make: "think", making: "think",
+  connect: "connect", connection: "connect", people: "connect", relationships: "connect", relationship: "connect", social: "connect", family: "connect",
+  contribute: "contribute", contribution: "contribute", give: "contribute", giving: "contribute", purpose: "contribute", help: "contribute", helping: "contribute", community: "contribute",
+};
+
+// Normalise a model-written area to one of the five canonical ids, or "" if it's
+// unrecognisable.
+function normalizeArea(raw: unknown): BalancedAreaId | "" {
+  const key = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (!key) return "";
+  if (VALID_AREAS.has(key)) return key as BalancedAreaId;
+  return AREA_SYNONYMS[key] ?? "";
+}
 
 // ---- Fallback (generic, never empty) ----
 // Only used when the model call fails entirely or there's nothing to draw on.
@@ -214,8 +251,8 @@ export function coerceBalancedGoals(raw: unknown): BalancedGoalsSeed {
   for (const item of arr) {
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
-    const area = typeof o.area === "string" ? o.area.trim().toLowerCase() : "";
-    if (!VALID_AREAS.has(area)) continue;
+    const area = normalizeArea(o.area);
+    if (!area) continue;
 
     const original = coerceVariant(o.original);
     if (!original) continue;
@@ -224,7 +261,7 @@ export function coerceBalancedGoals(raw: unknown): BalancedGoalsSeed {
     const quieter = coerceVariant(o.quieter);
 
     out.push({
-      area: area as BalancedAreaId,
+      area,
       why,
       original,
       ...(bolder ? { bolder } : {}),

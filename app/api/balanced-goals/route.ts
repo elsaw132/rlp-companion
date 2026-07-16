@@ -133,7 +133,16 @@ export async function POST(request: Request) {
     const end = text.lastIndexOf("}");
     const slice = start !== -1 && end !== -1 ? text.slice(start, end + 1) : text;
 
-    return Response.json({ seed: coerceBalancedGoals(JSON.parse(slice)) });
+    const coerced = coerceBalancedGoals(JSON.parse(slice));
+    // A coerced result that fell back to the generic set means the model returned
+    // nothing usable (garbage or all off-area). That's a transient failure, not a
+    // real draft — signal it with a null seed so the client retries rather than
+    // caching the generic list. (Genuinely-empty input is handled above, before the
+    // model call, and still returns the fallback directly.)
+    if (coerced === FALLBACK_BALANCED_GOALS) {
+      return Response.json({ seed: null });
+    }
+    return Response.json({ seed: coerced });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       console.error(
@@ -142,6 +151,8 @@ export async function POST(request: Request) {
     } else {
       console.error("[balanced-goals] Unexpected error:", error);
     }
-    return Response.json({ seed: FALLBACK_BALANCED_GOALS });
+    // A processing failure (model error after retries, or unparseable output) is
+    // recoverable — signal it so the client retries instead of settling on generic.
+    return Response.json({ seed: null });
   }
 }
