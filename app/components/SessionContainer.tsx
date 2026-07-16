@@ -27,6 +27,7 @@ import ScreeningCheck, {
 } from "./ScreeningCheck";
 import ScreeningCommitment from "./ScreeningCommitment";
 import LetterFlow from "./LetterFlow";
+import StageIntro, { type StageIntroData } from "./StageIntro";
 import {
   PrimerAudio,
   PrimerImage,
@@ -526,6 +527,11 @@ type SessionContainerProps = {
   // "mirror back, then confirm" wrap-up. For short, practical modules where
   // restating the answers adds nothing. Threaded to /api/chat at closing time.
   closeInOneStep?: boolean;
+  // The stage's framing intro, shown once before the reading when this is the
+  // first session of the stage (stages 2+). Null when it isn't the first session,
+  // the stage has no intro, or it's Stage 1 (whose intro lands on /home straight
+  // after onboarding instead). Built and tailored per cohort on the server.
+  stageIntro?: StageIntroData | null;
 };
 
 const COACH_ERROR_REPLY =
@@ -572,6 +578,7 @@ export default function SessionContainer({
   letterWritingPlaceholder,
   closingCommitment,
   closeInOneStep = false,
+  stageIntro = null,
 }: SessionContainerProps) {
   const { user } = useUser();
   const userData = useUserData();
@@ -670,6 +677,11 @@ export default function SessionContainer({
   // Vita's closing line for the first-year journey, shown above the completion
   // block once the person settles their year (it has its own editing chat).
   const [firstYearAck, setFirstYearAck] = useState<string | null>(null);
+  // Whether to show this stage's framing intro over the session before anything
+  // else. Set once on hydration when this is the first session of a stage (2+)
+  // whose intro the person hasn't met yet; cleared when they continue past it,
+  // which also records the intro as seen so it never returns.
+  const [showStageIntro, setShowStageIntro] = useState(false);
 
   // Load any saved conversation and built day from the snapshot as soon as the
   // user is signed in and the data layer has finished loading. We read during
@@ -688,6 +700,13 @@ export default function SessionContainer({
       setCompleted(true);
       // Already finished before — don't re-prompt the commitment step on revisit.
       setCommitmentDone(true);
+    }
+
+    // First forward entry into a stage (2+) shows its intro before the reading,
+    // then records it as seen so it shows only once. stageIntro is non-null only
+    // on the stage's first session, so the seen check is all that's left to make.
+    if (stageIntro && !userData.getStageIntrosSeen().includes(stageNumber)) {
+      setShowStageIntro(true);
     }
 
     const savedBuild = userData.getBuild(sessionId);
@@ -1751,6 +1770,21 @@ export default function SessionContainer({
       <div style={styles.container}>
         <p style={styles.loadingLine}>Loading…</p>
       </div>
+    );
+  }
+
+  // The stage's framing intro takes over the whole screen before the reading,
+  // once, on the first session of the stage. Continuing records it as seen (so it
+  // never returns) and drops into the reading exactly as if it had opened there.
+  if (showStageIntro && stageIntro) {
+    return (
+      <StageIntro
+        stage={stageIntro}
+        onContinue={() => {
+          if (user) void userData.markStageIntroSeen(stageNumber);
+          setShowStageIntro(false);
+        }}
+      />
     );
   }
 
