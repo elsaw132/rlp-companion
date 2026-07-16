@@ -14,8 +14,11 @@ import {
   windDownDecided,
   retiredLetter,
   isRetired,
+  STAGES,
+  stageNameFor,
   type BuildResult,
 } from "@/lib/modules";
+import type { StageIntroData } from "@/app/components/StageIntro";
 import { getUserData } from "@/lib/db";
 import { ageFromDob } from "@/lib/planDate";
 import { tailorCopy } from "@/lib/retirementCopy";
@@ -225,6 +228,29 @@ export default async function SessionPage({
         ? "See your Retirement Life Plan →"
         : `See your ${stageName} reveal →`;
 
+  // A stage's framing intro now opens its first session, in place of the old
+  // full-screen takeover on /home (Stage 1 is the exception — its intro still
+  // lands on the dashboard straight after onboarding). So build the tailored
+  // intro only when this IS the first session of a stage numbered 2 or above;
+  // SessionContainer then shows it once, before the reading, and records it as
+  // seen. Copy is tailored per cohort the same way the dashboard tailors it —
+  // heading and body through tailorCopy, the eyebrow name through stageNameFor
+  // (both no-ops with the flag off / stage unset).
+  const isFirstModuleOfStage = stageModuleIds[0] === mod.id;
+  const introStage = STAGES.find((s) => s.number === stageNumber);
+  const stageIntro: StageIntroData | null =
+    isFirstModuleOfStage && stageNumber >= 2 && introStage?.intro
+      ? {
+          number: stageNumber,
+          name: stageNameFor(introStage, effectiveRs),
+          intro: {
+            ...introStage.intro,
+            heading: tailorCopy(introStage.intro.heading, effectiveRs),
+            body: introStage.intro.body.map((p) => tailorCopy(p, effectiveRs)),
+          },
+        }
+      : null;
+
   return (
     <main style={{ minHeight: "100dvh", background: "var(--bg-alt)" }}>
       {/* Desktop back/reset row. Hidden on mobile (≤880px), where the unified
@@ -255,6 +281,7 @@ export default async function SessionPage({
         letterWritingPlaceholder={letterWritingPlaceholder}
         closingCommitment={closingCommitment}
         closeInOneStep={mod.closeInOneStep ?? false}
+        stageIntro={stageIntro}
       />
     </main>
   );
