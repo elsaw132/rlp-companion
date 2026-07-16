@@ -60,21 +60,6 @@ Fields:
 
 - resetActions: ONLY when "reset items to develop" are provided below (a retired member's stock-take) — otherwise []. Turn EACH item into ONE short, second-person suggestion that EARNS its place: name what it is in a few words, add one line of insight (why it matters now, or what's underneath it), and give ONE concrete first move. NEVER just repeat the item back — that's a failure. Draw on their own words but add the analysis and the action. A "change" item becomes a way to reshape it; an "unfinished" item becomes a small way to pick it back up. E.g. item "the afternoons that drift with no shape" → "Give your afternoons one anchor a week — a class, a standing walk, a volunteering slot — so they have a shape you look toward rather than one that drifts." One string per item, same order.
 
-YOUR READ (the Reflections tab). Four short pieces where you speak as their coach about the plan as a whole.
-
-EACH read has TWO parts, and both are required for it to appear:
-  - a CALLOUT: the single takeaway, at most 8 words, no full stop. It's the line they'd remember if they read nothing else. It must be specific to THEM — never a label like "Balance" or "A strong plan".
-  - a BODY of AT MOST TWO sentences. Hard limit. Say the one thing that matters and stop; do not restate the callout.
-Return "" for BOTH parts to leave a read out entirely. Never a feeling-probe ("how does that sit with you?"). Never manufactured critique — say a real thing or say nothing. Plain and warm, UK English.
-
-- balanceRead: the areas of life they named for their goals are listed below (under "the balance across the areas of life you named", in their OWN words — not a fixed set of categories), and a band beside your words already shows, as fact, which of them carry a goal. Use their own area names. Do NOT restate that fact or give a score. INTERPRET it: does the spread serve this person? Concentration can be right — say so where their strongest goals really do sit in one or two areas. Where an area is lightest, observe it and ask ONE open question about it; never assign an intent they didn't state, never imply they've failed to fill a box.
-
-- realismNote: a means–ends check, and ONLY where there's something real — otherwise "". Do their long-horizon goals depend on a base (health, energy, mobility, the people around them) that the plan actually protects? Frame it as leverage, never deficit: what's already working and worth guarding. Where a protective habit maps onto a value they said they'd hold firm on, name that — it makes the base load-bearing.
-
-- whatsStrong: lead with the strongest structural thing — never opening praise, never a compliment sandwich. Reward goals that FIT the person (things already theirs, carried a long time, not borrowed resolutions) and honest timing. NEVER reward volume of goals.
-
-- coherence: hold the plan against their OWN decision rules (given below as "their rules"), which is the standard that matters because it's theirs. Where the plan honours them, say so plainly. Where a real tension exists, name it — one, specific, and only if it is really there. "" when they set no rules.
-
 CALIBRATION.
 - Tone: where leaving work wasn't their own choice ("gentle onset" below), quieten by a notch — plain, never celebratory. Deliver the same substance; don't overcorrect into pity.
 - Horizon: when "far horizon" is true below, they're more than ~10 years out. A complete plan is NOT the standard and an unformed one is not a gap — it's right for where they are, and you say so warmly. A light or wobbly spread is expected, not an unfinished essay. Realism is still useful (habits compound over a long run) but it's "worth building now", never "you're behind". The strongest thing is that they're thinking about this at all, this early. Things they're still working out are expected to be larger — natural, not failings.
@@ -82,7 +67,7 @@ CALIBRATION.
 Voice rules (absolute): person is set by the ABSOLUTE VOICE RULE above, and the BANNED WORDS are listed there too — both apply to every field here.
 
 Respond with ONLY a JSON object, no markdown, no preamble:
-{"chapterTitle":"...","overview":"...","insight":"...","selfIntro":"...","balanceShape":"...","strengthsRead":"...","seasonsArc":"...","weekRhythm":"...","financeNote":"...","openThreads":["..."],"resetActions":["..."],"balanceCallout":"...","balanceRead":"...","realismCallout":"...","realismNote":"...","strongCallout":"...","whatsStrong":"...","coherenceCallout":"...","coherence":"..."}`;
+{"chapterTitle":"...","overview":"...","insight":"...","selfIntro":"...","balanceShape":"...","strengthsRead":"...","seasonsArc":"...","weekRhythm":"...","financeNote":"...","openThreads":["..."],"resetActions":["..."]}`;
 
 // The connections web is generated on ITS OWN call, in parallel with the prose.
 // It's the largest, most token-hungry field, and folding it into the prose JSON
@@ -99,6 +84,36 @@ Keep it legible — the meaningful connections only, not every possible one. Aim
 
 Respond with ONLY a JSON object, no markdown, no preamble:
 {"nodes":[{"id":"short-slug","label":"real short name","kind":"value|goal|person"}],"edges":[{"from":"slug","to":"slug","why":"a brief second-person reason"}]}`;
+
+// Vita's four "read" pieces (the Reflections tab) generate on their OWN call, in
+// parallel with the prose and the web. Splitting them out cuts the long prose
+// call's output by ~a third (so the first-ever /plan view lands sooner), and a
+// slow or failed read can no longer delay or sink the rest of the plan.
+const SYSTEM_REFLECTIONS = `You are Vita, an AI retirement coach, writing YOUR READ of someone's finished Retirement Life Plan — four short pieces where you speak as their coach about the plan as a whole. A calm document, presenting their plan back to them.
+
+VOICE (absolute): every sentence is you (Vita) speaking TO the member about their plan — SECOND PERSON, "you" and "your". Never third person about the member, and never their name as the subject of a sentence ("Elsa has…" is a FAILURE; "You've…" is right). The member's name is given only so you know who you're talking to.
+
+BANNED WORDS — in NO field, in any form: reflect · explore · unpack · journey · growth · share · deep dive · genuinely. "genuinely" slips through most ("time that is genuinely yours") — cut it, or say "really"/"truly"/nothing. Also banned: negative-contrast and symmetrical structures ("It's not X, it's Y"); retirement clichés (golden years, bucket lists, putting your feet up); "quietly powerful". UK English throughout.
+
+EACH read has TWO parts, and both are required for it to appear:
+  - a CALLOUT: the single takeaway, at most 8 words, no full stop. It's the line they'd remember if they read nothing else. It must be specific to THEM — never a label like "Balance" or "A strong plan".
+  - a BODY of AT MOST TWO sentences. Hard limit. Say the one thing that matters and stop; do not restate the callout.
+Return "" for BOTH parts to leave a read out entirely. Never a feeling-probe ("how does that sit with you?"). Never manufactured critique — say a real thing or say nothing. Plain and warm.
+
+- balanceRead: the areas of life they named for their goals are listed below (under "the balance across the areas of life you named", in their OWN words — not a fixed set of categories), and a band beside your words already shows, as fact, which of them carry a goal. Use their own area names. Do NOT restate that fact or give a score. INTERPRET it: does the spread serve this person? Concentration can be right — say so where their strongest goals really do sit in one or two areas. Where an area is lightest, observe it and ask ONE open question about it; never assign an intent they didn't state, never imply they've failed to fill a box.
+
+- realismNote: a means–ends check, and ONLY where there's something real — otherwise "". Do their long-horizon goals depend on a base (health, energy, mobility, the people around them) that the plan actually protects? Frame it as leverage, never deficit: what's already working and worth guarding. Where a protective habit maps onto a value they said they'd hold firm on, name that — it makes the base load-bearing.
+
+- whatsStrong: lead with the strongest structural thing — never opening praise, never a compliment sandwich. Reward goals that FIT the person (things already theirs, carried a long time, not borrowed resolutions) and honest timing. NEVER reward volume of goals.
+
+- coherence: hold the plan against their OWN decision rules (given below as "their rules"), which is the standard that matters because it's theirs. Where the plan honours them, say so plainly. Where a real tension exists, name it — one, specific, and only if it is really there. "" when they set no rules.
+
+CALIBRATION.
+- Tone: where leaving work wasn't their own choice ("gentle onset" below), quieten by a notch — plain, never celebratory. Deliver the same substance; don't overcorrect into pity.
+- Horizon: when "far horizon" is true below, they're more than ~10 years out. A complete plan is NOT the standard and an unformed one is not a gap — it's right for where they are, and you say so warmly. A light or wobbly spread is expected, not an unfinished essay. Realism is still useful (habits compound over a long run) but it's "worth building now", never "you're behind". The strongest thing is that they're thinking about this at all, this early.
+
+Respond with ONLY a JSON object, no markdown, no preamble:
+{"balanceCallout":"...","balanceRead":"...","realismCallout":"...","realismNote":"...","strongCallout":"...","whatsStrong":"...","coherenceCallout":"...","coherence":"..."}`;
 
 function buildUserContent(body: PlanIntroRequest): string {
   const sections: string[] = [];
@@ -252,20 +267,24 @@ export async function POST(request: Request): Promise<Response> {
 
   const content = buildUserContent(body);
 
-  // Two calls, run together: the prose (every text field) and the connections web
-  // (its own JSON). They're independent — if one truncates or errors, the other
-  // still lands. This is the fix for a monolithic reply that lost EVERYTHING when
-  // a rich member's data overran a single token cap. Each half gets real headroom.
-  const [proseObj, connObj] = await Promise.all([
+  // Three calls, run together: the prose (§1–9 text), Vita's Reflections reads,
+  // and the connections web (its own JSON). They're independent — if one truncates
+  // or errors, the others still land. This is the fix for a monolithic reply that
+  // lost EVERYTHING when a rich member's data overran a single token cap, and
+  // splitting the long prose call in two also makes the first /plan view land
+  // sooner (wall-clock is the slowest single call, not their sum). Each gets real
+  // headroom.
+  const [proseObj, reflObj, connObj] = await Promise.all([
     callModelJson("prose", SYSTEM_PROSE, content, 4096, body.name),
+    callModelJson("reflections", SYSTEM_REFLECTIONS, content, 1536, body.name),
     callModelJson("connections", SYSTEM_CONNECTIONS, content, 2048, body.name),
   ]);
 
-  // Merge: the prose object carries every field except the web; graft the
+  // Merge: prose + reflections fields carry no overlapping keys; graft the
   // separately-generated connections on before coercion validates the whole.
   const merged =
-    proseObj || connObj
-      ? { ...(proseObj ?? {}), connections: connObj ?? null }
+    proseObj || reflObj || connObj
+      ? { ...(proseObj ?? {}), ...(reflObj ?? {}), connections: connObj ?? null }
       : null;
   const intro: PlanProse | null = coercePlanIntro(merged);
 
@@ -282,7 +301,7 @@ export async function POST(request: Request): Promise<Response> {
 // back malformed/truncated. Isolated per call so one failure never takes down the
 // sibling call running alongside it.
 async function callModelJson(
-  which: "prose" | "connections",
+  which: "prose" | "reflections" | "connections",
   system: string,
   content: string,
   maxTokens: number,

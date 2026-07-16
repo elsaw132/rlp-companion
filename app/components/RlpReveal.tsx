@@ -39,6 +39,11 @@ export default function RlpReveal() {
   const [intro, setIntro] = useState<PlanIntro | null>(null);
   const [images, setImages] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
+  // True while Vita's prose is still being written (first-ever open). Lets the
+  // prose-only tabs (Connections, Reflections) show a "still writing" note
+  // instead of rendering blank, which reads as broken. Flips false the moment the
+  // generation resolves — instantly on a cache hit, so a warm plan never shows it.
+  const [generating, setGenerating] = useState(false);
 
   if (userData.loading) {
     return (
@@ -131,7 +136,10 @@ export default function RlpReveal() {
     // A cohort fixture always generates: its cache is stubbed out above, and
     // force also clears the module-level in-flight job so switching cohorts can't
     // reuse the previous one's generation.
-    void ensurePlanIntro(plan, source, io, regen || !!cohort);
+    setGenerating(true);
+    void ensurePlanIntro(plan, source, io, regen || !!cohort).finally(() =>
+      setGenerating(false)
+    );
     void ensurePlanImages(plan, io);
   }
 
@@ -179,6 +187,7 @@ export default function RlpReveal() {
       plan={shownPlan}
       seeded={seeded}
       images={images}
+      generating={generating && !intro}
       savedSelfIntro={userData.getPlanSelfIntro()}
       onSaveSelfIntro={(text) => userData.savePlanSelfIntro(text)}
     />

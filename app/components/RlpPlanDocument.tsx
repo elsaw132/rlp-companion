@@ -734,12 +734,16 @@ export default function RlpPlanDocument({
   plan,
   seeded,
   images = {},
+  generating = false,
   savedSelfIntro,
   onSaveSelfIntro,
 }: {
   plan: RlpPlan;
   seeded: boolean;
   images?: Record<string, string>;
+  // True while Vita's prose is still being written on a first-ever open — the
+  // prose-only tabs show a "still writing" note rather than rendering blank.
+  generating?: boolean;
   savedSelfIntro?: string | null;
   onSaveSelfIntro?: (text: string) => void;
 }) {
@@ -1130,6 +1134,14 @@ export default function RlpPlanDocument({
           <ConnectionsWeb graph={connections} printing={unfolded} />
         </section>
       )}
+      {/* While Vita is still writing on a first-ever open, the web isn't ready —
+          say so, rather than showing an empty tab that reads as broken. */}
+      {(unfolded || tab === "connections") && !connections && generating && (
+        <section className="rlp-section">
+          <SectionHead eyebrow="The web of it" title="See how it all connects" />
+          <p className="rlp-writing">Vita is drawing the connections across your plan&hellip; this takes a moment on your first visit.</p>
+        </section>
+      )}
 
       {/* ---- TAB 5 · The transition / The year ahead ---- */}
       {/* §9 — the year ahead (Tab 5). The retired cohorts aren't arriving at
@@ -1276,6 +1288,12 @@ export default function RlpPlanDocument({
           </div>
         </div>
 
+        {/* First-ever open: the reads are still being written. Show the balance
+            band (it's ready) and say the rest is coming, not a blank tab. */}
+        {generating && !reflections.balanceRead && (
+          <p className="rlp-writing">Vita is writing her read of your plan&hellip; this takes a moment on your first visit.</p>
+        )}
+
         <div className="rlp-read">
           <h3>Balance</h3>
           <BalanceBand areas={balance.areas} />
@@ -1382,6 +1400,7 @@ const css = `
 .rlp-section + .rlp-section{border-top:1px solid var(--border);padding-top:30px}
 .rlp-eyebrow{font-size:var(--fs-eyebrow);letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);font-weight:600;margin:0 0 6px}
 .rlp-lede{font-size:var(--fs-body);color:var(--text-muted);max-width:60ch;margin:0 0 22px}
+.rlp-writing{font-family:var(--font-serif);font-style:italic;font-size:var(--fs-body);color:var(--text-muted);margin:6px 0 0}
 .rlp-helper{margin:0 0 18px}
 
 .rlp-sec-head{margin:0 0 22px}
