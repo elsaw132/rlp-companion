@@ -51,6 +51,7 @@ import type { SeasonsCardsSeed } from "@/lib/seasonsCardsSeed";
 import type { FirstYearSeed } from "@/lib/firstYearSeed";
 import type { PlanIntro } from "@/lib/planIntro";
 import { stripStructuredLeak } from "@/lib/coachText";
+import { coreValuesFromFacts } from "@/lib/resolverInputs";
 
 // ---- Shapes shared across the app ----
 
@@ -1181,11 +1182,40 @@ export function useUserData() {
 
   // ---- Stage 3 confirmed values (the stage-close summary, feeds Stage 4) ----
   const getStage3Values = (): Stage3ValuesSummary | null => {
-    const v = snapshot[KEYS.stage3Values];
-    if (v && typeof v === "object" && Array.isArray((v as Stage3ValuesSummary).values)) {
-      return v as Stage3ValuesSummary;
+    const stored = snapshot[KEYS.stage3Values];
+    const storedSummary =
+      stored &&
+      typeof stored === "object" &&
+      Array.isArray((stored as Stage3ValuesSummary).values)
+        ? (stored as Stage3ValuesSummary)
+        : null;
+
+    // Prefer the CANONICAL value facts — the person's marked core-five, ordered by
+    // their ranking, in their verbatim words — over the stored `stage3-values`
+    // summary, which is an AI re-distillation that can drop marked-core values (e.g.
+    // Family) in favour of AI-picked ones (e.g. Reliability). Only take this path when
+    // they actually marked core values (coreFive flags present); otherwise the stored
+    // summary is all we have.
+    const raw = snapshot[CONTEXT_FACTS_SNAPSHOT_KEY];
+    const facts = Array.isArray(raw) ? (raw as StoredFact[]) : [];
+    const active = facts.filter((f) => f.status === "active");
+    const hasCore = active.some(
+      (f) => f.category === "value" && f.data.coreFive === true
+    );
+    if (hasCore) {
+      const core = coreValuesFromFacts(active);
+      if (core.length) {
+        return {
+          values: core.map((v) => ({
+            value: v.value,
+            meaning: v.meaning ?? "",
+            confidence: v.confidence ?? "certain",
+          })),
+          savedAt: storedSummary?.savedAt ?? "",
+        };
+      }
     }
-    return null;
+    return storedSummary;
   };
 
   const saveStage3Values = (summary: Stage3ValuesSummary) =>
