@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, stageSubtitleFor, isRetired, titleFor, PILOT_CALLOUT } from "@/lib/modules";
+import { STAGES, TOTAL_STAGES, visibleModules, stageNameFor, stageSubtitleFor, isRetired, titleFor } from "@/lib/modules";
 import {
   WINDING_STAGE1_INTRO_BODY,
   REVIEW_STAGE1_INTRO_HEADING,
@@ -21,6 +21,7 @@ import { getActiveStageNumber } from "@/lib/progress";
 import { useUserData } from "@/lib/userData";
 import { tailorCopy } from "@/lib/retirementCopy";
 import StageIntro from "./StageIntro";
+import ActPilotPopup from "./ActPilotPopup";
 import OpeningCapture from "./OpeningCapture";
 import VitaMark from "./VitaMark";
 import { stageColorFor, stageForegroundFor, stageWashFor, stageHeroGroundFor, stageHeroGraphicFor, STAGE_KEYS } from "@/lib/stageColors";
@@ -90,6 +91,9 @@ export default function HomeDashboard() {
   // It's a stage-opening step, not a module — shown once, after the Imagine
   // intro and before module 1.1, while 1.1 isn't done yet. Set once on load.
   const [showOpeningCapture, setShowOpeningCapture] = useState(false);
+  // Set true when the person dismisses the Act pilot popup this visit, so it
+  // hides at once (the persisted "seen" flag also stops it returning next time).
+  const [actPopupDismissed, setActPopupDismissed] = useState(false);
 
   // Sync the mobile app bar's "Jump to a stage" deep-link (?stage=N) into the
   // viewed stage — reactively, so it also works when we're already on /home (a
@@ -155,20 +159,16 @@ export default function HomeDashboard() {
     // instead (see the session page + SessionContainer), so "Take me home" after
     // a reveal calmly lands on the dashboard rather than the next stage's intro.
     const showStage1Intro = currentStage === 1 && !!stage?.intro;
-    // The one later exception: while Act (stage 5) has no sessions to open, the
-    // pilot callout stands in for its intro here — there's no first session to
-    // carry it. It keeps its own seen flag, so meeting the callout doesn't use up
-    // Act's real intro, which will open Act's first session the day they ship.
-    const actIsEmpty =
-      currentStage === 5 &&
-      !!stage &&
-      visibleModules(stage, retirementStage).length === 0;
-    const introSeen = actIsEmpty
-      ? userData.hasSeenPilotCallout()
-      : userData.getStageIntrosSeen().includes(currentStage);
-    if ((showStage1Intro || actIsEmpty) && !skipIntro && !introSeen) {
+    const introSeen = userData.getStageIntrosSeen().includes(currentStage);
+    if (showStage1Intro && !skipIntro && !introSeen) {
       setIntroStage(currentStage);
     }
+    // Act (stage 5) has no sessions to open, so its intro can't ride a first
+    // session like the others. While it's empty, the pilot callout stands in for
+    // it — shown as a popup once the person is looking at Act (see showActPopup
+    // below), rather than as a full-screen takeover. It keeps its own seen flag,
+    // so meeting the callout doesn't use up Act's real intro, which will open
+    // Act's first session the day they ship.
     // The Stage 1 opening capture comes right after that intro and before module
     // 1.day. Shown once (its own seen flag), and only while 1.day isn't complete,
     // so anyone already into Stage 1 isn't interrupted by it.
@@ -192,7 +192,10 @@ export default function HomeDashboard() {
   // records it as seen so it never shows again, then reveals the dashboard.
   if (introStage !== null) {
     const stage = STAGES.find((s) => s.number === introStage);
-    if (stage) {
+    // Only Stage 1's intro takes over the screen here now (straight after
+    // onboarding); every later stage's intro opens its first session instead, and
+    // Act's stand-in shows as a popup. So this only needs the Stage 1 tailoring.
+    if (stage?.intro) {
       // Stage 1 gets a present-progressive rewrite for winding-down (Phase 3):
       // they've already started the shift, so the "before you can plan" opening
       // reads wrong. Everyone else's Stage 1 intro is unchanged. Other stages
@@ -206,47 +209,25 @@ export default function HomeDashboard() {
       // and the eyebrow name swapped to "Review" (via stageNameFor). Phase 4.
       const reviewStage1 =
         RETIREMENT_PATHS && isRetired(retirementStage) && stage.number === 1;
-      // Act with nothing in it: the pilot callout replaces its intro entirely,
-      // and its button goes back to the plan rather than on into a stage that
-      // has nothing to open. Keyed off Act's actual sessions, so it stops
-      // standing in of its own accord once they exist.
-      const actIsEmpty =
-        stage.number === 5 &&
-        visibleModules(stage, retirementStage).length === 0;
-      const introStageObj = actIsEmpty
-        ? { ...stage, name: stageNameFor(stage, retirementStage), intro: PILOT_CALLOUT }
-        : stage.intro
-          ? {
-              ...stage,
-              name: stageNameFor(stage, retirementStage),
-              intro: {
-                ...stage.intro,
-                // The heading is tailored too, not just the body: Stage 4's asks
-                // the retired cohorts to shape a reset rather than make a plan.
-                // No rule matches the other stages' headings, so they pass
-                // through untouched.
-                heading: reviewStage1
-                  ? REVIEW_STAGE1_INTRO_HEADING
-                  : tailorCopy(stage.intro.heading, retirementStage),
-                body: reviewStage1
-                  ? REVIEW_STAGE1_INTRO_BODY
-                  : windingStage1
-                    ? WINDING_STAGE1_INTRO_BODY
-                    : stage.intro.body.map((p) => tailorCopy(p, retirementStage)),
-              },
-            }
-          : stage;
+      const introStageObj = {
+        ...stage,
+        name: stageNameFor(stage, retirementStage),
+        intro: {
+          ...stage.intro,
+          heading: reviewStage1
+            ? REVIEW_STAGE1_INTRO_HEADING
+            : tailorCopy(stage.intro.heading, retirementStage),
+          body: reviewStage1
+            ? REVIEW_STAGE1_INTRO_BODY
+            : windingStage1
+              ? WINDING_STAGE1_INTRO_BODY
+              : stage.intro.body.map((p) => tailorCopy(p, retirementStage)),
+        },
+      };
       return (
         <StageIntro
           stage={introStageObj}
           onContinue={() => {
-            if (actIsEmpty) {
-              // "Back to my plan" — record the callout against its own flag, so
-              // Act's real intro is still waiting when Act's sessions land.
-              if (user) void userData.markPilotCalloutSeen();
-              router.push("/plan");
-              return;
-            }
             if (user) void userData.markStageIntroSeen(introStage);
             setIntroStage(null);
           }}
@@ -329,6 +310,14 @@ export default function HomeDashboard() {
   const stageModules = visibleModules(viewedStageData, retirementStage);
   const doneInStage = stageModules.filter((m) => completed.includes(m.id)).length;
   const totalInStage = stageModules.length;
+  // The Act (stage 5) pilot stand-in: shown as a popup once the person is looking
+  // at Act while it has no sessions to open, and only until they've met it once
+  // (its own seen flag). Replaces the old full-screen home takeover for Act.
+  const showActPopup =
+    viewedStageNumber === 5 &&
+    totalInStage === 0 &&
+    !actPopupDismissed &&
+    !userData.hasSeenPilotCallout();
   // Coming-soon placeholders live on the stage but outside the real programme
   // (see moduleVisibleFor). Shown on the dashboard only, and only to people the
   // module is for (e.g. partner-gated modules need a partner).
@@ -412,6 +401,19 @@ export default function HomeDashboard() {
       }
     >
       <style>{homeCss}</style>
+
+      {showActPopup && (
+        <ActPilotPopup
+          onBackToPlan={() => {
+            if (user) void userData.markPilotCalloutSeen();
+            router.push("/plan");
+          }}
+          onClose={() => {
+            if (user) void userData.markPilotCalloutSeen();
+            setActPopupDismissed(true);
+          }}
+        />
+      )}
 
       <div className="shell">
         {/* SIDEBAR */}
