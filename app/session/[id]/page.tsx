@@ -179,7 +179,20 @@ export default async function SessionPage({
             ? { ...block, value: tailorCopy(block.value, retirementStage) }
             : block
         );
-  const interaction = windDown ? windDown.interaction : mod.interaction;
+  // The interaction bypasses tailorCopy in general, but the first-year (4.7) exercise
+  // labels carry the "first year" framing, so reframe those to "your next year" for the
+  // winding-down + retired cohorts (tailorCopy is a no-op for working / flag-off).
+  const rawInteraction = windDown ? windDown.interaction : mod.interaction;
+  const interaction =
+    !windDown && rawInteraction && rawInteraction.type === "first-year"
+      ? {
+          ...rawInteraction,
+          draftingLabel: tailorCopy(rawInteraction.draftingLabel, retirementStage),
+          introMessage: tailorCopy(rawInteraction.introMessage, retirementStage),
+          closingAck: tailorCopy(rawInteraction.closingAck, retirementStage),
+          summaryLabel: tailorCopy(rawInteraction.summaryLabel, retirementStage),
+        }
+      : rawInteraction;
   const sessionInstructions = isSenses
     ? sensesSessionInstructions(horizon, age)
     : retiredLtr

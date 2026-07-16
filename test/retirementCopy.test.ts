@@ -19,6 +19,12 @@ function copyCorpus(): string {
       for (const block of mod.primer) {
         if (block.type === "text") parts.push(block.value);
       }
+      // The first-year (4.7) exercise labels are tailored in the session page too,
+      // so a rule may target them — include them in the corpus.
+      const it = mod.interaction;
+      if (it && it.type === "first-year") {
+        parts.push(it.draftingLabel, it.introMessage, it.closingAck, it.summaryLabel);
+      }
     }
   }
   return parts.join("\n\n");

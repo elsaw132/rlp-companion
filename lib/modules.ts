@@ -1014,6 +1014,15 @@ export function titleFor(mod: Module, rs: RetirementStage | null): string {
     if (mod.id === "1.roles") return "The roles you play";
     if (mod.id === "1.day") return "A day in your retirement now";
   }
+  // "Your first year" reframes to "Your next year" for anyone winding down or already
+  // retired — for them the year ahead is not their first year of retirement.
+  if (
+    RETIREMENT_PATHS &&
+    (isRetired(rs) || isWindingDown(rs)) &&
+    mod.id === "4.7"
+  ) {
+    return "Your next year";
+  }
   return mod.title;
 }
 

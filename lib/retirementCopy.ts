@@ -241,6 +241,49 @@ export const RULES: Rule[] = [
       "Here's the balance of your week as it is now. Which of these did you feel most strongly about — and is there anything you'd like to shift?"
     ),
   },
+
+  // ---- 4.7 "Your first year" → "Your next year" (winding-down + retired) ----------
+  // For anyone winding down or already retired, the year they're shaping is not their
+  // FIRST year of retirement — so the title (titleFor), the primer, the description,
+  // the coach opening, the session instructions and the exercise labels all reframe to
+  // "your next year". The same wording fits all three non-working cohorts.
+  {
+    find: "your first year of retirement",
+    variants: v("your next year", "your next year"),
+  },
+  {
+    find: "Here's your first year, laid out as one journey",
+    variants: v(
+      "Here's your next year, laid out as one journey",
+      "Here's your next year, laid out as one journey"
+    ),
+  },
+  {
+    find: "laying your first year out as a journey",
+    variants: v(
+      "laying your next year out as a journey",
+      "laying your next year out as a journey"
+    ),
+  },
+  {
+    find: "This is your first year — the shape of it, the story of it.",
+    variants: v(
+      "This is your next year — the shape of it, the story of it.",
+      "This is your next year — the shape of it, the story of it."
+    ),
+  },
+  {
+    find: "the year you're stepping into.",
+    variants: v("the year ahead.", "the year ahead."),
+  },
+  {
+    find: "sequenced first year",
+    variants: v("sequenced next year", "sequenced next year"),
+  },
+  {
+    find: "Your first year",
+    variants: v("Your next year", "Your next year"),
+  },
 ];
 
 // Rewrite one string for a person's retirement stage. A no-op — returns the input
