@@ -234,13 +234,43 @@ export function coreValuesFromFacts(facts: StoredFact[]): ValueEntry[] {
   const flagged = valueFacts.filter((f) => f.data.coreFive === true);
   const chosen = flagged.length ? flagged : valueFacts;
 
-  const entries: ValueEntry[] = chosen.map((f) => {
-    const value = (f.data.label ?? "").trim();
-    const meaning = typeof f.data.description === "string" ? f.data.description.trim() : "";
-    const threat = typeof f.data.threat === "string" ? f.data.threat.trim() : "";
-    const protectors = Array.isArray(f.data.protectors)
+  // The person's own words for a value often live on a DIFFERENT value fact than the
+  // one marked core: 3.2 can mark a value core with no description, while 3.4 carries
+  // the meaning, threat and protectors for that same value. Build a per-label fallback
+  // across ALL value facts so a marked-core value never loses the person's own words.
+  const descOf = (f: StoredFact) =>
+    typeof f.data.description === "string" ? f.data.description.trim() : "";
+  const threatOf = (f: StoredFact) =>
+    typeof f.data.threat === "string" ? f.data.threat.trim() : "";
+  const protectorsOf = (f: StoredFact) =>
+    Array.isArray(f.data.protectors)
       ? (f.data.protectors as unknown[]).map((p) => String(p).trim()).filter(Boolean)
       : [];
+
+  const byLabel = new Map<
+    string,
+    { meaning?: string; threat?: string; protectors?: string[] }
+  >();
+  for (const f of valueFacts) {
+    const key = (f.data.label ?? "").trim().toLowerCase();
+    if (!key) continue;
+    const cur = byLabel.get(key) ?? {};
+    const m = descOf(f);
+    const t = threatOf(f);
+    const p = protectorsOf(f);
+    if (m && !cur.meaning) cur.meaning = m;
+    if (t && !cur.threat) cur.threat = t;
+    if (p.length && !cur.protectors) cur.protectors = p;
+    byLabel.set(key, cur);
+  }
+
+  const entries: ValueEntry[] = chosen.map((f) => {
+    const value = (f.data.label ?? "").trim();
+    const sibling = byLabel.get(value.toLowerCase()) ?? {};
+    const meaning = descOf(f) || sibling.meaning || "";
+    const threat = threatOf(f) || sibling.threat || "";
+    const own = protectorsOf(f);
+    const protectors = own.length ? own : sibling.protectors ?? [];
     return {
       value,
       ...(meaning ? { meaning } : {}),
