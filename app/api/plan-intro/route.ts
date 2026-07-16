@@ -11,14 +11,14 @@ import { coercePlanIntro, type PlanProse, type PlanIntroRequest } from "@/lib/pl
 // nothing. Anything malformed returns null so the client keeps its deterministic
 // fallback (the plan never breaks).
 
-export const maxDuration = 50;
+export const maxDuration = 60;
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
   maxRetries: 2,
 });
 
-const SYSTEM_PROMPT = `You are Vita, an AI retirement coach, writing the prose for someone's Retirement Life Plan — a calm document, presenting their plan back to them.
+const SYSTEM_PROSE = `You are Vita, an AI retirement coach, writing the prose for someone's Retirement Life Plan — a calm document, presenting their plan back to them.
 
 ABSOLUTE VOICE RULE. Every sentence you write is spoken by one of two people, and you decide which by asking WHOSE MOUTH IT IS. There is no third option — nothing in this document is ever written ABOUT the member in the third person.
 
@@ -48,7 +48,7 @@ Fields:
 
 - selfIntro: ONE complete, rounded way the member would introduce THEMSELF now the job title is gone — written in their OWN FIRST PERSON ("I'm…"), a whole portrait touching the round of who they are (their people, their passions, what drives them) in two to four sentences. NOT a single slice (not "the grandchildren one" or "the travel one"); the whole person. Specific, in their own material.
 
-- balanceShape: ONE sentence naming the shape across the five areas (Restore, Move, Think, Connect, Contribute) — where your life is fullest, where it's lightest, noting an area you left deliberately quiet as a choice. Use the area names; don't list goals.
+- balanceShape: ONE sentence naming the shape across the areas of life they named for their goals (given below under "the balance across the areas of life you named", in their OWN words — e.g. "Travel & adventure", "Our home", "Cooking") — where their life is fullest, where it's lightest, noting any area they left deliberately quiet as a choice. Use their own area names exactly as given; there is NO fixed set of categories to map onto; don't list goals.
 
 - seasonsArc: ONE sentence framing how your retirement evolves across the seasons, grounded strictly in where you actually placed things (e.g. the early years fullest while energy is highest; how things settle later). If a later season is sparse, frame it as deliberate openness. Invent no evolution the placements don't show. It opens a tab above the seasons themselves, so it must be a single tight line — never a paragraph.
 
@@ -60,8 +60,6 @@ Fields:
 
 - resetActions: ONLY when "reset items to develop" are provided below (a retired member's stock-take) — otherwise []. Turn EACH item into ONE short, second-person suggestion that EARNS its place: name what it is in a few words, add one line of insight (why it matters now, or what's underneath it), and give ONE concrete first move. NEVER just repeat the item back — that's a failure. Draw on their own words but add the analysis and the action. A "change" item becomes a way to reshape it; an "unfinished" item becomes a small way to pick it back up. E.g. item "the afternoons that drift with no shape" → "Give your afternoons one anchor a week — a class, a standing walk, a volunteering slot — so they have a shape you look toward rather than one that drifts." One string per item, same order.
 
-- connections: the web of REAL links between your goals, your values and the people who matter — only links you would recognise from what you actually said (e.g. a goal whose note names a person or a value). Return {"nodes":[{"id","label","kind"}],"edges":[{"from","to","why"}]} where kind is "value" | "goal" | "person", ids are short slugs, label is the real short name, and why is a brief second-person reason grounded in your material. Keep it legible — the meaningful connections only, not every possible one (aim for the strongest 6–14 edges). No speculative associations. null if there isn't enough real linkage.
-
 YOUR READ (the Reflections tab). Four short pieces where you speak as their coach about the plan as a whole.
 
 EACH read has TWO parts, and both are required for it to appear:
@@ -69,7 +67,7 @@ EACH read has TWO parts, and both are required for it to appear:
   - a BODY of AT MOST TWO sentences. Hard limit. Say the one thing that matters and stop; do not restate the callout.
 Return "" for BOTH parts to leave a read out entirely. Never a feeling-probe ("how does that sit with you?"). Never manufactured critique — say a real thing or say nothing. Plain and warm, UK English.
 
-- balanceRead: the five areas are Restore, Move, Think, Connect and Contribute, and a band beside your words already shows, as fact, which of them carry a goal. Do NOT restate that fact or give a score. INTERPRET it: does the spread serve this person? Concentration can be right — say so where their strongest goals really do sit in one or two areas. Where an area is lightest, observe it and ask ONE open question about it; never assign an intent they didn't state, never imply they've failed to fill a box.
+- balanceRead: the areas of life they named for their goals are listed below (under "the balance across the areas of life you named", in their OWN words — not a fixed set of categories), and a band beside your words already shows, as fact, which of them carry a goal. Use their own area names. Do NOT restate that fact or give a score. INTERPRET it: does the spread serve this person? Concentration can be right — say so where their strongest goals really do sit in one or two areas. Where an area is lightest, observe it and ask ONE open question about it; never assign an intent they didn't state, never imply they've failed to fill a box.
 
 - realismNote: a means–ends check, and ONLY where there's something real — otherwise "". Do their long-horizon goals depend on a base (health, energy, mobility, the people around them) that the plan actually protects? Frame it as leverage, never deficit: what's already working and worth guarding. Where a protective habit maps onto a value they said they'd hold firm on, name that — it makes the base load-bearing.
 
@@ -84,7 +82,23 @@ CALIBRATION.
 Voice rules (absolute): person is set by the ABSOLUTE VOICE RULE above, and the BANNED WORDS are listed there too — both apply to every field here.
 
 Respond with ONLY a JSON object, no markdown, no preamble:
-{"chapterTitle":"...","overview":"...","insight":"...","selfIntro":"...","balanceShape":"...","strengthsRead":"...","seasonsArc":"...","weekRhythm":"...","financeNote":"...","openThreads":["..."],"resetActions":["..."],"connections":{"nodes":[],"edges":[]},"balanceCallout":"...","balanceRead":"...","realismCallout":"...","realismNote":"...","strongCallout":"...","whatsStrong":"...","coherenceCallout":"...","coherence":"..."}`;
+{"chapterTitle":"...","overview":"...","insight":"...","selfIntro":"...","balanceShape":"...","strengthsRead":"...","seasonsArc":"...","weekRhythm":"...","financeNote":"...","openThreads":["..."],"resetActions":["..."],"balanceCallout":"...","balanceRead":"...","realismCallout":"...","realismNote":"...","strongCallout":"...","whatsStrong":"...","coherenceCallout":"...","coherence":"..."}`;
+
+// The connections web is generated on ITS OWN call, in parallel with the prose.
+// It's the largest, most token-hungry field, and folding it into the prose JSON
+// meant a rich member's reply overran the token cap and the parse died — losing
+// EVERY prose field along with it. Split out, each call has ample headroom and
+// one failing can't take the other down.
+const SYSTEM_CONNECTIONS = `You are Vita, an AI retirement coach, drawing the web of real connections in someone's Retirement Life Plan — the links between their goals, their values and the people who matter to them.
+
+Return ONLY the links you would recognise from what they actually said — a goal whose note names a person or a value, a value that clearly drives a goal, a person a goal is built around. NEVER a speculative or generic association (do not link two goals just because both are "outdoors", or a value to a goal on a hunch). If the material doesn't show a real link, leave it out.
+
+Each "why" is a brief line addressed to the member in the SECOND PERSON ("you"/"your"), grounded in their own material — never third person, never their name as the subject. BANNED WORDS in the why lines: reflect, explore, unpack, journey, growth, share, deep dive, genuinely.
+
+Keep it legible — the meaningful connections only, not every possible one. Aim for the strongest 6–14 edges. Every node you return must have at least one edge (no floating nodes). If there isn't enough real linkage for at least two connected nodes, return {"nodes":[],"edges":[]}.
+
+Respond with ONLY a JSON object, no markdown, no preamble:
+{"nodes":[{"id":"short-slug","label":"real short name","kind":"value|goal|person"}],"edges":[{"from":"slug","to":"slug","why":"a brief second-person reason"}]}`;
 
 function buildUserContent(body: PlanIntroRequest): string {
   const sections: string[] = [];
@@ -153,7 +167,7 @@ function buildUserContent(body: PlanIntroRequest): string {
           : `${a.goalCount} goal${a.goalCount > 1 ? "s" : ""}${a.focusGoals.length ? ` (spotlit: ${a.focusGoals.join("; ")})` : ""}`;
       return `- ${a.label}: ${fullness}`;
     });
-    sections.push(`The balance across the five areas:\n${lines.join("\n")}`);
+    sections.push(`The balance across the areas of life you named (your own words, not a fixed set):\n${lines.join("\n")}`);
   }
 
   if (body.focusGoals?.length) {
@@ -236,54 +250,73 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ intro: null });
   }
 
+  const content = buildUserContent(body);
+
+  // Two calls, run together: the prose (every text field) and the connections web
+  // (its own JSON). They're independent — if one truncates or errors, the other
+  // still lands. This is the fix for a monolithic reply that lost EVERYTHING when
+  // a rich member's data overran a single token cap. Each half gets real headroom.
+  const [proseObj, connObj] = await Promise.all([
+    callModelJson("prose", SYSTEM_PROSE, content, 4096, body.name),
+    callModelJson("connections", SYSTEM_CONNECTIONS, content, 2048, body.name),
+  ]);
+
+  // Merge: the prose object carries every field except the web; graft the
+  // separately-generated connections on before coercion validates the whole.
+  const merged =
+    proseObj || connObj
+      ? { ...(proseObj ?? {}), connections: connObj ?? null }
+      : null;
+  const intro: PlanProse | null = coercePlanIntro(merged);
+
+  // REVIEW/EVAL: the earned insight is the highest-trust, highest-risk line —
+  // log it so it can be checked against the member's actual material.
+  if (intro?.insight) {
+    console.log(`[plan-intro] REVIEW insight${body.name ? ` (${body.name})` : ""}: ${intro.insight}`);
+  }
+  if (intro) logVoiceBreaches(intro, body.name);
+  return Response.json({ intro });
+}
+
+// One model call returning a parsed JSON object, or null if it errored or came
+// back malformed/truncated. Isolated per call so one failure never takes down the
+// sibling call running alongside it.
+async function callModelJson(
+  which: "prose" | "connections",
+  system: string,
+  content: string,
+  maxTokens: number,
+  name?: string | null
+): Promise<Record<string, unknown> | null> {
   try {
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      // Sized for the whole JSON reply, which now carries 15 prose fields plus the
-      // connections graph. At 2200 the reply was being cut mid-object and the
-      // parse died ("Expected ',' or '}'"), losing every field including the ones
-      // that had generated fine — so this needs headroom, not a tight fit.
-      max_tokens: 3600,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildUserContent(body) }],
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content }],
     });
-
     const text = response.content
       .filter((b) => b.type === "text")
       .map((b) => b.text)
       .join("")
       .trim();
-
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
     const slice = start !== -1 && end !== -1 ? text.slice(start, end + 1) : text;
-
-    // A truncated reply throws here and loses the whole intro, including the
-    // fields that generated perfectly well — so say so loudly rather than
-    // failing silently into the deterministic fallback.
-    let parsed: unknown;
     try {
-      parsed = JSON.parse(slice);
+      return JSON.parse(slice) as Record<string, unknown>;
     } catch (e) {
       console.error(
-        `[plan-intro] reply was not valid JSON (${slice.length} chars) — likely truncated by max_tokens. Every field is lost. ${e}`
+        `[plan-intro] ${which} reply was not valid JSON (${slice.length} chars) — likely truncated by max_tokens${name ? ` (${name})` : ""}. ${e}`
       );
-      throw e;
+      return null;
     }
-    const intro: PlanProse | null = coercePlanIntro(parsed);
-    // REVIEW/EVAL: the earned insight is the highest-trust, highest-risk line —
-    // log it so it can be checked against the member's actual material.
-    if (intro?.insight) {
-      console.log(`[plan-intro] REVIEW insight${body.name ? ` (${body.name})` : ""}: ${intro.insight}`);
-    }
-    if (intro) logVoiceBreaches(intro, body.name);
-    return Response.json({ intro });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
-      console.error(`[plan-intro] Anthropic API error — status=${error.status} message=${error.message}`);
+      console.error(`[plan-intro] ${which} Anthropic API error — status=${error.status} message=${error.message}`);
     } else {
-      console.error("[plan-intro] Unexpected error:", error);
+      console.error(`[plan-intro] ${which} unexpected error:`, error);
     }
-    return Response.json({ intro: null });
+    return null;
   }
 }

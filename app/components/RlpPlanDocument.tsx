@@ -69,6 +69,23 @@ function BalanceBand({ areas }: { areas: PlanBalance["areas"] }) {
   );
 }
 
+// A "Worth picking up" action reads as "<the thing> — <insight, and a first
+// move>". Bold the short opening clause so each card leads with what it's about,
+// instead of running on as one block of prose. Only when the lead really is a
+// short label (a full opening sentence isn't one) — otherwise render it plain.
+function renderWorthItem(a: string) {
+  const dash = a.indexOf(" — ");
+  if (dash > 0 && dash <= 44) {
+    return (
+      <>
+        <strong className="rlp-worth-lead">{a.slice(0, dash)}</strong>
+        {a.slice(dash)}
+      </>
+    );
+  }
+  return a;
+}
+
 // ---- area theme: the five balanced areas mapped onto the existing palette ----
 const AREA_THEME: Record<BalancedAreaId, { base: string; sel: string; fg: string }> = {
   restore: { base: "var(--area-vitality-base)", sel: "var(--area-vitality-sel)", fg: "var(--area-vitality-fg)" },
@@ -1085,9 +1102,9 @@ export default function RlpPlanDocument({
           <div className="rlp-candidates">
             <h3 className="rlp-reset-head">Worth picking up</h3>
             <p className="rlp-reset-sub">A few ways to act on what you&rsquo;d reshape — small, concrete first moves.</p>
-            <ul className="rlp-reset-list">
+            <ul className="rlp-worth-list">
               {resetActions.map((a, i) => (
-                <li key={i}>{a}</li>
+                <li key={i}>{renderWorthItem(a)}</li>
               ))}
             </ul>
           </div>
@@ -1550,6 +1567,9 @@ const css = `
 .rlp-reset-sub{font-family:var(--font-sans);font-size:var(--fs-sm);color:var(--text-muted);margin:0 0 10px}
 .rlp-reset-list{margin:0;padding:0 0 0 18px;font-size:var(--fs-body);color:var(--text);line-height:var(--lh-body)}
 .rlp-reset-list li{margin:0 0 6px}
+.rlp-worth-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.rlp-worth-list li{margin:0;padding:14px 16px;background:var(--warm-surface);border-radius:var(--r-md);font-size:var(--fs-body);color:var(--text);line-height:var(--lh-body)}
+.rlp-worth-lead{font-weight:600;color:var(--ink)}
 .rlp-candidates{border-top:1px solid var(--border);padding-top:16px}
 .rlp-candidate-tag{color:var(--text-muted);font-size:var(--fs-sm)}
 @media (max-width:620px){.rlp-reset{grid-template-columns:1fr}}
