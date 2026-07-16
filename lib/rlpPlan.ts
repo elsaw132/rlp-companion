@@ -622,10 +622,11 @@ function buildSeasons(board: SeasonsBoardResult | null): PlanSeasons {
   for (const p of board?.placements ?? []) {
     const item = { label: p.label, category: p.category };
     const inOrdered = p.seasons.filter((s) => rank.has(s));
-    const spansAll = orderLabels.length > 0 && inOrdered.length === orderLabels.length;
-    const isEnduring = p.seasons.includes(enduringLabel) || spansAll;
 
-    if (isEnduring) {
+    // A card placed in the "Throughout" lane runs across every season — it goes in the
+    // enduring lane, once. (The board keeps the lane and the year-seasons mutually
+    // exclusive, so a card is in one or the other.)
+    if (p.seasons.includes(enduringLabel)) {
       const key = p.label.trim().toLowerCase();
       if (!enduringSeen.has(key)) {
         enduringSeen.add(key);
@@ -633,10 +634,10 @@ function buildSeasons(board: SeasonsBoardResult | null): PlanSeasons {
       }
       continue;
     }
-    if (inOrdered.length === 0) continue; // unplaced — leave it out
-    // Primary season: the earliest one it was placed in.
-    const primary = inOrdered.sort((a, b) => (rank.get(a)! - rank.get(b)!))[0];
-    bySeason.get(primary)!.push(item);
+    // Otherwise show it in EVERY year-season the person placed it in — not just the
+    // earliest — so a card placed across Early + Middle + Later appears in each,
+    // exactly as they arranged it on the board.
+    for (const s of inOrdered) bySeason.get(s)!.push(item);
   }
 
   const seasons: PlanSeason[] = cfgSeasons.map((s) => ({

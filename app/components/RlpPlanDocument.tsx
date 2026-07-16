@@ -1447,7 +1447,7 @@ const css = `
 .rlp-chips,.rlp-enduring-chips{display:flex;flex-wrap:wrap;gap:8px}
 /* A pill is one unit: it never shrinks below its text and never wraps mid-label —
    long labels keep the pill whole and move it to the next row. */
-.rlp-chip{font-size:var(--fs-sm);background:var(--muted-surface);color:var(--text);border-radius:var(--r-pill);padding:5px 12px;font-weight:500;display:inline-flex;align-items:center;white-space:nowrap;flex:0 0 auto;max-width:100%}
+.rlp-chip{font-size:var(--fs-sm);background:var(--muted-surface);color:var(--text);border-radius:var(--r-md);padding:6px 12px;font-weight:500;display:inline-flex;align-items:center;white-space:normal;overflow-wrap:anywhere;flex:0 1 auto;max-width:100%}
 .rlp-chip.firm{background:var(--success-surface);color:var(--success-text)}
 .rlp-chip.flex{background:var(--info-surface);color:var(--info-text)}
 .rlp-chip.fixed{background:var(--muted-surface);color:var(--ink);border-left:3px solid var(--accent);font-weight:600}
