@@ -914,11 +914,12 @@ export function isWindingDown(rs: RetirementStage | null): boolean {
   return rs === "winding_down";
 }
 
-// The artefact's name, which is per-cohort: the two retired cohorts are building
-// a Retirement RESET Plan (they're reshaping the retirement they're living), not
-// a Retirement Life Plan. This mirrors stageNameFor's rename of stage 4 — the
-// dashboard has said "Retirement Reset Plan" to retired members for a while, so
-// without this the plan document itself contradicted it.
+// The plan DOCUMENT's name, which is per-cohort: the two retired cohorts are
+// building a Retirement RESET Plan (they're reshaping the retirement they're
+// living), not a Retirement Life Plan. This is the document/artefact only — the
+// Stage 4 label is always "Plan" for everyone (see stageNameFor). The dashboard
+// has said "Retirement Reset Plan" to retired members for a while, so without
+// this the plan document itself would contradict it.
 export function planTitleFor(rs: RetirementStage | null): string {
   return RETIREMENT_PATHS && isRetired(rs)
     ? "Your Retirement Reset Plan"
@@ -976,14 +977,12 @@ export function visibleModules(stage: Stage, rs: RetirementStage | null): Module
   return mods;
 }
 
-// The stage's name for this person. Retired cohorts see Stage 1 as "Review" and
-// Stage 4 as "Retirement Reset Plan" (naming only in Phase 4; the plan surfaces
-// themselves come in Phase 5). Everyone else, and the flag off, keeps the base
-// name.
+// The stage's name for this person. Retired cohorts see Stage 1 as "Review".
+// Stage 4 is always "Plan", whatever stage of retirement someone is in — the
+// plan is the plan. Everyone else, and the flag off, keeps the base name.
 export function stageNameFor(stage: Stage, rs: RetirementStage | null): string {
   if (RETIREMENT_PATHS && isRetired(rs)) {
     if (stage.number === 1) return "Review";
-    if (stage.number === 4) return "Retirement Reset Plan";
   }
   return stage.name;
 }
@@ -2846,7 +2845,8 @@ WATCH FOR
       // about it. Heading, the first paragraph and the last are all rewritten
       // per cohort in retirementCopy.ts — the retired cohorts are shaping a
       // reset of a retirement they're living, not making a plan for one ahead,
-      // and their artefact is the Retirement Reset Plan.
+      // and their document is the Retirement Reset Plan (the Stage 4 label,
+      // though, is always "Plan" — see stageNameFor).
       heading: "Now let's make your plan",
       body: [
         "In Imagine you pictured the retirement you want, in Explore you looked at the elements of a balanced retirement one by one, and in Understand you found what sits beneath it. Now the work changes gear — from understanding what matters to deciding what to do about it: when and how you'll leave work, the goals worth pursuing, and the shape of an ordinary week.",

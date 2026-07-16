@@ -96,9 +96,9 @@ export const RULES: Rule[] = [
   // ---- Stage 4 intro ---------------------------------------------------------
   // Three rewrites: the heading (the retired cohorts are reshaping a retirement
   // they're living, not making a plan for one ahead), the backward reference,
-  // and the artefact's name — Retirement Life Plan for those still working
-  // toward it, Retirement Reset Plan for those already in it. The name mirrors
-  // stageNameFor's Stage 4 rename and the plan document's own title.
+  // and the plan DOCUMENT's name — Retirement Life Plan for those still working
+  // toward it, Retirement Reset Plan for those already in it (see planTitleFor).
+  // Note this is the document name only; the Stage 4 label is always "Plan".
   {
     find: "Now let's make your plan",
     variants: v("Now let's make your plan", "Now let's shape your reset"),

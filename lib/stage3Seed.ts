@@ -452,6 +452,59 @@ export function valueDefinitionsFallback(values: string[]): Stage3Seed {
   };
 }
 
+// Clean a marked-core value list: trim, de-dupe case-insensitively, cap at 5.
+// (The 3.2 "most core" selection is itself capped at coreMax=5; this mirrors it.)
+// Custom free-text values the person added are kept as-is — the marked-core set
+// is authoritative whether or not a label is in the fixed VALUE_SET.
+export function sanitizeCoreValues(values: string[] | undefined): string[] {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of values) {
+    const label = typeof v === "string" ? v.trim() : "";
+    const key = label.toLowerCase();
+    if (!label || seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+// Constrain a 3.3/3.4 seed's value SET to the values the person marked as most
+// core in 3.2 — the authoritative choice. The model still drafts the trade-off
+// pairs (3.3) and the threat/protector candidates (3.4), but WHICH values are
+// weighed and defined is never its call: a value the person marked can't be
+// dropped, and one they didn't mark can't be introduced. For value-definitions
+// the model's drafted description/threat/protectors are kept where they match a
+// core value (case-insensitively) and blanks stand in for any it didn't draft.
+// A no-op when `core` is empty (older data with no recorded core) or for the
+// other seed types.
+export function constrainSeedToCore(
+  seed: Stage3Seed,
+  core: string[]
+): Stage3Seed {
+  if (!core.length) return seed;
+  if (seed.type === "priority-choices") {
+    return { ...seed, values: core };
+  }
+  if (seed.type === "value-definitions") {
+    const drafted = new Map(
+      seed.values.map((v) => [v.value.toLowerCase(), v] as const)
+    );
+    return {
+      type: "value-definitions",
+      values: core.map((label) => {
+        const hit = drafted.get(label.toLowerCase());
+        return hit
+          ? { ...hit, value: label }
+          : { value: label, description: "", threat: "", protectors: [] };
+      }),
+    };
+  }
+  return seed;
+}
+
 // ---- Coercion ----
 // Validate and clean whatever the model returned into the seed shape for this
 // module type, falling back per-field (and ultimately to FALLBACK_SEEDS) so a
