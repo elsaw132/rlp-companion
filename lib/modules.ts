@@ -722,6 +722,9 @@ export type GoalPathsResult = {
     milestones?: { label: string; when?: string; done?: boolean }[];
     alreadyHelps?: string[];
     wouldHelp?: string[];
+    // The person's OWN named strengths that most fit this goal (verbatim from their
+    // Stage-3 strengths list). `lean` kept only for reading older saved results.
+    strengths?: string[];
     lean?: string;
   }[];
   summaryLabel: string;

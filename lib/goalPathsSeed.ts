@@ -27,6 +27,10 @@ export type GoalPath = {
   milestones?: Milestone[];
   alreadyHelps?: string[];
   wouldHelp?: string[];
+  // The person's OWN named strengths (from their Stage-3 strengths list) that most
+  // apply to this goal — surfaced verbatim, never invented. Replaces the old prose
+  // `lean` line; `lean` is kept only for reading back older saved paths.
+  strengths?: string[];
   lean?: string;
 };
 
@@ -51,6 +55,9 @@ export type GoalPathsDraftInput = {
   // the same rail as hasPartner for later phases; nothing branches on it yet.
   retirementStage: RetirementStage | null;
   goals: GoalPathInput[];
+  // The person's named strengths (their Stage-3 strengths list). The model picks the
+  // few that fit each goal, verbatim — it never invents a strength.
+  strengths: string[];
 };
 
 // Pull the spotlighted goals out of the 4.3 result, in the order the person
@@ -148,6 +155,31 @@ function coerceStrings(raw: unknown, cap: number): string[] {
   return out;
 }
 
+// Keep only the strengths the model returned that MATCH one of the person's own
+// named strengths (case-insensitive), in the list's canonical casing — so a path
+// never shows an invented strength. De-duplicated, capped.
+function coerceStrengths(raw: unknown, allowed: string[], cap = 3): string[] {
+  if (!Array.isArray(raw) || !allowed.length) return [];
+  const canon = new Map<string, string>();
+  for (const a of allowed) {
+    const k = a.trim().toLowerCase();
+    if (k && !canon.has(k)) canon.set(k, a.trim());
+  }
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const k = typeof item === "string" ? item.trim().toLowerCase() : "";
+    if (!k || seen.has(k)) continue;
+    const c = canon.get(k);
+    if (c) {
+      seen.add(k);
+      out.push(c);
+    }
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
 // Validate and clean whatever the model returned into the seed shape. Driven by
 // the INPUT goals so there's exactly one path per spotlighted goal, in order,
 // with the track taken authoritatively from 4.3 — the model only supplies the
@@ -155,7 +187,8 @@ function coerceStrings(raw: unknown, cap: number): string[] {
 // goal-specific generic path, so the surface always has one path per goal.
 export function coerceGoalPaths(
   raw: unknown,
-  goals: GoalPathInput[]
+  goals: GoalPathInput[],
+  strengthsList: string[] = []
 ): GoalPathsSeed {
   const fallback = fallbackGoalPaths(goals);
   if (!goals.length) return fallback;
@@ -180,20 +213,20 @@ export function coerceGoalPaths(
     const match = byGoal.get(g.goal.toLowerCase());
     const fb = fallback.paths[i];
 
+    const strengths = match ? coerceStrengths(match.strengths, strengthsList) : [];
+
     if (g.track === "be") {
       const alreadyHelps = match ? coerceStrings(match.alreadyHelps, 4) : [];
       const wouldHelp = match ? coerceStrings(match.wouldHelp, 3) : [];
-      const lean =
-        match && typeof match.lean === "string" ? match.lean.trim() : "";
       if (!alreadyHelps.length && !wouldHelp.length) {
-        return { ...fb, ...(lean ? { lean } : {}) };
+        return { ...fb, ...(strengths.length ? { strengths } : {}) };
       }
       return {
         goal: g.goal,
         track: "be",
         alreadyHelps,
         wouldHelp,
-        ...(lean ? { lean } : {}),
+        ...(strengths.length ? { strengths } : {}),
       };
     }
 
@@ -205,16 +238,14 @@ export function coerceGoalPaths(
         if (milestones.length >= 5) break;
       }
     }
-    const lean =
-      match && typeof match.lean === "string" ? match.lean.trim() : "";
     if (!milestones.length) {
-      return { ...fb, ...(lean ? { lean } : {}) };
+      return { ...fb, ...(strengths.length ? { strengths } : {}) };
     }
     return {
       goal: g.goal,
       track: "do",
       milestones,
-      ...(lean ? { lean } : {}),
+      ...(strengths.length ? { strengths } : {}),
     };
   });
 

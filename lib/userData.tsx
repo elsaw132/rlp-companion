@@ -161,8 +161,9 @@ const KEYS = {
   // fixed five areas, no "be" goals), so v2's caches are left unread and re-drafted.
   goalSeed: (id: string) => `goal-seed-v3:${id}`,
   // The path Vita drafted for each spotlighted goal in the goal-paths module
-  // (4.4), persisted so a refresh never re-drafts it.
-  goalPathSeed: (id: string) => `goal-path-v1:${id}`,
+  // (4.4), persisted so a refresh never re-drafts it. v2: paths now carry the
+  // person's own named strengths (was a prose "lean" line), so v1 caches re-draft.
+  goalPathSeed: (id: string) => `goal-path-v2:${id}`,
   // The trade-off scenarios and candidate decision principles Vita drafted for
   // the trade-offs module (4.5), persisted so a refresh never re-drafts them.
   tradeOffSeed: (id: string) => `trade-off-v1:${id}`,

@@ -20,6 +20,7 @@ type DraftRequest = {
   onboarding: string;
   hasPartner?: boolean;
   goals: GoalPathInput[];
+  strengths?: string[];
 };
 
 export const maxDuration = 60;
@@ -45,13 +46,15 @@ These are planning-level: the route to each goal, with at most a rough sense of 
 
 MAKE IT PERSONAL
 - Build only on what they actually told you — their real activities, people, places and dreams. A path must sound written for THIS person. Never invent facts about their life.
-- Optionally add "lean": ONE strength or resource of theirs the early steps can lean on (e.g. "you've organised trips like this before"). Tie it to something real. Omit it if nothing fits.
+
+STRENGTHS TO LEAN ON — FROM THEIR OWN LIST
+- Add "strengths": TWO or THREE of the person's OWN named strengths that would most help them with THIS goal. You are given their named strengths under "THEIR NAMED STRENGTHS". Choose ONLY from that list, copied VERBATIM (exact wording). Never invent a strength, never paraphrase one, and never write a sentence here — these are short strength names (e.g. "Perseverance", "Creativity", "Leadership"), shown as tags. Pick the ones that genuinely fit the goal; if the list is short, two is fine.
 
 ONE PATH PER GOAL, IN ORDER
 Return exactly one path object per goal you are given, in the SAME ORDER, each carrying the goal's exact label in "goal" and its given track in "track".
 
-JSON shape (a "do" goal carries "milestones"; a "be" goal carries "alreadyHelps" and "wouldHelp"; either may carry "lean"):
-{"paths":[{"goal":"<exact label>","track":"do","milestones":[{"label":"...","when":"...","done":true},{"label":"..."},{"label":"..."},{"label":"..."}],"lean":"..."},{"goal":"<exact label>","track":"be","alreadyHelps":["...","..."],"wouldHelp":["..."],"lean":"..."}]}
+JSON shape (a "do" goal carries "milestones"; a "be" goal carries "alreadyHelps" and "wouldHelp"; every path carries "strengths" — 2–3 of their named strengths, verbatim):
+{"paths":[{"goal":"<exact label>","track":"do","milestones":[{"label":"...","when":"...","done":true},{"label":"..."},{"label":"..."},{"label":"..."}],"strengths":["Perseverance","Creativity"]},{"goal":"<exact label>","track":"be","alreadyHelps":["...","..."],"wouldHelp":["..."],"strengths":["Kindness","Teamwork"]}]}
 
 Voice: warm, specific, plain. Never use these words: reflect, explore, unpack, journey, growth, share, deep dive. Never use the word "genuinely". Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"). Speak directly and in the affirmative.
 
@@ -67,6 +70,9 @@ export async function POST(request: Request) {
   }
 
   const goals = Array.isArray(body.goals) ? body.goals : [];
+  const strengths = Array.isArray(body.strengths)
+    ? body.strengths.filter((s): s is string => typeof s === "string" && s.trim() !== "")
+    : [];
 
   // No goals to draw a path for — return the generic fallback rather than
   // inventing goals from thin air.
@@ -88,10 +94,15 @@ export async function POST(request: Request) {
     })
     .join("\n");
 
+  const strengthsBlock = strengths.length
+    ? `THEIR NAMED STRENGTHS (their own words, from earlier — pick from THESE for each goal's "strengths", verbatim; never invent one):\n${strengths.map((s) => `- ${s}`).join("\n")}`
+    : "";
+
   const context = [
     body.onboarding && body.onboarding.trim() && `ABOUT THEM:\n${body.onboarding.trim()}`,
     body.userModel && body.userModel.trim(),
     `THE GOALS THEY SPOTLIGHTED (draft one path per goal, in this order, honouring each track):\n${goalBlock}`,
+    strengthsBlock,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -119,7 +130,7 @@ export async function POST(request: Request) {
     const end = text.lastIndexOf("}");
     const slice = start !== -1 && end !== -1 ? text.slice(start, end + 1) : text;
 
-    return Response.json({ seed: coerceGoalPaths(JSON.parse(slice), goals) });
+    return Response.json({ seed: coerceGoalPaths(JSON.parse(slice), goals, strengths) });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       console.error(

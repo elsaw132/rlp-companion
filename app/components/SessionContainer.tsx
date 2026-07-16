@@ -814,6 +814,11 @@ export default function SessionContainer({
         hasPartner: userData.hasPartner(),
         retirementStage: userData.getRetirementStage(),
         goals,
+        strengths: resolveSeedItems(
+          sessionId,
+          userData.getActiveFacts(),
+          "strength"
+        ).map((f) => f.label),
       });
       if (draft) void userData.saveGoalPathSeed(sessionId, draft);
     })();
@@ -1867,6 +1872,14 @@ export default function SessionContainer({
       ? resolveSeedText(sessionId, userData.getActiveFacts())
       : "";
 
+  // The person's named strengths — the "strengths to lean on" tags on each path (4.4).
+  const goalPathStrengths =
+    interaction?.type === "goal-paths"
+      ? resolveSeedItems(sessionId, userData.getActiveFacts(), "strength").map(
+          (f) => f.label
+        )
+      : [];
+
   return (
     <div style={styles.container}>
       <style>{focusCss + primerMediaCss}</style>
@@ -2027,6 +2040,7 @@ export default function SessionContainer({
           hasPartner={userData.hasPartner()}
           sessionId={sessionId}
           userModelText={planUserModelText}
+          goalPathStrengths={goalPathStrengths}
           onboardingContext={userData.buildOnboardingContext()}
         />
       )}
@@ -2045,6 +2059,7 @@ export default function SessionContainer({
           hasPartner={userData.hasPartner()}
           sessionId={sessionId}
           userModelText={planUserModelText}
+          goalPathStrengths={goalPathStrengths}
           onboardingContext={userData.buildOnboardingContext()}
         />
       )}
@@ -2465,6 +2480,7 @@ function InteractionStep({
   sessionId = "",
   userModelText = "",
   onboardingContext = "",
+  goalPathStrengths = [],
 }: {
   interaction: Interaction;
   // The seeded candidate content for Stage 3 surfaces; null for every other type.
@@ -2487,6 +2503,8 @@ function InteractionStep({
   // The rendered user model + onboarding line — input for the 4.3 goal draft.
   userModelText?: string;
   onboardingContext?: string;
+  // The person's named strengths — the "strengths to lean on" tags in 4.4.
+  goalPathStrengths?: string[];
 }) {
   switch (interaction.type) {
     case "day-builder":
@@ -2652,6 +2670,7 @@ function InteractionStep({
           userModelText={userModelText}
           onboardingContext={onboardingContext}
           hasPartner={hasPartner}
+          strengths={goalPathStrengths}
           onFinish={onFinish}
           mode={mode}
           initial={initial?.type === "goal-paths" ? initial : undefined}

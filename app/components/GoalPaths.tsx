@@ -34,7 +34,8 @@ type Path = {
   stones: Stone[];
   alreadyHelps: Support[];
   wouldHelp: Support[];
-  lean: string;
+  // The person's own named strengths that most fit this goal — shown as tags.
+  strengths: string[];
 };
 
 // The coach-facing summary — each path with the route already walked called out,
@@ -46,10 +47,11 @@ export function goalPathsSummaryText(result: GoalPathsResult): string {
     if (p.track === "be") {
       const helps = (p.alreadyHelps ?? []).join(", ");
       const would = (p.wouldHelp ?? []).join(", ");
+      const strengths = (p.strengths ?? []).join(", ");
       const bits = [
         helps && `already helps: ${helps}`,
         would && `would help it take root: ${would}`,
-        p.lean && `a strength to lean on: ${p.lean}`,
+        strengths && `strengths to lean on: ${strengths}`,
       ]
         .filter(Boolean)
         .join("; ");
@@ -61,8 +63,10 @@ export function goalPathsSummaryText(result: GoalPathsResult): string {
     const stoneText = stones
       .map((m) => `${m.done ? "✓ " : ""}${m.label}${m.when ? ` (${m.when})` : ""}`)
       .join(" → ");
-    const lean = p.lean ? `; a strength to lean on: ${p.lean}` : "";
-    return `${p.goal} (a thing to do — ${done.length} of ${stones.length} stepping stones already behind them, ${remaining.length} to go: ${stoneText}${lean})`;
+    const strengths = (p.strengths ?? []).length
+      ? `; strengths to lean on: ${(p.strengths ?? []).join(", ")}`
+      : "";
+    return `${p.goal} (a thing to do — ${done.length} of ${stones.length} stepping stones already behind them, ${remaining.length} to go: ${stoneText}${strengths})`;
   });
   return `${label}. ${lines.join(" ")}`;
 }
@@ -86,7 +90,7 @@ function pathsFromSeed(paths: GoalPath[]): Path[] {
       id: `p${i}-w${j}`,
       label: s,
     })),
-    lean: p.lean ?? "",
+    strengths: p.strengths ?? [],
   }));
 }
 
@@ -98,6 +102,9 @@ type GoalPathsProps = {
   userModelText: string;
   onboardingContext: string;
   hasPartner: boolean;
+  // The person's named strengths (from their Stage-3 list), for the "strengths to
+  // lean on" tags on each path.
+  strengths: string[];
   onFinish: (result: GoalPathsResult) => void;
 } & EditableProps<GoalPathsResult>;
 
@@ -107,6 +114,7 @@ export default function GoalPaths({
   userModelText,
   onboardingContext,
   hasPartner,
+  strengths,
   onFinish,
   mode = "create",
   initial,
@@ -124,7 +132,6 @@ export default function GoalPaths({
     alreadyHelpsLabel,
     wouldHelpLabel,
     addSupportPlaceholder,
-    leanLabel,
     boundaryHint,
     summaryLabel,
   } = interaction;
@@ -171,6 +178,7 @@ export default function GoalPaths({
           hasPartner,
           retirementStage: userData.getRetirementStage(),
           goals: goalInputs,
+          strengths,
         }));
       if (cancelled) return;
       if (draft && !cached) void userData.saveGoalPathSeed(sessionId, draft);
@@ -188,9 +196,6 @@ export default function GoalPaths({
   const nextIdRef = useRef(0);
   const makeId = (kind: string) => `${kind}-added-${nextIdRef.current++}`;
 
-  function patchPath(id: string, patch: Partial<Path>) {
-    setPaths((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-  }
 
   // ---- stone editing (do-goals) ----
   function updateStone(pid: string, sid: string, patch: Partial<Stone>) {
@@ -291,7 +296,7 @@ export default function GoalPaths({
     return {
       type: "goal-paths",
       paths: paths.map((p) => {
-        const lean = p.lean.trim();
+        const strengths = p.strengths.map((s) => s.trim()).filter(Boolean);
         if (p.track === "be") {
           const alreadyHelps = p.alreadyHelps
             .map((s) => s.label.trim())
@@ -304,7 +309,7 @@ export default function GoalPaths({
             track: "be" as const,
             ...(alreadyHelps.length ? { alreadyHelps } : {}),
             ...(wouldHelp.length ? { wouldHelp } : {}),
-            ...(lean ? { lean } : {}),
+            ...(strengths.length ? { strengths } : {}),
           };
         }
         const milestones = p.stones
@@ -318,7 +323,7 @@ export default function GoalPaths({
           goal: p.goal,
           track: "do" as const,
           ...(milestones.length ? { milestones } : {}),
-          ...(lean ? { lean } : {}),
+          ...(strengths.length ? { strengths } : {}),
         };
       }),
       summaryLabel,
@@ -361,7 +366,6 @@ export default function GoalPaths({
             alreadyHelpsLabel={alreadyHelpsLabel}
             wouldHelpLabel={wouldHelpLabel}
             addSupportPlaceholder={addSupportPlaceholder}
-            leanLabel={leanLabel}
             onUpdateStone={updateStone}
             onMoveStone={moveStone}
             onRemoveStone={removeStone}
@@ -369,7 +373,6 @@ export default function GoalPaths({
             onUpdateSupport={updateSupport}
             onRemoveSupport={removeSupport}
             onAddSupport={addSupport}
-            onLean={(v) => patchPath(path.id, { lean: v })}
           />
         ))}
         </div>
@@ -399,7 +402,6 @@ function PathCard({
   alreadyHelpsLabel,
   wouldHelpLabel,
   addSupportPlaceholder,
-  leanLabel,
   onUpdateStone,
   onMoveStone,
   onRemoveStone,
@@ -407,7 +409,6 @@ function PathCard({
   onUpdateSupport,
   onRemoveSupport,
   onAddSupport,
-  onLean,
 }: {
   path: Path;
   ladderLabel: string;
@@ -419,7 +420,6 @@ function PathCard({
   alreadyHelpsLabel: string;
   wouldHelpLabel: string;
   addSupportPlaceholder: string;
-  leanLabel: string;
   onUpdateStone: (pid: string, sid: string, patch: Partial<Stone>) => void;
   onMoveStone: (pid: string, index: number, dir: -1 | 1) => void;
   onRemoveStone: (pid: string, sid: string) => void;
@@ -436,7 +436,6 @@ function PathCard({
     sid: string
   ) => void;
   onAddSupport: (pid: string, field: "alreadyHelps" | "wouldHelp") => void;
-  onLean: (v: string) => void;
 }) {
   const doneCount = path.stones.filter((s) => s.done && s.label.trim()).length;
   const total = path.stones.filter((s) => s.label.trim()).length;
@@ -512,18 +511,18 @@ function PathCard({
         </div>
       )}
 
-      <div style={styles.leanField}>
-        <label style={styles.subLabel}>{leanLabel}</label>
-        <AutoTextarea
-          className="path-input"
-          style={styles.fieldInput}
-          minRows={1}
-          value={path.lean}
-          ariaLabel={leanLabel}
-          placeholder="A strength or resource you can lean on…"
-          onChange={onLean}
-        />
-      </div>
+      {path.strengths.length > 0 && (
+        <div style={styles.strengthsField}>
+          <span style={styles.subLabel}>Strengths to lean on</span>
+          <div style={styles.strengthChips}>
+            {path.strengths.map((s) => (
+              <span key={s} style={styles.strengthChip}>
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1046,12 +1045,27 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "var(--r-sm)",
     boxSizing: "border-box",
   },
-  leanField: {
+  strengthsField: {
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
+    gap: "8px",
     paddingTop: "14px",
     borderTop: "1px solid var(--border)",
+  },
+  strengthChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+  },
+  strengthChip: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    color: "var(--brand-primary)",
+    background: "var(--brand-primary-tint)",
+    border: "1px solid var(--brand-primary)",
+    borderRadius: "var(--r-pill)",
+    padding: "5px 12px",
   },
   subLabel: {
     fontFamily: "var(--font-sans)",
@@ -1142,8 +1156,10 @@ export function GoalPathsSummary({ result }: { result: GoalPathsResult }) {
               </div>
             )}
 
-            {p.lean && (
-              <p style={summaryStyles.lean}>A strength to lean on: {p.lean}</p>
+            {(p.strengths ?? []).length > 0 && (
+              <p style={summaryStyles.lean}>
+                Strengths to lean on: {(p.strengths ?? []).join(", ")}
+              </p>
             )}
           </div>
         ))}
