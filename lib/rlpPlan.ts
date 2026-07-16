@@ -202,6 +202,64 @@ export type PlanLeavingWork = {
   financeNote: string;
 };
 
+// Capitalise the first letter of a fact-sourced line. The person's verbatim words are
+// often stored lower-case (they were captured mid-sentence), so raw fact labels read as
+// "the trips with Harry" — this makes them a proper sentence for the plan.
+function capFirst(s: string): string {
+  const t = s.trim();
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+}
+
+// Words that don't distinguish one decision principle from another, for near-duplicate
+// detection.
+const PRINCIPLE_STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "but", "i", "you", "your", "my", "me", "to", "of", "in",
+  "on", "for", "with", "at", "that", "this", "it", "is", "are", "be", "as", "if", "when",
+  "what", "which", "one", "them", "they", "their", "so", "than", "not", "dont", "cant",
+  "ive", "id", "more", "first", "else", "around", "come", "before", "do", "doing", "can",
+  "have", "has", "get", "got",
+]);
+function principleTokens(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !PRINCIPLE_STOPWORDS.has(w));
+}
+function principleBigrams(tokens: string[]): Set<string> {
+  const out = new Set<string>();
+  for (let i = 0; i < tokens.length - 1; i++) out.add(`${tokens[i]} ${tokens[i + 1]}`);
+  return out;
+}
+
+// Clean the decision principles for display: capitalise each, drop exact repeats, and
+// drop a principle that restates an earlier one — the draft sometimes carries both a
+// first-person version and a second-person paraphrase of the same rule. Two principles
+// are "the same" when they share a distinctive two-word phrase (e.g. "closing window",
+// "fewer things") or overlap heavily in content words. The first occurrence wins (the
+// person's own wording tends to lead).
+export function dedupePrinciples(list: string[]): string[] {
+  const kept: { text: string; words: Set<string>; bigrams: Set<string> }[] = [];
+  for (const raw of list) {
+    const text = capFirst(raw);
+    if (!text) continue;
+    const tokens = principleTokens(text);
+    const words = new Set(tokens);
+    const bigrams = principleBigrams(tokens);
+    const isDup = kept.some((k) => {
+      if (k.text.toLowerCase() === text.toLowerCase()) return true;
+      for (const b of bigrams) if (k.bigrams.has(b)) return true;
+      const shorter = Math.min(k.words.size, words.size);
+      if (shorter === 0) return false;
+      let shared = 0;
+      for (const w of words) if (k.words.has(w)) shared++;
+      return shared / shorter >= 0.6;
+    });
+    if (!isDup) kept.push({ text, words, bigrams });
+  }
+  return kept.map((k) => k.text);
+}
+
 // §8, retired cohorts (Phase 5): the reset — carrying forward / reshaping /
 // letting go, from the retired letter's keep_change_leave. Replaces the
 // future-exit "leaving work" section, which reads wrong for someone already out.
@@ -782,7 +840,7 @@ export function buildRlpPlan(
     flexible: (tradeOffs?.values ?? [])
       .filter((v) => v.bucket === "flexible")
       .map((v) => v.value),
-    principles: tradeOffs?.principles ?? [],
+    principles: dedupePrinciples(tradeOffs?.principles ?? []),
     scenarios: (tradeOffs?.scenarios ?? []).map((s) => ({
       title: s.title,
       situation: s.situation,
@@ -816,7 +874,12 @@ export function buildRlpPlan(
     // §8 becomes the reset (keep / change / leave); no future-exit section.
     const kcl = keepChangeLeaveFromFacts(facts);
     if (kcl.keep.length || kcl.change.length || kcl.leaveBehind.length) {
-      reset = kcl;
+      // Capitalise the verbatim items so the reset lists read as proper sentences.
+      reset = {
+        keep: kcl.keep.map(capFirst),
+        change: kcl.change.map(capFirst),
+        leaveBehind: kcl.leaveBehind.map(capFirst),
+      };
     }
     anchors = kcl.keep;
     candidateGoals = [

@@ -104,10 +104,11 @@ describe("Reset plan — flag ON, per cohort", () => {
       makeSource("recently_retired", RETIRED_FACTS, { "4.1": readiness }),
       OPTS
     );
+    // The reset lists are capitalised for display (the raw facts are captured lower-case).
     expect(rr.reset).toEqual({
-      keep: ["my slow mornings"],
-      change: ["how I spend afternoons"],
-      leaveBehind: ["too much TV"],
+      keep: ["My slow mornings"],
+      change: ["How I spend afternoons"],
+      leaveBehind: ["Too much TV"],
     });
     expect(rr.leavingWork).toBeNull(); // the reset replaces the future-exit §8
     expect(rr.orientation.toLowerCase()).toContain("settling in");
