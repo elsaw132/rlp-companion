@@ -536,3 +536,33 @@ export async function getAllModuleFeedback(): Promise<ModuleFeedbackRow[]> {
     createdAt: toIso(r.created_at) ?? new Date().toISOString(),
   }));
 }
+
+// --- Per-user hard deletes ------------------------------------------------
+// Row-level erasure helpers, one per table. Each is scoped to a single user_id
+// and removes rows outright (no soft-delete / status flip): the correction loop
+// keeps rejected/superseded facts around, but erasure must leave nothing behind.
+// deleteAllUserData (above) covers the user_data table, including the base64 RLP
+// plan images, which live in the plan-images key there — there is no separate
+// image table.
+
+// Every context fact for a user, regardless of status (active, superseded,
+// rejected). Used by the "start over" reset and by full erasure.
+export async function deleteAllContextFacts(userId: string): Promise<void> {
+  await ensureContextFactsTable();
+  await sql()`DELETE FROM context_facts WHERE user_id = ${userId}`;
+}
+
+// Every general-feedback / support row for a user. Free-text bodies can name or
+// describe the person, so full erasure deletes them outright rather than
+// scrubbing user_id. Not touched by "start over" (a restart keeps feedback).
+export async function deleteAllFeedback(userId: string): Promise<void> {
+  await ensureFeedbackTable();
+  await sql()`DELETE FROM feedback WHERE user_id = ${userId}`;
+}
+
+// Every per-module feedback row for a user. Same reasoning as deleteAllFeedback
+// (the optional comment is free text). Not touched by "start over".
+export async function deleteAllModuleFeedback(userId: string): Promise<void> {
+  await ensureModuleFeedbackTable();
+  await sql()`DELETE FROM module_feedback WHERE user_id = ${userId}`;
+}
