@@ -4,6 +4,7 @@ import {
   setUserData,
   deleteUserData,
   deleteAllUserData,
+  deleteAllContextFacts,
 } from "@/lib/db";
 import {
   ensureBackfill,
@@ -62,7 +63,13 @@ export async function DELETE(request: Request) {
   };
 
   if (body.all === true) {
-    await deleteAllUserData(userId);
+    // "Start over" — a full restart. Clear the key/value store AND the derived
+    // context-facts profile together, so the reset matches its copy ("This
+    // clears all your answers and conversations"). Without the second delete the
+    // inferred profile (values, dreams, dob) would survive a reset and then be
+    // reconciled against the user's fresh picks. Feedback rows are deliberately
+    // left in place: this is a restart, not account erasure.
+    await Promise.all([deleteAllUserData(userId), deleteAllContextFacts(userId)]);
   } else if (typeof body.key === "string" && body.key.length > 0) {
     await deleteUserData(userId, body.key);
   } else {
