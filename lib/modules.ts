@@ -3041,16 +3041,16 @@ Reflect back the broad shape of the chapters they've sketched, in their own word
         id: "4.3",
         title: "Your most important goals",
         description:
-          "The handful of goals whose absence would leave retirement feeling incomplete — ranked, with what each one means to you.",
+          "A few bold goals worth stretching for, drawn from what matters most to you.",
         durationMin: 20,
         primer: [
           {
             type: "text",
-            value: `You may have more ideas for your retirement than you'll ever have time for, which is a great problem to have! This conversation isn't about squeezing everything in - it's to help you decide what deserves your time, your energy and your attention in the years ahead.`,
+            value: `The people who thrive in retirement rarely do so by accident. Having a few clear goals gives you something to look forward to, helps you prioritise what matters, and encourages you to keep growing by stretching yourself in new and rewarding ways. You don't need to map out every goal for every year ahead – just enough direction to help you create a retirement you'll enjoy. Few things are as satisfying as looking back and realising you've achieved something that once felt like a distant ambition!`,
           },
           { type: "image", src: "/primers/4-3.jpg" },
         ],
-        coachOpening: `Here's your retirement laid across the five areas of a balanced life — Restore, Move, Think, Connect, Contribute — with the goals you've kept and the few you've put in the spotlight. We can leave them just as they are. If you'd like to make any bolder, or talk one through, I'm right here.`,
+        coachOpening: `Here are the few goals that stood out from everything you've told me — the ones worth really going for. We can leave them just as they are. If you'd like to make any bolder, or talk one through, I'm right here.`,
         interaction: {
           type: "balanced-goals",
           areas: [

@@ -54,8 +54,16 @@ export function balancedGoalsSummaryText(result: BalancedGoalsResult): string {
   return `${label}. ${lines.join(" · ")}`;
 }
 
+// Capitalise the first letter — the draft's "why" and timing lines sometimes read as
+// mid-sentence continuations ("you kept coming back…", "start with two…"), so they
+// begin lower-case; nudge them to a proper sentence start for the card.
+function capFirst(s: string): string {
+  const t = s.trimStart();
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : s;
+}
+
 function toVariant(v: GoalVariant): Variant {
-  return { label: v.label, ...(v.cadence ? { cadence: v.cadence } : {}) };
+  return { label: v.label, ...(v.cadence ? { cadence: capFirst(v.cadence) } : {}) };
 }
 
 function mapSuggestions(suggestions: GoalSuggestion[]): Goal[] {
@@ -63,7 +71,7 @@ function mapSuggestions(suggestions: GoalSuggestion[]): Goal[] {
     id: `g${i}`,
     area: s.area,
     level: "original" as Intensity,
-    ...(s.why ? { why: s.why } : {}),
+    ...(s.why ? { why: capFirst(s.why) } : {}),
     variants: {
       original: toVariant(s.original),
       ...(s.bolder ? { bolder: toVariant(s.bolder) } : {}),
@@ -125,7 +133,7 @@ export default function BalancedGoals({
         area: g.area,
         level: "original" as Intensity,
         variants: {
-          original: { label: g.label, ...(g.cadence ? { cadence: g.cadence } : {}) },
+          original: { label: g.label, ...(g.cadence ? { cadence: capFirst(g.cadence) } : {}) },
         },
       }));
     }
@@ -341,14 +349,13 @@ function CurateCard({
 
   return (
     <div style={styles.goalCard}>
-      <input
-        type="text"
+      <AutoTextarea
         className="bal-input"
         style={styles.areaField}
         placeholder={areaPlaceholder}
         value={goal.area}
-        onChange={(e) => onUpdateArea(goal.id, e.target.value)}
-        aria-label="Area of life this goal is about"
+        onChange={(val) => onUpdateArea(goal.id, val)}
+        ariaLabel="Area of life this goal is about"
       />
       {goal.why && <p style={styles.whyLine}>{goal.why}</p>}
       {levelNote && <span style={styles.levelTag}>{levelNote}</span>}
@@ -612,12 +619,12 @@ const styles: Record<string, React.CSSProperties> = {
   // The area-of-life label at the top of each card — reads as a tag, editable so an
   // added goal can be named and a drafted one retitled.
   areaField: {
-    alignSelf: "flex-start",
-    maxWidth: "100%",
+    width: "100%",
     padding: "2px 0",
     fontFamily: "var(--font-sans)",
     fontSize: "12px",
     fontWeight: 700,
+    lineHeight: "1.4",
     letterSpacing: "0.04em",
     textTransform: "uppercase",
     color: "var(--accent-strong)",

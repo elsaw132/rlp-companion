@@ -48,12 +48,12 @@ LEAD WITH AMBITION, THEN LET THEM DIAL IT
 - Each version is COMPLETE and reads fully on its own — never a fragment or a "…but smaller". Someone seeing only the quieter version must understand the whole goal.
 
 EACH GOAL CARRIES
-- "area": the area of THEIR life this goal is about, in a few natural words in their own terms — e.g. "Travel & adventure", "Our home", "Cooking", "Time with the grandchildren", "Mentoring". This is a free label, NOT a fixed category. One short phrase.
-- "why": ONE short, warm line on why this one, tied to something they actually said (e.g. "you kept coming back to the longer trips"). Never a verdict.
-- "original", "bolder", "quieter": each an object {"label": the goal as a short, vivid phrase with a stretch built in; "cadence": a rough when or how-often — "over the first summer", "a course this year, then every week", "one big trip a year"}.
+- "area": the area of THEIR life this goal is about, as a SHORT label in their own terms — two to four words, e.g. "Travel", "Our home", "Cooking", "The grandchildren", "Mentoring". It reads as a tidy title above the goal, so keep it brief. A free label, NOT a fixed category.
+- "why": ONE short, warm line on why this one, tied to something they actually said. Write it as a complete sentence that STARTS WITH A CAPITAL LETTER (e.g. "You kept coming back to the longer trips."). Never a verdict.
+- "original", "bolder", "quieter": each an object {"label": the goal as a short, vivid phrase with a stretch built in; "cadence": a rough when or how-often, STARTING WITH A CAPITAL LETTER — "Over the first summer", "A course this year, then every week", "One big trip a year"}.
 
 JSON shape:
-{"suggestions":[{"area":"Travel & adventure","why":"you kept coming back to the longer, immersive trips","original":{"label":"Spend a full month island-hopping across Croatia with Harry","cadence":"a big trip in year one"},"bolder":{"label":"Take three months to travel the length of the Mediterranean coast by train and boat","cadence":"a long trip in the first two years"},"quieter":{"label":"Take one two-week island-hopping trip to Croatia with Harry","cadence":"once in the first year"}}]}
+{"suggestions":[{"area":"Travel","why":"You kept coming back to the longer, immersive trips.","original":{"label":"Spend a full month island-hopping across Croatia with Harry","cadence":"A big trip in year one"},"bolder":{"label":"Take three months to travel the length of the Mediterranean coast by train and boat","cadence":"A long trip in the first two years"},"quieter":{"label":"Take one two-week island-hopping trip to Croatia with Harry","cadence":"Once in the first year"}}]}
 
 Draft 3 or 4 goals — never more. Voice: warm, specific, plain. Never use these words: reflect, explore, unpack, journey, growth, share, deep dive. Never use the word "genuinely". Never use negative-contrast, parataxis, or symmetrical structures ("It's not X, it's Y"). Speak directly and in the affirmative.
 
