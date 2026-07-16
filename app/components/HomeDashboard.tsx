@@ -37,6 +37,24 @@ function greetingWord(): string {
   return "Good evening";
 }
 
+// A session's takeaway is written as 2–4 sentences and reused as Vita's memory and
+// to seed the plan, so it runs long. On the dashboard we only want the gist, so
+// show just the opening sentence(s) up to a short budget — always whole sentences,
+// never a cut-off fragment. The stored takeaway is untouched everywhere else.
+const RECAP_MAX_CHARS = 240;
+function shortenRecap(text: string): string {
+  const trimmed = text.trim();
+  const sentences = trimmed.match(/[^.!?]+[.!?]+(?=\s|$)/g);
+  if (!sentences || sentences.length <= 1) return trimmed;
+  let out = sentences[0].trim();
+  for (let i = 1; i < sentences.length; i++) {
+    const next = sentences[i].trim();
+    if (`${out} ${next}`.length > RECAP_MAX_CHARS) break;
+    out += ` ${next}`;
+  }
+  return out;
+}
+
 export default function HomeDashboard() {
   const { user } = useUser();
   const userData = useUserData();
@@ -357,7 +375,7 @@ export default function HomeDashboard() {
   } else if (priorTakeaway?.text) {
     // Vita reads the recap directly to the user here, so use the second-person
     // version; older takeaways without it fall back to the third-person text.
-    const recap = priorTakeaway.textDirect ?? priorTakeaway.text;
+    const recap = shortenRecap(priorTakeaway.textDirect ?? priorTakeaway.text);
     heroIntro = `${recap} Today, let's look at "${nextModule.title}".`;
   } else {
     heroIntro = `Last time, you worked through "${lastCompleted.title}". Today, let's look at "${nextModule.title}".`;
