@@ -58,12 +58,22 @@ export async function ensureBackfill(
 
   await Promise.all(toAdd.map((d) => addFact(userId, d)));
 
-  // Record the version so the whole pass short-circuits next time.
-  try {
-    await setUserData(userId, BACKFILL_VERSION_KEY, CURRENT_BACKFILL_VERSION);
-  } catch {
-    // The identity de-dup above keeps a missed marker from duplicating facts.
+  // Only mark the pass done once there was genuinely something to process — the
+  // snapshot yielded derivable drafts, or the user already has facts. On the
+  // very first authed load (UserDataProvider fires GET /api/user-data from
+  // /onboarding before the user has typed anything) the snapshot is empty and
+  // derives nothing; writing the marker then would permanently short-circuit the
+  // backfill so it never runs against the real data. Leaving it unset keeps the
+  // pass armed until source data exists, then it marks itself done. Cheap to
+  // re-attempt each load until then (the derivation is pure and de-duped).
+  const provisioned = drafts.length > 0 || existing.length > 0;
+  if (provisioned) {
+    try {
+      await setUserData(userId, BACKFILL_VERSION_KEY, CURRENT_BACKFILL_VERSION);
+    } catch {
+      // The identity de-dup above keeps a missed marker from duplicating facts.
+    }
   }
 
-  return { ran: true, added: toAdd.length, facts: await activeFacts(userId) };
+  return { ran: provisioned, added: toAdd.length, facts: await activeFacts(userId) };
 }

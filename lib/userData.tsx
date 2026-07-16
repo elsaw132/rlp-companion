@@ -598,6 +598,24 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   const removeAll = useCallback(async () => {
     commit({});
+    // Purge residual client-side storage too. The pre-Postgres build wrote
+    // legacy `rlp_*` keys to localStorage; the migration copies them up but never
+    // cleared them, so they linger on the device. A destructive reset is the
+    // right moment to remove them (and any sessionStorage) so nothing survives
+    // client-side after the user asks to start over.
+    if (typeof window !== "undefined") {
+      try {
+        const stale: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith("rlp_")) stale.push(k);
+        }
+        stale.forEach((k) => localStorage.removeItem(k));
+        sessionStorage.clear();
+      } catch {
+        // Storage can throw (private mode / disabled) — best-effort only.
+      }
+    }
     try {
       await fetch("/api/user-data", {
         method: "DELETE",
