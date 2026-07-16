@@ -149,9 +149,11 @@ function assembleSynthesis(
     .map((s) => s.label.trim())
     .filter(Boolean);
   const values = body.coreValues ?? [];
+  // The most-core value's written meaning still anchors the card as the subtitle,
+  // but every core value the person marked appears as a tag — including the top
+  // one — so the tag row is the full set at a glance, not a subset.
   const valuesTop = values[0]?.meaning?.trim() ?? "";
   const valuesChips = values
-    .slice(1)
     .map((v) => v.value.trim())
     .filter(Boolean);
 
