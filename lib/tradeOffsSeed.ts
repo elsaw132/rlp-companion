@@ -17,6 +17,8 @@ import type {
 } from "@/lib/modules";
 import type { Stage3ValuesSummary } from "@/lib/stage3Seed";
 import type { RetirementStage } from "@/lib/userData";
+import type { StoredFact } from "@/lib/contextFacts";
+import { coreValuesFromFacts } from "@/lib/resolverInputs";
 import { fetchSeedWithRetry } from "@/lib/seedRetry";
 
 // One drafted trade-off — the framing only. The person supplies where they lean
@@ -120,6 +122,19 @@ export function valueInputs(
       ...(v.meaning ? { meaning: v.meaning } : {}),
       ...(v.confidence ? { confidence: v.confidence } : {}),
     }));
+}
+
+// The person's core values, sourced from the CANONICAL value facts — their marked
+// core-five (or all value facts if none flagged), ordered by their Stage-3 ranking,
+// each in their VERBATIM own words. This is the source of truth for the sort: the
+// old path read the `stage3-values` summary, which is an AI re-distillation that can
+// drop marked-core values (e.g. Family) in favour of AI-picked ones (e.g. Reliability).
+export function coreValueInputs(facts: StoredFact[]): ValueInput[] {
+  return coreValuesFromFacts(facts).map((v) => ({
+    value: v.value,
+    ...(v.meaning ? { meaning: v.meaning } : {}),
+    ...(v.confidence ? { confidence: v.confidence } : {}),
+  }));
 }
 
 // Call the drafting route. Returns the drafted seed, or null on any failure so

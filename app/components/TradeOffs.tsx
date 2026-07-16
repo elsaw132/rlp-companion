@@ -13,6 +13,7 @@ import {
   financeSignal,
   tradeOffGoalInputs,
   valueInputs,
+  coreValueInputs,
   type TradeOffsSeed,
 } from "@/lib/tradeOffsSeed";
 import { useUserData } from "@/lib/userData";
@@ -180,7 +181,13 @@ export default function TradeOffs({
     finance: financeSignal(
       (userData.getBuild("4.1") as ReadinessSnapshotResult | null) ?? null
     ),
-    values: valueInputs(userData.getStage3Values()),
+    // The sort is anchored to the CANONICAL value facts (marked core-five, ranked,
+    // verbatim) — not the AI-distilled stage3-values summary, which could drop
+    // marked-core values. Falls back to the summary only if no value facts exist.
+    values: (() => {
+      const core = coreValueInputs(userData.getActiveFacts());
+      return core.length ? core : valueInputs(userData.getStage3Values());
+    })(),
   });
   const draftInputs = draftInputsRef.current;
 

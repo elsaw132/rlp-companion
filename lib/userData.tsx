@@ -165,8 +165,11 @@ const KEYS = {
   // person's own named strengths (was a prose "lean" line), so v1 caches re-draft.
   goalPathSeed: (id: string) => `goal-path-v2:${id}`,
   // The trade-off scenarios and candidate decision principles Vita drafted for
-  // the trade-offs module (4.5), persisted so a refresh never re-drafts them.
-  tradeOffSeed: (id: string) => `trade-off-v1:${id}`,
+  // the trade-offs module (4.5), persisted so a refresh never re-drafts them. v2:
+  // the values-to-sort now come from the canonical value facts (marked core-five,
+  // ranked) instead of the AI-distilled stage3-values summary, so v1 caches (which
+  // may hold the wrong values) are left unread and re-drafted.
+  tradeOffSeed: (id: string) => `trade-off-v2:${id}`,
   weekShapeSeed: (id: string) => `week-shape-v2:${id}`,
   // The curated seasons-board cards Vita chose for "The chapters of retirement"
   // (4.2) — a balanced set of the person's real priorities across chapters, in a

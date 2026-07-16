@@ -104,6 +104,7 @@ import {
   tradeOffGoalInputs,
   financeSignal,
   valueInputs,
+  coreValueInputs,
 } from "@/lib/tradeOffsSeed";
 import {
   fetchWeekShapeDraft,
@@ -841,7 +842,13 @@ export default function SessionContainer({
     const finance = financeSignal(
       (userData.getBuild("4.1") as ReadinessSnapshotResult | null) ?? null
     );
-    const values = valueInputs(userData.getStage3Values());
+    // Anchor the values to the canonical value facts (marked core-five, ranked,
+    // verbatim), not the AI-distilled stage3-values summary. Fall back to the summary
+    // only when there are no value facts to read.
+    const coreValues = coreValueInputs(userData.getActiveFacts());
+    const values = coreValues.length
+      ? coreValues
+      : valueInputs(userData.getStage3Values());
     if (!goals.length && !values.length) return;
     tradeOffsPrefetchedRef.current = true;
     void (async () => {
