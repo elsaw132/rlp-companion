@@ -232,28 +232,28 @@ export default function HowItWorks() {
               <li>
                 <span className="t">•</span>
                 <span>
-                  <b>Take your time.</b> Vita is happy to wait, and there&rsquo;s
+                  <b>Take your time.</b>{" "}Vita is happy to wait, and there&rsquo;s
                   no clock running.
                 </span>
               </li>
               <li>
                 <span className="t">•</span>
                 <span>
-                  <b>Not sure how to answer?</b> Say so — Vita will help you think
+                  <b>Not sure how to answer?</b>{" "}Say so — Vita will help you think
                   it through.
                 </span>
               </li>
               <li>
                 <span className="t">•</span>
                 <span>
-                  <b>You&rsquo;re in charge.</b> Ask Vita to slow down, go deeper,
+                  <b>You&rsquo;re in charge.</b>{" "}Ask Vita to slow down, go deeper,
                   or move on whenever you like.
                 </span>
               </li>
               <li>
                 <span className="t">•</span>
                 <span>
-                  <b>If it gets something wrong, just say so.</b> Vita will update
+                  <b>If it gets something wrong, just say so.</b>{" "}Vita will update
                   it, and nothing is set until it sounds like you.
                 </span>
               </li>
@@ -277,7 +277,7 @@ export default function HowItWorks() {
             <li>
               <span className="t">•</span>
               <span>
-                <b>Just tell Vita.</b> Mid-conversation, say something like
+                <b>Just tell Vita.</b>{" "}Mid-conversation, say something like
                 &ldquo;actually, that&rsquo;s not quite right&rdquo; — Vita will
                 update it there and then.
               </span>
@@ -285,7 +285,7 @@ export default function HowItWorks() {
             <li>
               <span className="t">•</span>
               <span>
-                <b>Keep talking.</b> After a session ends, tap &ldquo;Want to add
+                <b>Keep talking.</b>{" "}After a session ends, tap &ldquo;Want to add
                 something? Keep talking&rdquo; to reopen the conversation and add
                 or change what you said.
               </span>
@@ -293,7 +293,7 @@ export default function HowItWorks() {
             <li>
               <span className="t">•</span>
               <span>
-                <b>Restart the session.</b> Inside any session, &ldquo;Restart
+                <b>Restart the session.</b>{" "}Inside any session, &ldquo;Restart
                 this session&rdquo; lets you begin it again from the start.
               </span>
             </li>
