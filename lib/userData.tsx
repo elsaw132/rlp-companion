@@ -1214,7 +1214,17 @@ export function useUserData() {
     await removeKey(KEYS.conversation(id));
     await removeKey(KEYS.interaction(id));
     await clearSeed(id);
+    // Every per-module AI draft cache, so "restart" actually re-drafts from the
+    // current profile rather than serving a stale seed. Missing these was why a
+    // restart of the seasons board (and 4.4–4.7) kept showing the old cards; each
+    // clear is a keyed no-op for modules that don't use that seed.
     await clearGoalSeed(id);
+    await clearGoalPathSeed(id);
+    await clearTradeOffSeed(id);
+    await clearWeekShapeSeed(id);
+    await clearSeasonsCardsSeed(id);
+    await clearFirstYearSeed(id);
+    await removeKey(KEYS.firstYearChat(id));
     await clearCommitment(id);
     await clearTakeaway(id);
     await clearDreams(id);
