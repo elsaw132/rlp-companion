@@ -155,6 +155,8 @@ export async function POST(request: Request) {
     } else {
       console.error("[trade-offs] Unexpected error:", error);
     }
-    return Response.json({ seed: fallbackTradeOffs(input) });
+    // Recoverable processing failure — signal it so the client retries rather than
+    // settling on the generic fallback.
+    return Response.json({ seed: null });
   }
 }

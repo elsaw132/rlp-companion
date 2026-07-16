@@ -194,6 +194,8 @@ export async function POST(request: Request) {
     } else {
       console.error("[first-year] Unexpected error:", error);
     }
-    return Response.json({ seed: fallbackFirstYear(input) });
+    // Recoverable processing failure — signal it so the client retries rather than
+    // settling on the generic fallback.
+    return Response.json({ seed: null });
   }
 }

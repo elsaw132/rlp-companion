@@ -11,6 +11,7 @@
 import type { BalancedAreaId } from "@/lib/modules";
 import type { RetirementStage } from "@/lib/userData";
 import { BALANCED_AREAS } from "@/lib/userModel";
+import { fetchSeedWithRetry } from "@/lib/seedRetry";
 
 // One intensity of a goal — a complete, standalone phrasing that reads clearly
 // on its own. Each carries its own track and its own timing, so swapping to a
@@ -66,27 +67,12 @@ export async function fetchBalancedGoalsDraft(
   input: BalancedGoalsDraftInput,
   opts: { attempts?: number } = {}
 ): Promise<BalancedGoalsSeed | null> {
-  const attempts = Math.max(1, opts.attempts ?? 3);
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const res = await fetch("/api/balanced-goals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { seed: BalancedGoalsSeed | null };
-        if (data.seed && data.seed.suggestions.length > 0) return data.seed;
-      }
-    } catch {
-      // network error — fall through to the backoff and retry
-    }
-    // Back off a little between attempts (400ms, 800ms, …), never after the last.
-    if (i < attempts - 1) {
-      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
-    }
-  }
-  return null;
+  return fetchSeedWithRetry<BalancedGoalsSeed>(
+    "/api/balanced-goals",
+    input,
+    (s) => s.suggestions.length > 0,
+    opts.attempts ?? 3
+  );
 }
 
 // The five valid area ids, as a lookup so off-area model output is dropped.

@@ -17,6 +17,7 @@ import type {
   ReadinessSnapshotResult,
 } from "@/lib/modules";
 import type { RetirementStage } from "@/lib/userData";
+import { fetchSeedWithRetry } from "@/lib/seedRetry";
 
 // The rough frequencies — the grain people can answer this far out. These strings
 // are exactly what the result stores and what the component renders as options.
@@ -144,18 +145,11 @@ export function transitionShape(
 export async function fetchWeekShapeDraft(
   input: WeekShapeDraftInput
 ): Promise<WeekShapeSeed | null> {
-  try {
-    const res = await fetch("/api/week-shape", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { seed: WeekShapeSeed | null };
-    return data.seed && data.seed.activities.length > 0 ? data.seed : null;
-  } catch {
-    return null;
-  }
+  return fetchSeedWithRetry<WeekShapeSeed>(
+    "/api/week-shape",
+    input,
+    (s) => s.activities.length > 0
+  );
 }
 
 // ---- Fallback (grounded where it can be, never empty) ----

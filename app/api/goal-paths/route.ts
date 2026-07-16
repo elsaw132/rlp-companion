@@ -128,6 +128,8 @@ export async function POST(request: Request) {
     } else {
       console.error("[goal-paths] Unexpected error:", error);
     }
-    return Response.json({ seed: fallbackGoalPaths(goals) });
+    // Recoverable processing failure — signal it so the client retries rather than
+    // settling on the generic fallback. (Genuinely-empty input is handled above.)
+    return Response.json({ seed: null });
   }
 }

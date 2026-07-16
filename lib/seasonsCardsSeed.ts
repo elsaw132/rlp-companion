@@ -18,6 +18,7 @@
 
 import type { SeasonCard } from "@/lib/userModel";
 import type { SeasonCandidate } from "@/lib/resolverInputs";
+import { fetchSeedWithRetry } from "@/lib/seedRetry";
 
 // The cached result the board reads: the curated cards, in the shape the board
 // already consumes.
@@ -38,18 +39,11 @@ export type SeasonsCardsInput = {
 export async function fetchSeasonsCards(
   input: SeasonsCardsInput
 ): Promise<SeasonsCardsSeed | null> {
-  try {
-    const res = await fetch("/api/seasons-cards", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { seed: SeasonsCardsSeed | null };
-    return data.seed && data.seed.cards.length > 0 ? data.seed : null;
-  } catch {
-    return null;
-  }
+  return fetchSeedWithRetry<SeasonsCardsSeed>(
+    "/api/seasons-cards",
+    input,
+    (s) => s.cards.length > 0
+  );
 }
 
 // Maximum cards on the board — a sortable, uncluttered set.

@@ -18,6 +18,7 @@ import type {
 } from "@/lib/modules";
 import { transitionShape, type TransitionShape } from "@/lib/weekShapeSeed";
 import type { RetirementStage } from "@/lib/userData";
+import { fetchSeedWithRetry } from "@/lib/seedRetry";
 
 export { transitionShape, type TransitionShape };
 
@@ -192,18 +193,11 @@ export function firstYearSeasonInputs(prior: SeasonsBoardResult | null): {
 export async function fetchFirstYearDraft(
   input: FirstYearDraftInput
 ): Promise<FirstYearSeed | null> {
-  try {
-    const res = await fetch("/api/first-year", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { seed: FirstYearSeed | null };
-    return data.seed && data.seed.items.length > 0 ? data.seed : null;
-  } catch {
-    return null;
-  }
+  return fetchSeedWithRetry<FirstYearSeed>(
+    "/api/first-year",
+    input,
+    (s) => s.items.length > 0
+  );
 }
 
 // Ask Vita to reshape the timeline and/or rewrite the narrative from a natural-

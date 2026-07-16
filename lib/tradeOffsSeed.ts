@@ -17,6 +17,7 @@ import type {
 } from "@/lib/modules";
 import type { Stage3ValuesSummary } from "@/lib/stage3Seed";
 import type { RetirementStage } from "@/lib/userData";
+import { fetchSeedWithRetry } from "@/lib/seedRetry";
 
 // One drafted trade-off — the framing only. The person supplies where they lean
 // and the two free-text answers on the surface.
@@ -127,18 +128,11 @@ export function valueInputs(
 export async function fetchTradeOffsDraft(
   input: TradeOffsDraftInput
 ): Promise<TradeOffsSeed | null> {
-  try {
-    const res = await fetch("/api/trade-offs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { seed: TradeOffsSeed | null };
-    return data.seed && data.seed.scenarios.length > 0 ? data.seed : null;
-  } catch {
-    return null;
-  }
+  return fetchSeedWithRetry<TradeOffsSeed>(
+    "/api/trade-offs",
+    input,
+    (s) => s.scenarios.length > 0
+  );
 }
 
 // ---- Fallback (grounded where it can be, never empty) ----

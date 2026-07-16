@@ -12,6 +12,7 @@
 
 import type { BalancedGoalsResult, GoalPathsResult } from "@/lib/modules";
 import type { RetirementStage } from "@/lib/userData";
+import { fetchSeedWithRetry } from "@/lib/seedRetry";
 
 // One stepping stone on a do/achieve ladder. `when` is an optional ROUGH sense
 // of timing (never a date); `done` marks a rung already behind the person.
@@ -76,18 +77,11 @@ export function spotlightGoalInputs(
 export async function fetchGoalPathsDraft(
   input: GoalPathsDraftInput
 ): Promise<GoalPathsSeed | null> {
-  try {
-    const res = await fetch("/api/goal-paths", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { seed: GoalPathsSeed | null };
-    return data.seed && data.seed.paths.length > 0 ? data.seed : null;
-  } catch {
-    return null;
-  }
+  return fetchSeedWithRetry<GoalPathsSeed>(
+    "/api/goal-paths",
+    input,
+    (s) => s.paths.length > 0
+  );
 }
 
 // ---- Fallback (generic, never empty) ----

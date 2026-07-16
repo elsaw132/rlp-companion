@@ -169,6 +169,8 @@ export async function POST(request: Request) {
     } else {
       console.error("[week-shape] Unexpected error:", error);
     }
-    return Response.json({ seed: fallbackWeekShape(input) });
+    // Recoverable processing failure — signal it so the client retries rather than
+    // settling on the generic fallback.
+    return Response.json({ seed: null });
   }
 }
