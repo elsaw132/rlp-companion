@@ -429,7 +429,10 @@ const css = `
 /* cards */
 .rlp-ureveal .stage{position:relative;min-height:430px}
 .rlp-ureveal .card{position:absolute;inset:0;padding:26px 28px 22px;display:none;flex-direction:column;text-align:center;opacity:0;transition:opacity .32s ease;background:var(--bg)}
-.rlp-ureveal .card.on{display:flex;opacity:1}
+/* The active card flows in normal flow (position:relative) so the stage grows to
+   fit it — a tall card is no longer clipped by the reveal's overflow:hidden.
+   min-height keeps short cards tall enough for body-mid to centre as before. */
+.rlp-ureveal .card.on{display:flex;opacity:1;position:relative;min-height:430px}
 .rlp-ureveal .card.washed{background:linear-gradient(180deg,color-mix(in srgb, var(--accbg) 72%, var(--warm-surface)) 0%,var(--warm-surface) 40%)}
 .rlp-ureveal .card.cream{background:var(--warm-surface)}
 
@@ -487,12 +490,5 @@ const css = `
 @media(prefers-reduced-motion:reduce){
   .rlp-ureveal .card{transition:none}
   .rlp-ureveal .thread .node,.rlp-ureveal .thread .seg{transition:none}
-}
-/* On a phone a long card can exceed the fixed 548px stage and get clipped (the
-   reveal has overflow:hidden). Let the active card flow so the stage grows to
-   fit it — 548px stays as a floor, and only-one-card-visible keeps the layout
-   stable. Desktop keeps its fixed-height carousel. */
-@media(max-width:880px){
-  .rlp-ureveal .card.on{position:relative}
 }
 `;

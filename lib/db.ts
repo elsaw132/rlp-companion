@@ -536,3 +536,183 @@ export async function getAllModuleFeedback(): Promise<ModuleFeedbackRow[]> {
     createdAt: toIso(r.created_at) ?? new Date().toISOString(),
   }));
 }
+
+// --- Baseline survey ------------------------------------------------------
+// The one-time pilot baseline, captured at the end of onboarding — "before
+// participants begin". Its own table (like module_feedback) because it is
+// cross-user research data read by the admin portal, not per-turn coaching
+// state. One row per member (user_id is the PK), upserted, so re-running
+// onboarding overwrites rather than duplicating. The four survey-specific
+// answers (gender, feelings, planning confidence, expectations) live only here;
+// the demographic columns (dob, partner, retirement_stage, horizon) are a
+// snapshot of answers also held in user_data, copied in so the baseline is one
+// self-contained, analysable row. Every column is nullable — every question can
+// be skipped, and the flag-gated status/horizon steps may never be asked.
+let baselineSurveyTableReady: Promise<void> | null = null;
+
+function ensureBaselineSurveyTable(): Promise<void> {
+  if (!baselineSurveyTableReady) {
+    baselineSurveyTableReady = sql()`
+      CREATE TABLE IF NOT EXISTS baseline_survey (
+        user_id text PRIMARY KEY,
+        gender text,
+        feelings jsonb,
+        prior_planning text,
+        planning_confidence int,
+        expectations text,
+        dob text,
+        partner text,
+        retirement_stage text,
+        horizon text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `
+      .then(() => undefined)
+      .catch((err) => {
+        baselineSurveyTableReady = null;
+        throw err;
+      });
+  }
+  return baselineSurveyTableReady;
+}
+
+// The full baseline payload. user_id always comes from the authenticated Clerk
+// session at the call site, never from client input. feelings is the up-to-three
+// multi-select (stored as a JSON array); priorPlanning is how much non-financial
+// planning they've already done (stored as the chosen label); planningConfidence
+// is 1–5 or null.
+export type BaselineSurveyInput = {
+  userId: string;
+  gender: string | null;
+  feelings: string[];
+  priorPlanning: string | null;
+  planningConfidence: number | null;
+  expectations: string | null;
+  dob: string | null;
+  partner: string | null;
+  retirementStage: string | null;
+  horizon: string | null;
+};
+
+// Record (or overwrite) one member's baseline. The PK conflict target makes this
+// idempotent: finishing onboarding twice updates the single row in place.
+export async function upsertBaselineSurvey(
+  input: BaselineSurveyInput
+): Promise<void> {
+  await ensureBaselineSurveyTable();
+  await sql()`
+    INSERT INTO baseline_survey (
+      user_id, gender, feelings, prior_planning, planning_confidence,
+      expectations, dob, partner, retirement_stage, horizon, updated_at
+    )
+    VALUES (
+      ${input.userId}, ${input.gender},
+      ${JSON.stringify(input.feelings)}::jsonb, ${input.priorPlanning},
+      ${input.planningConfidence},
+      ${input.expectations}, ${input.dob}, ${input.partner},
+      ${input.retirementStage}, ${input.horizon}, now()
+    )
+    ON CONFLICT (user_id) DO UPDATE SET
+      gender = EXCLUDED.gender,
+      feelings = EXCLUDED.feelings,
+      prior_planning = EXCLUDED.prior_planning,
+      planning_confidence = EXCLUDED.planning_confidence,
+      expectations = EXCLUDED.expectations,
+      dob = EXCLUDED.dob,
+      partner = EXCLUDED.partner,
+      retirement_stage = EXCLUDED.retirement_stage,
+      horizon = EXCLUDED.horizon,
+      updated_at = now()
+  `;
+}
+
+// One baseline row, as read by the admin portal. Read-only there.
+export type BaselineSurveyRow = {
+  userId: string;
+  gender: string | null;
+  feelings: string[];
+  priorPlanning: string | null;
+  planningConfidence: number | null;
+  expectations: string | null;
+  dob: string | null;
+  partner: string | null;
+  retirementStage: string | null;
+  horizon: string | null;
+  createdAt: string;
+};
+
+// Every baseline submission, newest first — for the admin portal. Reads across
+// all users, so it is only ever called behind the admin gate.
+export async function getAllBaselineSurveys(): Promise<BaselineSurveyRow[]> {
+  await ensureBaselineSurveyTable();
+  const rows = (await sql()`
+    SELECT user_id, gender, feelings, prior_planning, planning_confidence,
+           expectations, dob, partner, retirement_stage, horizon, created_at
+    FROM baseline_survey
+    ORDER BY created_at DESC
+  `) as {
+    user_id: string;
+    gender: string | null;
+    feelings: unknown;
+    prior_planning: string | null;
+    planning_confidence: number | null;
+    expectations: string | null;
+    dob: string | null;
+    partner: string | null;
+    retirement_stage: string | null;
+    horizon: string | null;
+    created_at: string | Date;
+  }[];
+  return rows.map((r) => ({
+    userId: r.user_id,
+    gender: r.gender,
+    feelings: Array.isArray(r.feelings) ? (r.feelings as string[]) : [],
+    priorPlanning: r.prior_planning,
+    planningConfidence: r.planning_confidence,
+    expectations: r.expectations,
+    dob: r.dob,
+    partner: r.partner,
+    retirementStage: r.retirement_stage,
+    horizon: r.horizon,
+    createdAt: toIso(r.created_at) ?? new Date().toISOString(),
+  }));
+}
+
+// --- Per-user hard deletes ------------------------------------------------
+// Row-level erasure helpers, one per table. Each is scoped to a single user_id
+// and removes rows outright (no soft-delete / status flip): the correction loop
+// keeps rejected/superseded facts around, but erasure must leave nothing behind.
+// deleteAllUserData (above) covers the user_data table, including the base64 RLP
+// plan images, which live in the plan-images key there — there is no separate
+// image table.
+
+// Every context fact for a user, regardless of status (active, superseded,
+// rejected). Used by the "start over" reset and by full erasure.
+export async function deleteAllContextFacts(userId: string): Promise<void> {
+  await ensureContextFactsTable();
+  await sql()`DELETE FROM context_facts WHERE user_id = ${userId}`;
+}
+
+// Every general-feedback / support row for a user. Free-text bodies can name or
+// describe the person, so full erasure deletes them outright rather than
+// scrubbing user_id. Not touched by "start over" (a restart keeps feedback).
+export async function deleteAllFeedback(userId: string): Promise<void> {
+  await ensureFeedbackTable();
+  await sql()`DELETE FROM feedback WHERE user_id = ${userId}`;
+}
+
+// Every per-module feedback row for a user. Same reasoning as deleteAllFeedback
+// (the optional comment is free text). Not touched by "start over".
+export async function deleteAllModuleFeedback(userId: string): Promise<void> {
+  await ensureModuleFeedbackTable();
+  await sql()`DELETE FROM module_feedback WHERE user_id = ${userId}`;
+}
+
+// The member's baseline row. The expectations free-text can describe the person,
+// so full erasure deletes it outright. Not touched by "start over" (a restart
+// keeps the baseline, same as feedback).
+export async function deleteAllBaselineSurvey(userId: string): Promise<void> {
+  await ensureBaselineSurveyTable();
+  await sql()`DELETE FROM baseline_survey WHERE user_id = ${userId}`;
+}

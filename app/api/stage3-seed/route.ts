@@ -5,6 +5,8 @@ import {
   isSeededType,
   FALLBACK_SEEDS,
   valueDefinitionsFallback,
+  sanitizeCoreValues,
+  constrainSeedToCore,
   VIA_STRENGTHS,
   VALUE_SET,
   fearHorizonsFor,
@@ -33,6 +35,13 @@ type SeedRequest = {
   // triage), sent so a failed AI seed can fall back to THEIR values on the
   // value-definitions surface rather than a generic stand-in they never picked.
   carryValues?: string[];
+  // The values the person MARKED as most core in 3.2 (triage.core), ordered by
+  // the 3.3 ranking where one exists. This is authoritative: the 3.3 ranking pool
+  // and the 3.4 definition cards are constrained to exactly this set, so the
+  // model can never weigh or define a value the person didn't mark — or drop one
+  // they did. Empty for older data with no recorded core (then the model chooses,
+  // as before).
+  coreValues?: string[];
   // Whether the person flagged a partner at onboarding. Used by the hopes-fears
   // seed to keep partner-only worries out of the bank for someone planning alone.
   hasPartner?: boolean;
@@ -108,7 +117,8 @@ const MAX_TOKENS_BY_TYPE: Record<Stage3SeedType, number> = {
 function systemPrompt(
   seedType: Stage3SeedType,
   hasPartner: boolean,
-  retirementStage: RetirementStage | null
+  retirementStage: RetirementStage | null,
+  coreValues: string[]
 ): string {
   let spec = SEED_SPECS[seedType];
   if (seedType === "hopes-fears") {
@@ -118,6 +128,20 @@ function systemPrompt(
       .map((h) => `${h.name}:\n${h.fears.map((f) => `  - ${f}`).join("\n")}`)
       .join("\n\n");
     spec = spec.replace("__FEAR_BANK__", bank);
+  }
+  // Name the exact marked-core set so the model drafts around the RIGHT values,
+  // not a re-inference. The output is also enforced to this set after coercion
+  // (constrainSeedToCore) — this just gets the drafted pairs/threats aligned to
+  // it in the first place.
+  if (coreValues.length && seedType === "priority-choices") {
+    spec += `\n\nThe person marked exactly these values as most core to them: ${coreValues.join(
+      ", "
+    )}. Your "values" array MUST be these exact labels, verbatim and in this order — do not add, drop, rename, or reorder any. Build the either/or pairs around these values.`;
+  }
+  if (coreValues.length && seedType === "value-definitions") {
+    spec += `\n\nThe person marked exactly these values as most core to them: ${coreValues.join(
+      ", "
+    )}. Produce one entry for EACH of these values, using these exact labels, in this order — and NO others: do not add, drop, or rename any.`;
   }
   return `You are preparing a pre-filled exercise surface for someone working through the "Understand" stage of a guided retirement life-planning programme. They have already imagined their retirement and explored it area by area. Work ONLY from what this person actually shared — their words, their specifics. Never invent facts about their life.
 
@@ -156,14 +180,23 @@ export async function POST(request: Request) {
     .filter(Boolean)
     .join("\n\n");
 
+  // The values the person marked as most core in 3.2. Authoritative for 3.3/3.4:
+  // the ranking pool and the definition cards are constrained to exactly this set
+  // (see constrainSeedToCore), and the model is told to draft around it.
+  const core = sanitizeCoreValues(body.coreValues);
+
   // The safety-net seed for when the AI seed can't be used. For value-definitions
-  // this is built from the person's OWN values (passed in carryValues) so a
-  // failure shows their real values to fill in — never a stand-in they never
-  // chose. Every other surface keeps its generic fallback.
+  // this is built from the person's OWN values so a failure shows their real
+  // values to fill in — never a stand-in they never chose: the marked-core set
+  // where we have it, else the older carryValues list. For priority-choices we
+  // still pin the ranking pool to their core values. Every other surface keeps
+  // its generic fallback.
   const fallbackSeed: Stage3Seed =
     seedType === "value-definitions"
-      ? valueDefinitionsFallback(body.carryValues ?? [])
-      : FALLBACK_SEEDS[seedType];
+      ? valueDefinitionsFallback(core.length ? core : body.carryValues ?? [])
+      : seedType === "priority-choices"
+        ? constrainSeedToCore(FALLBACK_SEEDS[seedType], core)
+        : FALLBACK_SEEDS[seedType];
 
   // Nothing to work from — return the fallback rather than asking the model to
   // invent a life. Flagged so the client knows this isn't a real AI seed.
@@ -178,7 +211,8 @@ export async function POST(request: Request) {
       system: systemPrompt(
         seedType,
         body.hasPartner ?? false,
-        body.retirementStage ?? null
+        body.retirementStage ?? null,
+        core
       ),
       messages: [
         {
@@ -209,7 +243,13 @@ export async function POST(request: Request) {
     if (coerced === FALLBACK_SEEDS[seedType]) {
       return Response.json({ seed: fallbackSeed, fromFallback: true });
     }
-    return Response.json({ seed: coerced, fromFallback: false });
+    // Enforce the marked-core set on the model's output: a value the person
+    // marked can't be dropped, and one they didn't mark can't slip in (no-op for
+    // non-3.3/3.4 seeds, and when no core was recorded).
+    return Response.json({
+      seed: constrainSeedToCore(coerced, core),
+      fromFallback: false,
+    });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       console.error(

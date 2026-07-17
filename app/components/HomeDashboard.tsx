@@ -145,17 +145,20 @@ export default function HomeDashboard() {
     ) {
       setViewedStage(stageParam);
     }
-    // A stage reveal's "Return home" links to /home?intro=skip so the person
-    // lands on the dashboard itself, not straight into the next stage's intro.
-    // A stage deep-link (?stage=N) is likewise not interrupted by the intro.
-    // Transient (this visit only) — the intro still shows on a later forward
-    // entry, since this never records it as seen.
-    const skipIntro =
-      !!params &&
-      (params.get("intro") === "skip" || params.get("stage") !== null);
-    // While Act has no sessions to open, the pilot callout stands in for its
-    // intro. It keeps its own seen flag, so meeting the callout doesn't use up
-    // Act's real intro — that still has to land the day Act's sessions do.
+    // A stage deep-link (?stage=N) isn't interrupted by the intro. Transient
+    // (this visit only) — the intro still shows on a later forward entry, since
+    // this never records it as seen.
+    const skipIntro = !!params && params.get("stage") !== null;
+    // Stage 1's intro is the only stage intro shown as a full-screen takeover on
+    // /home: it lands here straight after onboarding, the first time /home is the
+    // current stage. Every later stage's intro now opens its first session
+    // instead (see the session page + SessionContainer), so "Take me home" after
+    // a reveal calmly lands on the dashboard rather than the next stage's intro.
+    const showStage1Intro = currentStage === 1 && !!stage?.intro;
+    // The one later exception: while Act (stage 5) has no sessions to open, the
+    // pilot callout stands in for its intro here — there's no first session to
+    // carry it. It keeps its own seen flag, so meeting the callout doesn't use up
+    // Act's real intro, which will open Act's first session the day they ship.
     const actIsEmpty =
       currentStage === 5 &&
       !!stage &&
@@ -163,7 +166,7 @@ export default function HomeDashboard() {
     const introSeen = actIsEmpty
       ? userData.hasSeenPilotCallout()
       : userData.getStageIntrosSeen().includes(currentStage);
-    if ((stage?.intro || actIsEmpty) && !skipIntro && !introSeen) {
+    if ((showStage1Intro || actIsEmpty) && !skipIntro && !introSeen) {
       setIntroStage(currentStage);
     }
     // The Stage 1 opening capture comes right after that intro and before module

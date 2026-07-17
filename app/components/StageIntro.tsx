@@ -10,11 +10,16 @@
 import type { Stage } from "@/lib/modules";
 import VitaMark from "./VitaMark";
 
+// Only the number, name and intro copy are read here, so the prop is widened to
+// that slice: the dashboard passes a full tailored Stage, and the first-session
+// surface (SessionContainer) passes a lighter object built on the server.
+export type StageIntroData = Pick<Stage, "number" | "name" | "intro">;
+
 export default function StageIntro({
   stage,
   onContinue,
 }: {
-  stage: Stage;
+  stage: StageIntroData;
   onContinue: () => void;
 }) {
   const intro = stage.intro;

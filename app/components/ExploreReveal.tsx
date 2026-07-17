@@ -240,9 +240,9 @@ export default function ExploreReveal() {
         label: `Continue to Stage ${nextStage?.number ?? 3}`,
         href: "/home",
       }}
-      // Return home lands on the dashboard itself — not the next stage's intro,
-      // which /home otherwise shows on first forward entry (see HomeDashboard).
-      returnHref="/home?intro=skip"
+      // Return home lands on the dashboard. The next stage's intro no longer
+      // shows here — it now opens that stage's first session (see HomeDashboard).
+      returnHref="/home"
     >
       <ExploreWheel areas={synthesis.areas} />
     </StageReveal>

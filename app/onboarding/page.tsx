@@ -42,16 +42,85 @@ const MOTIVATION_OPTIONS = [
   "Just curious for now",
 ];
 
-// Health-data consent shown on the welcome step — a standalone agreement, kept
-// separate from the AI-disclaimer tick, and required before continuing. Held as
-// constants so the exact wording is unambiguous (and can't be nicked by the
-// react/no-unescaped-entities rule the way inline JSX apostrophes would be). If
-// this wording changes, bump HEALTH_CONSENT_VERSION in lib/userData.
-const HEALTH_CONSENT_HEADING = "Your health-related information";
-const HEALTH_CONSENT_BODY =
-  "As you work through the programme, Vita will ask about things like your energy, sleep, eating, how you're recovering, how ready you feel for retirement, your hearing and eyesight, and your hopes and fears. Some of this counts as health information, which the law treats with extra care. We store it securely and use it only to tailor your plan. We won't let a person read your responses unless you separately agree, and you can delete everything at any time.";
+// --- Pilot baseline survey ------------------------------------------------
+// The one-time baseline captured at the end of onboarding — the four questions
+// the pilot evaluation needs that aren't already asked. Answers go to the
+// dedicated baseline_survey table (via saveBaselineSurvey), not the onboarding
+// record. Every one can be skipped.
+
+// Single-select. "Prefer to self-describe" reveals a free-text field; its value
+// is what gets stored. "Prefer not to say" stores that label.
+const GENDER_OPTIONS = [
+  "Female",
+  "Male",
+  "Non-binary",
+  "Prefer to self-describe",
+  "Prefer not to say",
+];
+const GENDER_SELF_DESCRIBE = "Prefer to self-describe";
+
+// Multi-select, up to three. The pilot spec's original nine, plus four that speak
+// to someone already retired ("Relieved", "Settled", "At a loose end", "Lonely")
+// — feeling adrift or isolated is common after retiring and nothing in the
+// original nine caught it. One list for everyone, whatever stage they're at.
+// Ordered on a positive → neutral → difficult gradient. Keep this in step with
+// the allowlist in /api/baseline-survey, which bounds what actually gets stored.
+const FEELINGS_OPTIONS = [
+  "Excited",
+  "Curious",
+  "Hopeful",
+  "Confident",
+  "Relieved",
+  "Settled",
+  "Neutral",
+  "Uncertain",
+  "At a loose end",
+  "Lonely",
+  "Overwhelmed",
+  "Anxious",
+  "Avoiding thinking about it",
+];
+const FEELINGS_MAX = 3;
+
+// Single-select. How much non-financial retirement planning they've already
+// done — asked before the confidence question, so "confident in your plans"
+// lands against a stated amount of planning rather than in the abstract.
+const PRIOR_PLANNING_OPTIONS = [
+  "Extensive",
+  "Some",
+  "A small amount",
+  "Very little",
+  "None at all",
+];
+
+// Health-data consent, shown on its own screen straight after the welcome's AI
+// disclaimer. Held as constants so the exact wording is unambiguous (and can't be
+// nicked by the react/no-unescaped-entities rule the way inline JSX apostrophes
+// would be). The body carries a bold phrase and a link, so it is split into runs
+// rather than one string. If this wording changes, bump HEALTH_CONSENT_VERSION in
+// lib/userData — it is the record of which text each person actually agreed to.
+const HEALTH_CONSENT_HEADING = "Your health information";
+const HEALTH_CONSENT_BODY_BEFORE_BOLD =
+  "Vita will ask about things like your sleep, energy, how you're recovering, and how you feel about retirement. Some of this is health information, which the law protects closely. Chorus Life needs it to build your plan, so the programme can't run without it. Vita uses your answers automatically — ";
+const HEALTH_CONSENT_BODY_BOLD = "no one here reads them";
+const HEALTH_CONSENT_BODY_AFTER_BOLD =
+  " — and we never sell your information. Our ";
+const HEALTH_CONSENT_PRIVACY_LINK_TEXT = "Privacy Notice";
+const HEALTH_CONSENT_BODY_END = " has the full detail and your rights.";
 const HEALTH_CONSENT_LABEL =
-  "I agree to Chorus Life collecting and using my health-related information as described above.";
+  "I've read the above and explicitly consent to Chorus Life using my health information to build my plan.";
+const HEALTH_CONSENT_WITHDRAW_BEFORE =
+  "Withdraw consent or delete your information anytime — ";
+const HEALTH_CONSENT_MANAGE_LINK_TEXT = "manage it here";
+const HEALTH_CONSENT_WITHDRAW_MIDDLE = " or email ";
+const HEALTH_CONSENT_EMAIL = "hello@chorus-life.com";
+
+// Where "manage it here" points — the self-serve withdraw/delete route.
+const MANAGE_DATA_URL = "https://app.chorus-life.com/delete-account";
+// The published Privacy Notice. Empty while the notice is being finalised; until
+// it has a URL the words render as plain text rather than a link to nowhere. Set
+// this and it becomes a link with no other change.
+const PRIVACY_NOTICE_URL = "";
 
 // Vita's register, chosen here and stored against the user. Each label maps to a
 // stable code value (CoachTone) the chat API turns into a tone directive. All
@@ -84,6 +153,7 @@ function usePreviewData(real: ReturnType<typeof useUserData>) {
       ...real,
       isOnboardingComplete: () => false,
       saveOnboarding: async () => {},
+      saveBaselineSurvey: async () => {},
       markOnboardingComplete: async () => {},
       recordHealthConsent: async () => {},
       setPreferredName: async () => {},
@@ -116,6 +186,13 @@ export default function OnboardingPage() {
   );
   const [horizon, setHorizon] = useState("");
   const [motivation, setMotivation] = useState("");
+  // Pilot baseline answers (their own table, written on Finish).
+  const [gender, setGender] = useState("");
+  const [genderSelf, setGenderSelf] = useState("");
+  const [feelings, setFeelings] = useState<string[]>([]);
+  const [priorPlanning, setPriorPlanning] = useState("");
+  const [confidence, setConfidence] = useState<number | null>(null);
+  const [expectations, setExpectations] = useState("");
   // Pre-select "Warm and friendly" — it's the default, not the only proper choice.
   const [tone, setTone] = useState<CoachTone>("warm");
 
@@ -130,22 +207,34 @@ export default function OnboardingPage() {
 
   type StepKey =
     | "welcome"
+    | "consent"
     | "name"
     | "partner"
     | "dob"
+    | "gender"
     | "status"
     | "horizon"
     | "motivation"
+    | "feelings"
+    | "priorPlanning"
+    | "confidence"
+    | "expectations"
     | "tone";
 
   const steps: StepKey[] = [
     "welcome",
+    "consent",
     "name",
     "partner",
     "dob",
+    "gender",
     ...(RETIREMENT_PATHS ? (["status"] as StepKey[]) : []),
     ...(showHorizon ? (["horizon"] as StepKey[]) : []),
     "motivation",
+    "feelings",
+    "priorPlanning",
+    "confidence",
+    "expectations",
     "tone",
   ];
   // The status step (when shown) only ever inserts the horizon step AFTER itself,
@@ -216,10 +305,16 @@ export default function OnboardingPage() {
               firstName={user?.firstName?.trim() || ""}
               understood={understood}
               setUnderstood={setUnderstood}
+              onContinue={goNext}
+            />
+          )}
+
+          {current === "consent" && (
+            <ConsentStep
               healthConsent={healthConsent}
               setHealthConsent={setHealthConsent}
               onContinue={async () => {
-                // Stamp the health-data consent as they leave the welcome — the
+                // Stamp the health-data consent as they leave this step — the
                 // button is gated on the tick, so reaching here means agreed.
                 await data.recordHealthConsent();
                 goNext();
@@ -281,6 +376,33 @@ export default function OnboardingPage() {
             />
           )}
 
+          {current === "gender" && (
+            <CardStep
+              heading="How would you describe your gender?"
+              options={GENDER_OPTIONS}
+              selected={gender}
+              onSelect={setGender}
+              note={
+                gender === GENDER_SELF_DESCRIBE ? (
+                  <div className="name-field self-describe">
+                    <input
+                      id="gender-self-describe"
+                      type="text"
+                      className="name-input"
+                      value={genderSelf}
+                      onChange={(e) => setGenderSelf(e.target.value)}
+                      placeholder="In your own words"
+                      maxLength={80}
+                    />
+                  </div>
+                ) : null
+              }
+              onContinue={goNext}
+              buttonLabel="Continue"
+              onSkip={goNext}
+            />
+          )}
+
           {current === "status" && (
             <CardStep
               heading="Where are you with work and retirement?"
@@ -333,6 +455,74 @@ export default function OnboardingPage() {
             />
           )}
 
+          {current === "feelings" && (
+            <MultiSelectStep
+              heading="How do you feel about your retirement right now?"
+              subheading="Choose up to three."
+              options={FEELINGS_OPTIONS}
+              selected={feelings}
+              max={FEELINGS_MAX}
+              onToggle={(opt) =>
+                setFeelings((prev) =>
+                  prev.includes(opt)
+                    ? prev.filter((f) => f !== opt)
+                    : prev.length < FEELINGS_MAX
+                      ? [...prev, opt]
+                      : prev
+                )
+              }
+              onContinue={goNext}
+              onSkip={() => {
+                setFeelings([]);
+                goNext();
+              }}
+            />
+          )}
+
+          {current === "priorPlanning" && (
+            <CardStep
+              heading="Have you done any form of retirement planning so far beyond financial planning?"
+              options={PRIOR_PLANNING_OPTIONS}
+              selected={priorPlanning}
+              onSelect={setPriorPlanning}
+              onContinue={goNext}
+              buttonLabel="Continue"
+              onSkip={() => {
+                setPriorPlanning("");
+                goNext();
+              }}
+            />
+          )}
+
+          {current === "confidence" && (
+            <ScaleStep
+              heading="How confident do you feel in your plans for retirement?"
+              lowLabel="Not at all confident"
+              highLabel="Very confident"
+              value={confidence}
+              onPick={setConfidence}
+              onContinue={goNext}
+              onSkip={() => {
+                setConfidence(null);
+                goNext();
+              }}
+            />
+          )}
+
+          {current === "expectations" && (
+            <TextAreaStep
+              heading="What are you expecting to get from the programme?"
+              value={expectations}
+              setValue={setExpectations}
+              placeholder="Whatever comes to mind — a sentence is plenty."
+              onContinue={goNext}
+              onSkip={() => {
+                setExpectations("");
+                goNext();
+              }}
+            />
+          )}
+
           {current === "tone" && (
             <CardStep
               heading="How would you like Vita, our AI coach, to talk with you?"
@@ -346,6 +536,24 @@ export default function OnboardingPage() {
               }}
               onContinue={async () => {
                 await data.saveOnboarding({ tone });
+                // Write the one-time pilot baseline to its own table, snapshotting
+                // the demographics captured earlier in the flow. Empty answers
+                // (skipped, or a flag-off step never shown) go as null.
+                const genderValue =
+                  gender === GENDER_SELF_DESCRIBE
+                    ? genderSelf.trim() || null
+                    : gender || null;
+                await data.saveBaselineSurvey({
+                  gender: genderValue,
+                  feelings,
+                  priorPlanning: priorPlanning || null,
+                  planningConfidence: confidence,
+                  expectations: expectations.trim() || null,
+                  dob: dob.trim() || null,
+                  partner: partner || null,
+                  retirementStage: retirementStage || null,
+                  horizon: horizon || null,
+                });
                 await data.markOnboardingComplete();
                 router.push("/home");
               }}
@@ -407,15 +615,11 @@ function Welcome({
   firstName,
   understood,
   setUnderstood,
-  healthConsent,
-  setHealthConsent,
   onContinue,
 }: {
   firstName: string;
   understood: boolean;
   setUnderstood: (v: boolean) => void;
-  healthConsent: boolean;
-  setHealthConsent: (v: boolean) => void;
   onContinue: () => void;
 }) {
   const tuner = useSceneTuner();
@@ -478,31 +682,81 @@ function Welcome({
           </span>
         </label>
 
-        {/* Health-data consent — a standalone agreement, separate from the AI
-            disclaimer above. Both must be ticked before Get started enables. */}
-        <div className="consent-block">
-          <h2 className="consent-heading">{HEALTH_CONSENT_HEADING}</h2>
-          <p className="consent-body">{HEALTH_CONSENT_BODY}</p>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={healthConsent}
-              onChange={(e) => setHealthConsent(e.target.checked)}
-            />
-            <span className="lab">{HEALTH_CONSENT_LABEL}</span>
-          </label>
-        </div>
-
         <button
           type="button"
           className="btn btn-navy"
-          disabled={!understood || !healthConsent}
+          disabled={!understood}
           onClick={onContinue}
         >
           Get started →
         </button>
       </div>
     </section>
+  );
+}
+
+// Health-data consent — its own screen, straight after the welcome's AI
+// disclaimer, so the agreement is read on its own rather than as a second tick
+// under the intro. The tick gates the button, so continuing means agreed, and
+// the caller stamps the consent record at that point.
+function ConsentStep({
+  healthConsent,
+  setHealthConsent,
+  onContinue,
+}: {
+  healthConsent: boolean;
+  setHealthConsent: (v: boolean) => void;
+  onContinue: () => void;
+}) {
+  return (
+    <>
+      <h1 className="step-heading">{HEALTH_CONSENT_HEADING}</h1>
+      <p className="paragraph">
+        {HEALTH_CONSENT_BODY_BEFORE_BOLD}
+        <strong>{HEALTH_CONSENT_BODY_BOLD}</strong>
+        {HEALTH_CONSENT_BODY_AFTER_BOLD}
+        {PRIVACY_NOTICE_URL ? (
+          <a
+            className="consent-link"
+            href={PRIVACY_NOTICE_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {HEALTH_CONSENT_PRIVACY_LINK_TEXT}
+          </a>
+        ) : (
+          HEALTH_CONSENT_PRIVACY_LINK_TEXT
+        )}
+        {HEALTH_CONSENT_BODY_END}
+      </p>
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={healthConsent}
+          onChange={(e) => setHealthConsent(e.target.checked)}
+        />
+        <span className="lab">{HEALTH_CONSENT_LABEL}</span>
+      </label>
+      <p className="consent-withdraw">
+        {HEALTH_CONSENT_WITHDRAW_BEFORE}
+        <a className="consent-link" href={MANAGE_DATA_URL}>
+          {HEALTH_CONSENT_MANAGE_LINK_TEXT}
+        </a>
+        {HEALTH_CONSENT_WITHDRAW_MIDDLE}
+        <a className="consent-link" href={`mailto:${HEALTH_CONSENT_EMAIL}`}>
+          {HEALTH_CONSENT_EMAIL}
+        </a>
+        .
+      </p>
+      <button
+        type="button"
+        className="btn btn-navy"
+        disabled={!healthConsent}
+        onClick={onContinue}
+      >
+        Agree and continue
+      </button>
+    </>
   );
 }
 
@@ -560,8 +814,7 @@ function DateStep({
       <h1 className="step-heading">What&apos;s your date of birth?</h1>
       <p className="paragraph">
         This helps Vita tailor a few practical, age-related suggestions — like
-        when a routine health check becomes worth a mention. It&apos;s private,
-        kept only on your own plan, and never shared. You can skip it.
+        when a routine health check becomes worth a mention. You can skip it.
       </p>
       <div className="name-field">
         <input
@@ -653,6 +906,167 @@ function CardStep({
   );
 }
 
+// Multi-select cards with a cap (the "choose up to three" pilot question). Once
+// the cap is reached, unpicked cards disable so the limit is felt, not policed
+// after the fact. Continue needs at least one; Skip records none.
+function MultiSelectStep({
+  heading,
+  subheading,
+  options,
+  selected,
+  max,
+  onToggle,
+  onContinue,
+  onSkip,
+}: {
+  heading: string;
+  subheading: string;
+  options: string[];
+  selected: string[];
+  max: number;
+  onToggle: (opt: string) => void;
+  onContinue: () => void;
+  onSkip: () => void;
+}) {
+  const atMax = selected.length >= max;
+  return (
+    <>
+      <h1 className="step-heading">{heading}</h1>
+      <p className="step-sub">{subheading}</p>
+      {/* Grid rather than the default single column: this list is long (13
+          feelings), and stacking them makes the step tower off the screen. */}
+      <div className="card-list grid">
+        {options.map((opt) => {
+          const isSelected = selected.includes(opt);
+          const disabled = !isSelected && atMax;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onToggle(opt)}
+              aria-pressed={isSelected}
+              disabled={disabled}
+              className={isSelected ? "card is-selected" : "card"}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        className="btn btn-navy"
+        disabled={selected.length === 0}
+        onClick={onContinue}
+      >
+        Continue
+      </button>
+      <button type="button" onClick={onSkip} className="skip">
+        Skip
+      </button>
+    </>
+  );
+}
+
+// A 1–5 rating (the baseline confidence question). Five numbered buttons anchored
+// by a word at each pole. Continue needs a pick; Skip records none.
+function ScaleStep({
+  heading,
+  lowLabel,
+  highLabel,
+  value,
+  onPick,
+  onContinue,
+  onSkip,
+}: {
+  heading: string;
+  lowLabel: string;
+  highLabel: string;
+  value: number | null;
+  onPick: (v: number) => void;
+  onContinue: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <>
+      <h1 className="step-heading">{heading}</h1>
+      <div className="scale-row" role="group" aria-label={heading}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onPick(n)}
+            aria-pressed={value === n}
+            className={value === n ? "scale-btn is-selected" : "scale-btn"}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <div className="scale-ends">
+        <span>{lowLabel}</span>
+        <span>{highLabel}</span>
+      </div>
+      <button
+        type="button"
+        className="btn btn-navy"
+        disabled={value === null}
+        onClick={onContinue}
+      >
+        Continue
+      </button>
+      <button type="button" onClick={onSkip} className="skip">
+        Skip
+      </button>
+    </>
+  );
+}
+
+// A free-text step (the baseline expectations question). Auto-growing textarea so
+// everything typed stays visible — never a clipping single line. Optional, so
+// Continue always enables; Skip records nothing.
+function TextAreaStep({
+  heading,
+  value,
+  setValue,
+  placeholder,
+  onContinue,
+  onSkip,
+}: {
+  heading: string;
+  value: string;
+  setValue: (v: string) => void;
+  placeholder: string;
+  onContinue: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <>
+      <h1 className="step-heading">{heading}</h1>
+      {/* `wide` because .column is align-items:flex-start, so a field only fills
+          the column when it says so — without it the box shrinks to its default
+          textarea width. */}
+      <div className="name-field wide">
+        <textarea
+          id="expectations"
+          className="name-input textarea"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={placeholder}
+          rows={4}
+          maxLength={2000}
+        />
+      </div>
+      <button type="button" className="btn btn-navy" onClick={onContinue}>
+        Continue
+      </button>
+      <button type="button" onClick={onSkip} className="skip">
+        Skip
+      </button>
+    </>
+  );
+}
+
 const css = `
 .rlp-onb{min-height:calc(100dvh - var(--header-h));background:var(--bg-alt);display:flex;justify-content:center;padding:56px 24px 80px;font-family:var(--font-sans)}
 .rlp-onb .column{width:100%;max-width:600px;display:flex;flex-direction:column;align-items:flex-start}
@@ -682,6 +1096,9 @@ const css = `
 .rlp-onb .ai-note{font-size:var(--fs-sm);color:var(--text-muted);padding-left:14px;border-left:2px solid color-mix(in srgb, var(--color-vita) 35%, transparent)}
 
 .rlp-onb .name-field{display:flex;flex-direction:column;gap:8px;margin:0 0 20px}
+/* .column is align-items:flex-start, so fields are content-width by default.
+   Opt in to the full column width (the free-text answer box wants it). */
+.rlp-onb .name-field.wide{width:100%}
 .rlp-onb .name-label{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;color:var(--ink)}
 .rlp-onb .name-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;min-height:52px;font-family:var(--font-sans);font-size:var(--fs-body);color:var(--text);box-sizing:border-box;transition:border-color .15s ease,box-shadow .15s ease}
 .rlp-onb .name-input:hover{border-color:var(--border-strong)}
@@ -692,15 +1109,32 @@ const css = `
 .rlp-onb .checkbox-row input:focus-visible{box-shadow:var(--focus-ring);border-radius:var(--r-xs)}
 .rlp-onb .checkbox-row .lab{font-family:var(--font-sans);font-size:var(--fs-sm);line-height:1.5;color:var(--text)}
 
-/* Health-data consent — its own block above the Get started button. Heading in
-   the sans section role, body at reading size, then the same warm checkbox-row
-   as the AI disclaimer for a consistent pair. */
-.rlp-onb .consent-block{margin:0 0 26px}
-.rlp-onb .consent-heading{font-family:var(--font-sans);font-size:var(--fs-section);font-weight:700;color:var(--ink);margin:0 0 8px}
-.rlp-onb .consent-body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:var(--lh-body);color:var(--text);margin:0;max-width:58ch}
-.rlp-onb .consent-block .checkbox-row{margin:14px 0 0}
+.rlp-onb .step-sub{font-family:var(--font-sans);font-size:var(--fs-sm);color:var(--text-muted);margin:-16px 0 22px}
+.rlp-onb .name-input.textarea{min-height:120px;resize:vertical;line-height:var(--lh-body)}
+.rlp-onb .self-describe{margin:-14px 0 28px}
+
+/* 1–5 rating: a row of five equal buttons with an end-label caption beneath. */
+.rlp-onb .scale-row{display:flex;gap:8px;width:100%;margin:0 0 8px}
+.rlp-onb .scale-btn{flex:1 1 0;min-width:0;min-height:56px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);font-family:var(--font-sans);font-size:var(--fs-section);font-weight:600;color:var(--text);cursor:pointer;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
+.rlp-onb .scale-btn:hover{border-color:var(--border-strong);box-shadow:var(--shadow-md)}
+.rlp-onb .scale-btn.is-selected{background:var(--brand-primary-tint);border-color:var(--brand-primary);color:var(--ink)}
+.rlp-onb .scale-btn:focus-visible{box-shadow:var(--focus-ring)}
+.rlp-onb .scale-ends{display:flex;justify-content:space-between;width:100%;margin:0 0 28px;font-family:var(--font-sans);font-size:var(--fs-sm);color:var(--text-muted)}
+
+.rlp-onb .card:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+.rlp-onb .card:disabled:hover{border-color:var(--border)}
+/* Consent screen: links take the interaction layer (Chorus green); the withdraw
+   line sits under the tick as a quieter footnote to the agreement. */
+.rlp-onb .consent-link{color:var(--brand-primary);text-decoration:underline;font-weight:600}
+.rlp-onb .consent-link:hover{color:var(--brand-primary-hover)}
+.rlp-onb .consent-link:focus-visible{box-shadow:var(--focus-ring);border-radius:var(--r-xs)}
+.rlp-onb .consent-withdraw{font-family:var(--font-sans);font-size:var(--fs-sm);line-height:var(--lh-body);color:var(--text-muted);margin:0 0 26px;max-width:58ch}
 
 .rlp-onb .card-list{display:flex;flex-direction:column;gap:12px;width:100%;margin:0 0 28px}
+/* Long option lists (the 13 feelings) reflow into columns instead of one tall
+   stack. auto-fit + a 240px floor gives two columns at the 600px column width —
+   wide enough for the longest label on one line — and drops to one on a phone. */
+.rlp-onb .card-list.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:stretch}
 .rlp-onb .card{width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:18px 20px;min-height:56px;box-shadow:var(--shadow-sm);font-family:var(--font-sans);font-size:var(--fs-body);font-weight:500;color:var(--text);cursor:pointer;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
 .rlp-onb .card:hover{border-color:var(--border-strong);box-shadow:var(--shadow-md)}
 .rlp-onb .card.large{min-height:84px;font-size:var(--fs-section);font-weight:600}

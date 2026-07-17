@@ -27,6 +27,7 @@ import ScreeningCheck, {
 } from "./ScreeningCheck";
 import ScreeningCommitment from "./ScreeningCommitment";
 import LetterFlow from "./LetterFlow";
+import StageIntro, { type StageIntroData } from "./StageIntro";
 import {
   PrimerAudio,
   PrimerImage,
@@ -527,6 +528,11 @@ type SessionContainerProps = {
   // "mirror back, then confirm" wrap-up. For short, practical modules where
   // restating the answers adds nothing. Threaded to /api/chat at closing time.
   closeInOneStep?: boolean;
+  // The stage's framing intro, shown once before the reading when this is the
+  // first session of the stage (stages 2+). Null when it isn't the first session,
+  // the stage has no intro, or it's Stage 1 (whose intro lands on /home straight
+  // after onboarding instead). Built and tailored per cohort on the server.
+  stageIntro?: StageIntroData | null;
 };
 
 const COACH_ERROR_REPLY =
@@ -575,6 +581,7 @@ export default function SessionContainer({
   letterWritingPlaceholder,
   closingCommitment,
   closeInOneStep = false,
+  stageIntro = null,
 }: SessionContainerProps) {
   const { user } = useUser();
   const userData = useUserData();
@@ -627,12 +634,19 @@ export default function SessionContainer({
   const [input, setInput] = useState("");
   // The composer is an auto-growing textarea; this lets it size to its content.
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  // The "What they built" recap shown above the chat — a jump button scrolls the
+  // page back up to it so the person can re-read their answers mid-conversation.
+  const exerciseRef = useRef<HTMLDivElement>(null);
   // Flips true once we've read this module's saved state out of the snapshot, so
   // the persist effect can't overwrite a saved conversation with an empty one
   // before hydration.
   const [hydrated, setHydrated] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // True on phones/tablets once the reader has scrolled up away from the bottom
+  // of the chat (e.g. after tapping "Your answers"). Reveals a floating "Keep
+  // chatting" pill that drops them back to the latest message and the composer.
+  const [scrolledUp, setScrolledUp] = useState(false);
   // Guards the one-time dynamic-opening call so it can't fire twice (e.g. under
   // React's double-invoked effects in development).
   const openingRequested = useRef(false);
@@ -673,6 +687,11 @@ export default function SessionContainer({
   // Vita's closing line for the first-year journey, shown above the completion
   // block once the person settles their year (it has its own editing chat).
   const [firstYearAck, setFirstYearAck] = useState<string | null>(null);
+  // Whether to show this stage's framing intro over the session before anything
+  // else. Set once on hydration when this is the first session of a stage (2+)
+  // whose intro the person hasn't met yet; cleared when they continue past it,
+  // which also records the intro as seen so it never returns.
+  const [showStageIntro, setShowStageIntro] = useState(false);
 
   // Load any saved conversation and built day from the snapshot as soon as the
   // user is signed in and the data layer has finished loading. We read during
@@ -691,6 +710,13 @@ export default function SessionContainer({
       setCompleted(true);
       // Already finished before — don't re-prompt the commitment step on revisit.
       setCommitmentDone(true);
+    }
+
+    // First forward entry into a stage (2+) shows its intro before the reading,
+    // then records it as seen so it shows only once. stageIntro is non-null only
+    // on the stage's first session, so the seen check is all that's left to make.
+    if (stageIntro && !userData.getStageIntrosSeen().includes(stageNumber)) {
+      setShowStageIntro(true);
     }
 
     const savedBuild = userData.getBuild(sessionId);
@@ -1419,6 +1445,22 @@ export default function SessionContainer({
     if (triage?.type === "value-triage")
       triage.sorted.filter((s) => s.tray === "me").forEach((s) => addValue(s.label));
 
+    // The values the person MARKED as most core in 3.2 — the authoritative set the
+    // 3.3 ranking and 3.4 definitions must weigh/define, never an AI re-inference.
+    // Ordered by the 3.3 ranking where one already exists (so 3.4's cards follow
+    // the order the person landed on), else by their 3.2 selection order. Same
+    // ordering the reveal uses, so the whole values thread stays consistent.
+    const markedCore =
+      triage?.type === "value-triage" ? triage.core.filter(Boolean) : [];
+    const rankedOrder =
+      ranking?.type === "priority-choices" ? ranking.ranked.filter(Boolean) : [];
+    const coreValues = markedCore.length
+      ? [
+          ...rankedOrder.filter((l) => markedCore.includes(l)),
+          ...markedCore.filter((l) => !rankedOrder.includes(l)),
+        ]
+      : [];
+
     const body = JSON.stringify({
       seedType: interaction.type,
       onboardingContext: userData.buildOnboardingContext(),
@@ -1429,6 +1471,7 @@ export default function SessionContainer({
       carryForward: resolveSeedText(sessionId, userData.getActiveFacts()),
       priorBuilds,
       carryValues,
+      coreValues,
       hasPartner: userData.hasPartner(),
       retirementStage: userData.getRetirementStage(),
     });
@@ -1657,10 +1700,9 @@ export default function SessionContainer({
   // page to its TRUE bottom rather than scrollIntoView-ing the end-of-list
   // sentinel: the composer (and any completion block) sit below that sentinel, so
   // aligning the sentinel to the viewport bottom would scroll the page *up* and
-  // push the composer off-screen — the aggressive upward jump on reaching the
-  // bottom. Going to document bottom instead settles at the real bottom, and
-  // because the reveal grows a few characters per frame it reads as a smooth,
-  // continuous follow rather than a jump.
+  // push the composer off-screen. Going to document bottom instead settles at the
+  // real bottom, and because the reveal grows a few characters per frame it reads
+  // as a smooth, continuous follow rather than a jump.
   useEffect(() => {
     if (!streamingRef.current) return;
     const nearBottom =
@@ -1670,6 +1712,80 @@ export default function SessionContainer({
       window.scrollTo({ top: document.documentElement.scrollHeight });
     }
   }, [messages]);
+
+  // On phones/tablets the composer is pinned to the bottom of the screen (see
+  // mobileChatCss) so it never hides beneath the on-screen keyboard. The keyboard
+  // is anchored to the physical bottom of the screen and its height doesn't
+  // change as you scroll, so we measure it as the gap between the layout viewport
+  // (window.innerHeight) and the visible area above the keyboard
+  // (visualViewport.height) — deliberately WITHOUT visualViewport.offsetTop,
+  // which only reflects scroll pan and would make the pinned bar drift under the
+  // keyboard as you scroll. We publish that as --vita-kb; the composer (fixed,
+  // bottom:var(--vita-kb)) rests just above the keyboard and stays put while
+  // scrolling. A threshold ignores the small innerHeight/visual difference from
+  // the browser toolbar so a closed keyboard reads as 0. Recomputed only on
+  // resize (keyboard open/close) — never on scroll, which would jitter.
+  useEffect(() => {
+    if (phase !== "conversation") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const update = () => {
+      const gap = window.innerHeight - vv.height;
+      root.style.setProperty("--vita-kb", `${gap > 100 ? gap : 0}px`);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      root.style.removeProperty("--vita-kb");
+    };
+  }, [phase]);
+
+  // Track whether the reader has scrolled up from the bottom of the chat, so the
+  // "Keep chatting" pill can appear only when it's useful (they've gone up to
+  // re-read their answers) and stay out of the way otherwise.
+  useEffect(() => {
+    if (phase !== "conversation") return;
+    // Throttled to one measurement per animation frame so a fast scroll can't
+    // thrash layout (each check reads scrollHeight) or re-render on every event.
+    let ticking = false;
+    const measure = () => {
+      ticking = false;
+      const nearBottom =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 240;
+      setScrolledUp(!nearBottom);
+    };
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(measure);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [phase, messages.length]);
+
+  // Jump the page back up to the exercise recap ("Your answers"). scrollMarginTop
+  // on the target keeps it clear of the mobile app bar.
+  function scrollToExercise() {
+    exerciseRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // The return trip: drop back down to the newest message and the composer, and
+  // put the cursor in the box so they can carry straight on typing.
+  function scrollToLatest() {
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: "smooth",
+    });
+    composerRef.current?.focus();
+  }
 
   async function handleSend() {
     const text = input.trim();
@@ -1782,6 +1898,21 @@ export default function SessionContainer({
     );
   }
 
+  // The stage's framing intro takes over the whole screen before the reading,
+  // once, on the first session of the stage. Continuing records it as seen (so it
+  // never returns) and drops into the reading exactly as if it had opened there.
+  if (showStageIntro && stageIntro) {
+    return (
+      <StageIntro
+        stage={stageIntro}
+        onContinue={() => {
+          if (user) void userData.markStageIntroSeen(stageNumber);
+          setShowStageIntro(false);
+        }}
+      />
+    );
+  }
+
   // The Stage 4 modules are pre-populated from the person's earlier answers,
   // deterministic and free, no seed call. Both now read the resolver's seed view
   // (manifest-scoped, status=active) rather than the lossy user-model re-derivation:
@@ -1816,11 +1947,14 @@ export default function SessionContainer({
       : "";
 
   return (
-    <div style={styles.container}>
-      <style>{focusCss + primerMediaCss}</style>
+    <div
+      style={styles.container}
+      className={phase === "conversation" ? "session-in-conversation" : undefined}
+    >
+      <style>{focusCss + primerMediaCss + mobileChatCss}</style>
 
       {/* ZONE 1 — PROGRAMME HEADER */}
-      <header style={styles.header}>
+      <header className="session-programme-header" style={styles.header}>
         <div style={styles.stageLine}>
           Stage {stageNumber} of {totalStages} · {stageName}
         </div>
@@ -1855,7 +1989,7 @@ export default function SessionContainer({
       </header>
 
       {/* ZONE 2 — CONTENT */}
-      <section style={styles.contentCard}>
+      <section className="session-primer-card" style={styles.contentCard}>
         <div style={styles.labelRow}>
           <span style={styles.contentLabel}>
             <span aria-hidden="true">{labelIcon}</span>
@@ -1999,12 +2133,25 @@ export default function SessionContainer({
 
       {/* ZONE 2.75 — WHAT THEY BUILT (kept visible through the conversation) */}
       {phase === "conversation" && interaction && buildResult && (
-        <InteractionSummary result={buildResult} onEdit={handleEditStart} />
+        <div ref={exerciseRef} style={{ scrollMarginTop: "70px" }}>
+          <InteractionSummary result={buildResult} onEdit={handleEditStart} />
+        </div>
       )}
 
       {/* ZONE 3 — VITA + CONVERSATION */}
       {phase === "conversation" && (
         <section style={styles.conversationZone}>
+          {interaction && buildResult && (
+            <div className="vita-jump-bar">
+              <button
+                type="button"
+                className="vita-jump-btn"
+                onClick={scrollToExercise}
+              >
+                <span aria-hidden>↑</span> Your answers
+              </button>
+            </div>
+          )}
           <div style={styles.vitaLockup}>
             <VitaMark size={34} />
             <span style={styles.vitaName}>Vita</span>
@@ -2019,9 +2166,8 @@ export default function SessionContainer({
                 <UserBubble key={i} text={m.text} />
               )
             )}
-            {/* Show the typing dots only until Vita's first streamed token
-                lands — once her (partial) bubble is on screen it carries the
-                "still writing" cue itself, so the dots would just sit below it. */}
+            {/* Typing dots show only until Vita's first streamed token lands —
+                her partial bubble then carries the "still writing" cue itself. */}
             {sending && messages[messages.length - 1]?.role !== "coach" && (
               <TypingBubble />
             )}
@@ -2067,7 +2213,22 @@ export default function SessionContainer({
                 </div>
               )}
 
-              <div style={styles.composer}>
+              {/* Floating return button — only while scrolled up (e.g. after
+                  tapping "Your answers"); drops back to the latest message. */}
+              {scrolledUp && (
+                <button
+                  type="button"
+                  className="vita-keep-chatting"
+                  onClick={scrollToLatest}
+                >
+                  Keep chatting <span aria-hidden>↓</span>
+                </button>
+              )}
+
+              {/* Holds scroll space so the last message can rest above the
+                  composer once it's pinned to the bottom on mobile. */}
+              <div className="vita-composer-spacer" aria-hidden />
+              <div className="vita-composer" style={styles.composer}>
                 <textarea
                   ref={composerRef}
                   className="composer-input"
@@ -2080,18 +2241,24 @@ export default function SessionContainer({
                     if (error) setError(null);
                   }}
                   onFocus={() => {
-                    // On mobile the composer sits at the end of a long scrolling
-                    // page, so when the on-screen keyboard opens it can be left
-                    // off-screen. Once the keyboard has had a moment to animate in,
-                    // ensure the input is visible — but only just: block "nearest"
-                    // scrolls the minimum needed, so an already-visible composer
-                    // stays put rather than being yanked to the centre of the
-                    // viewport (which threw the page upward when tapping to type).
+                    // Give the keyboard a moment to animate in, then bring the
+                    // newest messages up above the pinned composer. On desktop
+                    // there's no keyboard — a gentle nudge to the bottom.
                     setTimeout(() => {
-                      composerRef.current?.scrollIntoView({
-                        block: "nearest",
-                        behavior: "smooth",
-                      });
+                      if (
+                        window.matchMedia("(max-width: 880px), (pointer: coarse)")
+                          .matches
+                      ) {
+                        window.scrollTo({
+                          top: document.documentElement.scrollHeight,
+                          behavior: "smooth",
+                        });
+                      } else {
+                        composerRef.current?.scrollIntoView({
+                          block: "nearest",
+                          behavior: "smooth",
+                        });
+                      }
                     }, 300);
                   }}
                   onKeyDown={(e) => {
@@ -3410,4 +3577,109 @@ const focusCss = `
     0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
     30% { opacity: 1; transform: translateY(-3px); }
   }
+`;
+
+// Mobile/tablet chat ergonomics: pin the composer above the keyboard, and give
+// the conversation "Your answers" / "Keep chatting" jump affordances. Scoped to
+// touch devices and narrow screens (≤880px OR pointer:coarse). A mouse-driven
+// desktop keeps the inline composer and never sees these.
+const mobileChatCss = `
+@media (max-width: 880px), (pointer: coarse) {
+  /* Once the conversation is underway, hide the programme header and the reading
+     material on phones/tablets so the chat is the focus and there's far less to
+     scroll past. They've already read the primer to get here; the app bar still
+     carries back/stage navigation, and the exercise recap is one tap away via
+     "Your answers". Desktop keeps everything on the page. */
+  .session-in-conversation .session-programme-header,
+  .session-in-conversation .session-primer-card { display: none; }
+  /* Pin the composer to the bottom of the screen, resting just above the
+     on-screen keyboard. --vita-kb (set from the visual viewport in JS) is how
+     much the keyboard is covering; when it's closed the value is 0 and the bar
+     sits at the bottom, clear of the home indicator via the safe-area padding. */
+  .vita-composer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--vita-kb, 0px);
+    z-index: 95;
+    margin: 0;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--bg-alt);
+    border-top: 1px solid var(--border);
+    box-sizing: border-box;
+  }
+  /* Empty scroll space at the end of the chat so the last message can settle
+     above the pinned composer rather than behind it. */
+  .vita-composer-spacer {
+    height: calc(84px + env(safe-area-inset-bottom));
+  }
+  /* A quick way back up to the exercise recap while chatting. Sticks to the top
+     as the conversation scrolls (tucked below the app bar where one exists). */
+  .vita-jump-bar {
+    display: flex;
+    justify-content: flex-end;
+    position: sticky;
+    top: 0;
+    z-index: 90;
+    margin: -6px 0 -2px;
+    padding: 6px 0;
+    background: color-mix(in srgb, var(--bg-alt) 92%, transparent);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  /* The return trip — floats just above the pinned composer, centred. */
+  .vita-keep-chatting {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(var(--vita-kb, 0px) + 84px + env(safe-area-inset-bottom));
+    z-index: 96;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--brand-primary);
+    color: var(--brand-on-primary);
+    border: none;
+    border-radius: 999px;
+    padding: 10px 18px;
+    min-height: 44px;
+    box-shadow: var(--shadow-md);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .vita-keep-chatting:hover { background: var(--brand-primary-hover); }
+  .vita-keep-chatting:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+}
+/* Phones and portrait tablets carry the sticky mobile app bar (≤880px only), so
+   tuck the jump bar just beneath it. Wider touch tablets have no app bar and
+   keep top:0 from the rule above. */
+@media (max-width: 880px) {
+  .vita-jump-bar { top: calc(54px + env(safe-area-inset-top)); }
+}
+/* Desktop (wide AND mouse): these are touch/narrow-only affordances. */
+@media (min-width: 881px) and (pointer: fine) {
+  .vita-jump-bar,
+  .vita-keep-chatting { display: none; }
+  .vita-composer-spacer { display: none; }
+}
+.vita-jump-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--brand-primary-tint);
+  color: var(--brand-primary);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, transparent);
+  border-radius: var(--r-sm);
+  padding: 9px 14px;
+  min-height: 44px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.vita-jump-btn span[aria-hidden] { font-size: 15px; line-height: 1; }
+.vita-jump-btn:hover { background: color-mix(in srgb, var(--brand-primary) 18%, #fff); }
+.vita-jump-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 `;
