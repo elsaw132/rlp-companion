@@ -113,6 +113,14 @@ export default function ProviderBand() {
                 </div>
                 {/* Room for "Delete all my data" and settings (e.g. Vita's tone)
                     will sit here once those ship. */}
+                <Link
+                  href="/privacy"
+                  className="menu-item"
+                  role="menuitem"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Privacy
+                </Link>
                 <button
                   type="button"
                   className="menu-item"

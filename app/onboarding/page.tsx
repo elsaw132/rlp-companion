@@ -120,7 +120,7 @@ const MANAGE_DATA_URL = "https://app.chorus-life.com/delete-account";
 // The published Privacy Notice. Empty while the notice is being finalised; until
 // it has a URL the words render as plain text rather than a link to nowhere. Set
 // this and it becomes a link with no other change.
-const PRIVACY_NOTICE_URL = "";
+const PRIVACY_NOTICE_URL = "https://app.chorus-life.com/privacy";
 
 // Vita's register, chosen here and stored against the user. Each label maps to a
 // stable code value (CoachTone) the chat API turns into a tone directive. All

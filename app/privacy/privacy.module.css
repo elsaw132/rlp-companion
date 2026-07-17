@@ -1,0 +1,159 @@
+/* Standalone document styling for the app privacy notice. Scoped under .page so
+   these globalish tag rules (h1/h2/p/ul/li) don't leak past this route and win
+   over Tailwind's preflight. Fonts come from the app's own --font-sans /
+   --font-serif (self-hosted Inter + Source Serif 4) — the same faces the mock
+   loaded from Google, so no extra render-blocking font request. The warm
+   document palette below is local to this page and intentionally distinct from
+   the in-app Chorus chrome. */
+
+.page {
+  --ink: #20293d; /* navy text/headings */
+  --ink-soft: #41485a; /* body */
+  --muted: #7a8090; /* meta */
+  --page-bg: #faf8f3; /* warm off-white */
+  --rule: #e7e2d6; /* hairline */
+  --link: #2f3a57;
+  --accent: #c96a3f; /* used only as a thin top rule, sparingly */
+
+  min-height: 100vh;
+  background: var(--page-bg);
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 18px; /* comfortable for an older audience */
+  line-height: 1.7;
+}
+
+.topbar {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 28px 0;
+}
+
+.back {
+  font-size: 15px;
+  color: var(--link);
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.back:hover {
+  text-decoration: underline;
+}
+
+.main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 28px 96px;
+}
+
+.titleBlock {
+  border-top: 3px solid var(--accent);
+  padding-top: 28px;
+  margin-top: 20px;
+}
+
+.main h1 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 40px;
+  line-height: 1.15;
+  color: var(--ink);
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  color: var(--muted);
+  margin: 0 0 6px;
+  font-weight: 400;
+}
+
+.updated {
+  font-size: 15px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.intro {
+  margin-top: 26px;
+}
+
+.main h2 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 24px;
+  color: var(--ink);
+  margin: 44px 0 12px;
+  padding-top: 22px;
+  border-top: 1px solid var(--rule);
+}
+.main h2:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.main p {
+  margin: 0 0 16px;
+}
+
+.main a {
+  color: var(--link);
+}
+
+.main ul {
+  margin: 0 0 16px;
+  padding-left: 1.25em;
+  list-style: disc;
+}
+.main li {
+  margin: 0 0 10px;
+}
+.main li strong,
+.main p strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.leadPara strong {
+  display: inline;
+}
+
+.note {
+  font-size: 16px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.contactEmail {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.footer {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 28px 60px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .page {
+    font-size: 17px;
+  }
+  .main h1 {
+    font-size: 32px;
+  }
+  .main h2 {
+    font-size: 21px;
+  }
+  .main {
+    padding: 16px 20px 72px;
+  }
+  .topbar {
+    padding: 22px 20px 0;
+  }
+}
