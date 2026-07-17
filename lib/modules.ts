@@ -1933,11 +1933,13 @@ WATCH FOR
         primer: [
           {
             type: "text",
-            value: `Have you ever noticed how alive you feel when you're learning something new? Perhaps you've mastered a recipe, picked up a camera for the first time, started learning a language or finally understood something that had puzzled you for years. There is satisfaction in stretching your mind.
+            value: `Have you ever noticed how alive you feel when you're learning something new?
+
+Perhaps you've mastered a recipe, picked up a camera for the first time, started learning a language or finally understood something that had puzzled you for years. There is satisfaction in stretching your mind.
 
 That feeling isn't just enjoyable. It's also one of the ways your brain stays adaptable throughout life. Whenever you challenge yourself with something unfamiliar, your brain responds by building and strengthening new connections.
 
-Curiosity isn't just enjoyable. It may be one of the most valuable investments you make in your future self. Retirement often removes many of the daily challenges that kept your brain working. One of the best things you can do is replace them with challenges you've chosen for yourself.`,
+Curiosity may be one of the most valuable investments you make in your future self. Retirement often removes many of the daily challenges that kept your brain working. One of the best things you can do is replace them with challenges you've chosen for yourself.`,
           },
           { type: "video", url: "https://www.youtube.com/watch?v=ad7ID2VrRFM" },
         ],
