@@ -5,6 +5,7 @@ import {
   deleteAllContextFacts,
   deleteAllFeedback,
   deleteAllModuleFeedback,
+  deleteAllBaselineSurvey,
 } from "@/lib/db";
 
 // True erasure for one person — the mechanism the end-of-pilot "delete it all"
@@ -19,6 +20,7 @@ import {
 //   - context_facts      — the derived profile, every status
 //   - feedback           — free-text bodies can name the person, so delete, not scrub
 //   - module_feedback    — same reasoning (optional free-text comment)
+//   - baseline_survey    — same reasoning (free-text expectations)
 //   - the Clerk user account itself (done last — see below)
 //
 // The Postgres deletes run first and together; the Clerk account is deleted last
@@ -40,6 +42,7 @@ export async function deleteAllUserContext(userId: string): Promise<void> {
     deleteAllContextFacts(userId),
     deleteAllFeedback(userId),
     deleteAllModuleFeedback(userId),
+    deleteAllBaselineSurvey(userId),
   ]);
 
   // Account last: deleting the Clerk user invalidates their sessions and removes

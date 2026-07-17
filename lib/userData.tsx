@@ -91,6 +91,24 @@ export type OnboardingAnswers = {
   tone?: CoachTone;
 };
 
+// The one-time pilot baseline, captured at the end of onboarding. These
+// research answers live only in the dedicated baseline_survey table (via
+// /api/baseline-survey), never in the onboarding user_data record — they are for
+// evaluating the pilot, not for Vita's coaching. The demographic snapshot
+// (dob/partner/retirementStage/horizon) is added at save time from onboarding
+// state so the stored row is self-contained.
+export type BaselineSurveyAnswers = {
+  gender: string | null;
+  feelings: string[];
+  priorPlanning: string | null;
+  planningConfidence: number | null;
+  expectations: string | null;
+  dob: string | null;
+  partner: string | null;
+  retirementStage: string | null;
+  horizon: string | null;
+};
+
 export type ConversationMessage = {
   role: "coach" | "user";
   text: string;
@@ -99,7 +117,7 @@ export type ConversationMessage = {
 // The current version of the health-data consent wording. Stored alongside each
 // recorded consent so we always know which text a person agreed to; bump this
 // (and the copy in onboarding) if the wording ever changes.
-export const HEALTH_CONSENT_VERSION = "2026-07-health-v1";
+export const HEALTH_CONSENT_VERSION = "2026-07-health-v2";
 
 // The audit record that a person agreed to the health-data consent at
 // onboarding: whether they agreed, when, and against which version of the
@@ -867,6 +885,22 @@ export function useUserData() {
     return setKey(KEYS.onboarding, merged);
   };
 
+  // Persist the one-time pilot baseline to its own table. Unlike saveOnboarding
+  // this is a direct POST (no user_data key): the answers are research data, kept
+  // out of the coaching snapshot. Optimistic and best-effort, like setKey — a
+  // network blip shouldn't block finishing onboarding.
+  const saveBaselineSurvey = async (answers: BaselineSurveyAnswers) => {
+    try {
+      await fetch("/api/baseline-survey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(answers),
+      });
+    } catch {
+      // best-effort — onboarding still completes
+    }
+  };
+
   // "Yes" is the current onboarding answer; "Me and my partner" is kept for any
   // data saved before the question was simplified to Yes/No.
   const hasPartner = (): boolean => {
@@ -1366,6 +1400,7 @@ export function useUserData() {
     recordHealthConsent,
     getOnboarding,
     saveOnboarding,
+    saveBaselineSurvey,
     hasPartner,
     getRetirementStage,
     getCoachTone,
