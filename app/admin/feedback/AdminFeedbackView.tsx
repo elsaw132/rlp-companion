@@ -1,8 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ModuleFeedbackRow, FeedbackRow } from "@/lib/db";
+import type {
+  ModuleFeedbackRow,
+  FeedbackRow,
+  BaselineSurveyRow,
+} from "@/lib/db";
 import { RATING_MIN, RATING_MAX } from "@/lib/moduleFeedback";
+import { toAnalysisRow, type BaselineAnalysisRow } from "@/lib/baselineAnalysis";
 import AdminSignOut from "../AdminSignOut";
 
 // The read-only admin view over both feedback sources. All data is passed in
@@ -22,6 +27,7 @@ type Props = {
   adminEmail: string;
   moduleFeedback: ModuleFeedbackRow[];
   generalFeedback: FeedbackRow[];
+  baseline: BaselineSurveyRow[];
   modules: ModuleMeta[];
 };
 
@@ -146,16 +152,37 @@ function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url);
 }
 
-type Tab = "summary" | "comments" | "general";
+type Tab = "summary" | "baseline" | "comments" | "general";
 type SortKey = "order" | "responses" | "useful" | "engaging";
 
 export default function AdminFeedbackView({
   adminEmail,
   moduleFeedback,
   generalFeedback,
+  baseline,
   modules,
 }: Props) {
   const [tab, setTab] = useState<Tab>("summary");
+
+  // --- Baseline -------------------------------------------------------------
+  // One row per participant, oldest first: the order people joined the pilot is
+  // more useful to read down than newest-first.
+  const baselineRows = useMemo<BaselineAnalysisRow[]>(
+    () =>
+      [...baseline]
+        .map(toAnalysisRow)
+        .sort((a, b) => a.takenAt.localeCompare(b.takenAt)),
+    [baseline]
+  );
+
+  // The participant's demographics, keyed by user id, so a session rating can be
+  // read alongside who gave it. This is the join that makes "how did people
+  // winding down rate this session?" answerable at all.
+  const baselineByUser = useMemo(() => {
+    const m = new Map<string, BaselineAnalysisRow>();
+    for (const r of baselineRows) m.set(r.userId, r);
+    return m;
+  }, [baselineRows]);
 
   // --- Per-module summary ---------------------------------------------------
   const summary = useMemo<SummaryRow[]>(() => {
@@ -315,6 +342,12 @@ export default function AdminFeedbackView({
 
   // --- CSV exports ----------------------------------------------------------
   function exportModuleCsv() {
+    // Each rating carries the demographics of whoever gave it, so the pilot
+    // questions ("do people winding down find this less useful?") are a pivot
+    // table away rather than a manual join across two exports. Blank demographic
+    // columns mean that participant has no baseline (they onboarded before it
+    // existed, or skipped the question).
+    //
     // The rating columns are named with their scale: a bare "4" in a spreadsheet
     // is unreadable a month later, and this table has held other scales before.
     const header = [
@@ -327,19 +360,77 @@ export default function AdminFeedbackView({
       "issue",
       "comment",
       "timestamp_utc",
+      // Joined from the participant's baseline.
+      "age",
+      "age_band",
+      "gender",
+      "work_retirement_status",
+      "partner",
+      "retirement_horizon",
+      "feelings_at_baseline",
+      "prior_planning",
+      "baseline_confidence_1_5",
     ];
-    const rows = moduleFeedback.map((r) => [
-      r.userId,
-      r.moduleId,
-      moduleTitle.get(r.moduleId) ?? "",
-      r.useful ?? "",
-      r.engaging ?? "",
-      r.worked ?? "",
-      r.issue ?? "",
-      r.comment ?? "",
-      r.createdAt,
-    ]);
+    const rows = moduleFeedback.map((r) => {
+      const b = baselineByUser.get(r.userId);
+      return [
+        r.userId,
+        r.moduleId,
+        moduleTitle.get(r.moduleId) ?? "",
+        r.useful ?? "",
+        r.engaging ?? "",
+        r.worked ?? "",
+        r.issue ?? "",
+        r.comment ?? "",
+        r.createdAt,
+        b?.age !== null && b?.age !== undefined ? String(b.age) : "",
+        b?.ageBand ?? "",
+        b?.gender ?? "",
+        b?.stage ?? "",
+        b?.partner ?? "",
+        b?.horizon ?? "",
+        b ? b.feelings.join("; ") : "",
+        b?.priorPlanning ?? "",
+        b?.confidence !== null && b?.confidence !== undefined
+          ? String(b.confidence)
+          : "",
+      ];
+    });
     downloadCsv("module-feedback.csv", [header, ...rows]);
+  }
+
+  // One row per participant: the baseline as taken, for the cohort description
+  // ("who is in this pilot?").
+  function exportBaselineCsv() {
+    const header = [
+      "user_id",
+      "age",
+      "age_band",
+      "gender",
+      "work_retirement_status",
+      "partner",
+      "retirement_horizon",
+      "feelings",
+      "prior_planning",
+      "confidence_1_5",
+      "expectations",
+      "taken_at_utc",
+    ];
+    const rows = baselineRows.map((r) => [
+      r.userId,
+      r.age === null ? "" : String(r.age),
+      r.ageBand,
+      r.gender,
+      r.stage,
+      r.partner,
+      r.horizon,
+      r.feelings.join("; "),
+      r.priorPlanning,
+      r.confidence === null ? "" : String(r.confidence),
+      r.expectations,
+      r.takenAt,
+    ]);
+    downloadCsv("baseline-survey.csv", [header, ...rows]);
   }
 
   function exportGeneralCsv() {
@@ -377,6 +468,7 @@ export default function AdminFeedbackView({
         </header>
 
         <div style={S.statStrip}>
+          <Stat label="Participants (baseline)" value={baselineRows.length} />
           <Stat label="Module responses" value={totals.moduleResponses} />
           <Stat label="Testers (modules)" value={totals.moduleTesters} />
           <Stat label="Written comments" value={totals.commentCount} />
@@ -387,6 +479,9 @@ export default function AdminFeedbackView({
           <TabButton active={tab === "summary"} onClick={() => setTab("summary")}>
             Per-module summary
           </TabButton>
+          <TabButton active={tab === "baseline"} onClick={() => setTab("baseline")}>
+            Baseline ({baselineRows.length})
+          </TabButton>
           <TabButton active={tab === "comments"} onClick={() => setTab("comments")}>
             Comments ({comments.length})
           </TabButton>
@@ -394,6 +489,121 @@ export default function AdminFeedbackView({
             General &amp; support ({generalFeedback.length})
           </TabButton>
         </nav>
+
+        {tab === "baseline" && (
+          <section>
+            <div style={S.toolbar}>
+              <p style={S.help}>
+                One row per participant, in the order they joined —
+                who is in this pilot, before they started. Age is their age{" "}
+                <em>when they answered</em>, so it doesn&apos;t drift as the pilot
+                runs. Blanks are skipped questions; every one is optional. To
+                compare ratings <em>by</em> these characteristics, use the CSV on
+                the <strong>Per-module summary</strong> tab — each rating there
+                carries the demographics of whoever gave it.
+              </p>
+              <button style={S.csvBtn} onClick={exportBaselineCsv}>
+                ↓ Download CSV
+              </button>
+            </div>
+            {baselineRows.length === 0 ? (
+              <Empty>
+                No baseline responses yet. They&apos;re captured at the end of
+                onboarding, so the first will land when someone new signs up.
+              </Empty>
+            ) : (
+              <div style={S.tableWrap}>
+                <table style={S.table}>
+                  <thead>
+                    <tr>
+                      <Th>Participant</Th>
+                      <Th align="right">Age</Th>
+                      <Th>Gender</Th>
+                      {/* Headers are nowrap, so a long one sets that column's
+                          minimum width — kept short to keep all nine on screen. */}
+                      <Th>Work status</Th>
+                      <Th>Partner</Th>
+                      <Th>Horizon</Th>
+                      <Th>Feelings</Th>
+                      <Th>Planning</Th>
+                      <Th align="right">Confidence</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {baselineRows.map((r) => (
+                      <tr key={r.userId} style={S.tr}>
+                        <td style={S.tdModule}>
+                          <span style={S.testerTag} title={r.userId}>
+                            {shortUser(r.userId)}
+                          </span>
+                          <div style={S.moduleMeta}>{fmtDate(r.takenAt)}</div>
+                        </td>
+                        <td style={S.tdNum}>
+                          {r.age === null ? (
+                            <span style={S.muted}>—</span>
+                          ) : (
+                            r.age
+                          )}
+                        </td>
+                        <Cell v={r.gender} />
+                        <Cell v={r.stage} />
+                        <Cell v={r.partner} />
+                        <Cell v={r.horizon} />
+                        <td style={S.tdWrap}>
+                          {r.feelings.length === 0 ? (
+                            <span style={S.muted}>—</span>
+                          ) : (
+                            <div style={S.chips}>
+                              {r.feelings.map((f) => (
+                                <span key={f} style={S.chip}>
+                                  {f}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <Cell v={r.priorPlanning} />
+                        <td style={S.tdNum}>
+                          {r.confidence === null ? (
+                            <span style={S.muted}>—</span>
+                          ) : (
+                            `${r.confidence} / ${RATING_MAX}`
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Expectations are prose, not a column — they'd be unreadable
+                squeezed into the table, and they're the one baseline answer
+                worth reading rather than counting. */}
+            {baselineRows.some((r) => r.expectations) && (
+              <section style={S.expectBlock}>
+                <h2 style={S.expectHeading}>
+                  What they expect from the programme
+                </h2>
+                <ul style={S.cardList}>
+                  {baselineRows
+                    .filter((r) => r.expectations)
+                    .map((r) => (
+                      <li key={r.userId} style={S.card}>
+                        <div style={S.cardHead}>
+                          <span style={S.testerTag} title={r.userId}>
+                            {shortUser(r.userId)}
+                          </span>
+                          <span style={S.cardDate}>{fmtDate(r.takenAt)}</span>
+                        </div>
+                        <p style={S.cardBody}>{r.expectations}</p>
+                      </li>
+                    ))}
+                </ul>
+              </section>
+            )}
+          </section>
+        )}
 
         {tab === "summary" && (
           <section>
@@ -704,6 +914,14 @@ function Th({
   );
 }
 
+// A plain text cell that shows an em-dash for a skipped answer, so a blank never
+// reads as a rendering fault.
+function Cell({ v }: { v: string }) {
+  return (
+    <td style={S.tdWrap}>{v ? v : <span style={S.muted}>—</span>}</td>
+  );
+}
+
 function AvgCell({ stat }: { stat: DimStat }) {
   if (stat.avg === null) {
     return (
@@ -927,7 +1145,11 @@ const S: Record<string, React.CSSProperties> = {
   tableWrap: {
     border: "1px solid var(--border)",
     borderRadius: "var(--r-md)",
-    overflow: "hidden",
+    // Scroll, never clip. This was `overflow: hidden` (to round the corners),
+    // which silently amputated any column past the container's width — the
+    // baseline table's last column was unreachable, not merely off-screen.
+    // overflow-x:auto still clips to the radius, so the corners stay rounded.
+    overflowX: "auto",
     background: "var(--surface)",
   },
   table: { width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-sm)" },
@@ -1021,6 +1243,39 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: "var(--fs-body)",
     lineHeight: "var(--lh-body)",
     whiteSpace: "pre-wrap",
+  },
+  // Baseline table: cells wrap rather than truncate — a clipped "Winding down"
+  // or a hidden feeling is worse than a taller row.
+  tdWrap: {
+    padding: "10px 12px",
+    borderTop: "1px solid var(--border)",
+    fontSize: "var(--fs-sm)",
+    color: "var(--text)",
+    verticalAlign: "top",
+  },
+  chips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "4px",
+  },
+  chip: {
+    fontSize: "11px",
+    color: "var(--text)",
+    background: "var(--bg-alt)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-pill)",
+    padding: "2px 8px",
+    whiteSpace: "nowrap",
+  },
+  expectBlock: {
+    marginTop: "28px",
+  },
+  expectHeading: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-section)",
+    fontWeight: 700,
+    color: "var(--ink)",
+    margin: "0 0 12px",
   },
   // A reported breakage: flagged on the warning surface so it reads as a problem
   // to act on rather than another comment to browse.
