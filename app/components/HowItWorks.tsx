@@ -66,7 +66,7 @@ const FAQS = [
   },
   {
     q: "Who is Vita?",
-    a: "Vita is your coach through Chorus — an AI, not a person. It asks questions, listens, and reflects back what it hears so your plan stays in your own words. Because it's AI it can occasionally misunderstand, which is why it checks with you and lets you correct it any time. Your conversations stay private to you. During the pilot they aren't used to train Vita or any other AI, and no one on our team reads your individual responses.",
+    a: "Vita is your coach through Chorus — an AI, not a person. It asks questions, listens, and reflects back what it hears so your plan stays in your own words. Because it's AI it can occasionally misunderstand, which is why it checks with you and lets you correct it any time. Your conversations stay private to you. During the pilot they aren't used to train Vita or any other AI, and no one on our team reads them.",
   },
   {
     q: "What do I end up with?",
@@ -81,12 +81,12 @@ const FAQS = [
     a: "Yes — and it's good news: it means you've completed your Retirement Life Plan. Stage 5 (Act) is where you'll put that plan into action, and we're still building it out during the pilot. For now it holds one optional session, for those with a partner, with more to come. So a quiet Stage 5 simply means you've reached the end of what's ready today — well done!",
   },
   {
-    q: "Can anyone at Chorus see what I share?",
-    a: "Not during the pilot. What you type and your conversations with Vita stay private to you, and no one on our team reads your individual responses. When the pilot ends, we'll email you to ask whether you're happy for our team to review your responses to help improve Vita — or whether you'd like us to delete everything. Nothing is reviewed by a person unless you say yes.",
+    q: "Can anyone at Chorus see my answers?",
+    a: "Your conversations with Vita, and the answers you give inside the sessions, stay private to you during the pilot — no one on our team reads them. Feedback is the part that comes to us on purpose: the short card at the end of each session, the questions we asked when you joined, and anything you send with the feedback button are read by our team, so we can make the programme better. We can also see which sessions you've finished and roughly how long each one took. When the pilot ends, we'll email you to ask whether you're happy for our team to read your sessions too, to help improve Vita — or whether you'd like us to delete everything. Nothing from your sessions is read by a person unless you say yes.",
   },
   {
     q: "Is my information used to train the AI?",
-    a: "No. What you type and your conversations with Vita aren't used to train Vita or any other AI. During the pilot we don't look at your individual responses at all. When the pilot ends, we'll email you to ask whether you're happy for our team to review your responses to help improve Vita — or whether you'd like us to delete everything. That choice is entirely yours.",
+    a: "No. What you type and your conversations with Vita aren't used to train Vita or any other AI. During the pilot we don't read your sessions at all. When the pilot ends, we'll email you to ask whether you're happy for our team to read them to help improve Vita — or whether you'd like us to delete everything. That choice is entirely yours.",
   },
 ];
 
@@ -309,16 +309,28 @@ export default function HowItWorks() {
               Everything you type, and every conversation you have with Vita, is
               used to build your plan — but it stays private to you.{" "}
               <b>
-                No one on the Chorus Life team can read it, and it is never used to
-                train Vita or any other AI.
+                No one on the Chorus Life team reads your conversations with Vita
+                or the answers you give inside the sessions, and they are never
+                used to train Vita or any other AI.
               </b>
             </p>
+            {/* The feedback the team DOES read, said plainly. Everything above is
+                about the sessions; the survey answers and the end-of-session card
+                come straight to us, and someone reading "no one reads your
+                responses" could easily think otherwise. */}
             <p>
-              During the pilot, we won&rsquo;t look at your individual responses.
-              When the pilot ends, we&rsquo;ll email you to ask whether you&rsquo;re
-              happy for our team to review your responses to help improve Vita — or
-              whether you&rsquo;d like us to delete everything. Nothing is reviewed
-              by a person unless you say yes.
+              Feedback is the part that comes to us on purpose. The short card at
+              the end of each session, the questions we asked when you joined, and
+              anything you send with the feedback button are read by our team, so
+              we can make the programme better. We can also see which sessions
+              you&rsquo;ve finished and roughly how long each one took.
+            </p>
+            <p>
+              During the pilot, we won&rsquo;t read your sessions. When the pilot
+              ends, we&rsquo;ll email you to ask whether you&rsquo;re happy for our
+              team to read them to help improve Vita — or whether you&rsquo;d like
+              us to delete everything. Nothing from your sessions is read by a
+              person unless you say yes.
             </p>
             <p className="more">
               Full detail lives on the{" "}
