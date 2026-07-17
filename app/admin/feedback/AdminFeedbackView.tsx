@@ -5,9 +5,11 @@ import type {
   ModuleFeedbackRow,
   FeedbackRow,
   BaselineSurveyRow,
+  ModuleProgressRow,
 } from "@/lib/db";
 import { RATING_MIN, RATING_MAX } from "@/lib/moduleFeedback";
 import { toAnalysisRow, type BaselineAnalysisRow } from "@/lib/baselineAnalysis";
+import { medianMs, fmtDuration } from "@/lib/durations";
 import AdminSignOut from "../AdminSignOut";
 
 // The read-only admin view over both feedback sources. All data is passed in
@@ -28,6 +30,7 @@ type Props = {
   moduleFeedback: ModuleFeedbackRow[];
   generalFeedback: FeedbackRow[];
   baseline: BaselineSurveyRow[];
+  progress: ModuleProgressRow[];
   modules: ModuleMeta[];
 };
 
@@ -99,6 +102,12 @@ type SummaryRow = {
   // from the ratings because it is not a matter of degree — one report of a
   // broken session is worth more than a dip in an average.
   broke: number;
+  // Progress, which is independent of feedback: someone can finish a session and
+  // skip the card, so these counts come from the progress table and will not
+  // match the response count.
+  started: number;
+  finished: number;
+  medianActiveMs: number | null;
 };
 
 const MONTHS = [
@@ -160,6 +169,7 @@ export default function AdminFeedbackView({
   moduleFeedback,
   generalFeedback,
   baseline,
+  progress,
   modules,
 }: Props) {
   const [tab, setTab] = useState<Tab>("summary");
@@ -184,6 +194,14 @@ export default function AdminFeedbackView({
     return m;
   }, [baselineRows]);
 
+  // One person's progress on one session, for putting time-spent next to the
+  // rating they gave it.
+  const progressByUserModule = useMemo(() => {
+    const m = new Map<string, ModuleProgressRow>();
+    for (const p of progress) m.set(`${p.userId} ${p.moduleId}`, p);
+    return m;
+  }, [progress]);
+
   // --- Per-module summary ---------------------------------------------------
   const summary = useMemo<SummaryRow[]>(() => {
     const byModule = new Map<string, ModuleFeedbackRow[]>();
@@ -191,6 +209,13 @@ export default function AdminFeedbackView({
       const list = byModule.get(r.moduleId) ?? [];
       list.push(r);
       byModule.set(r.moduleId, list);
+    }
+
+    const progressByModule = new Map<string, ModuleProgressRow[]>();
+    for (const p of progress) {
+      const list = progressByModule.get(p.moduleId) ?? [];
+      list.push(p);
+      progressByModule.set(p.moduleId, list);
     }
 
     function dim(values: (string | null)[]): DimStat {
@@ -206,6 +231,8 @@ export default function AdminFeedbackView({
 
     function build(id: string, meta: ModuleMeta | null): SummaryRow {
       const rows = byModule.get(id) ?? [];
+      const prog = progressByModule.get(id) ?? [];
+      const finished = prog.filter((p) => p.completedAt !== null);
       return {
         id,
         title: meta?.title ?? "(unknown module)",
@@ -215,6 +242,12 @@ export default function AdminFeedbackView({
         useful: dim(rows.map((r) => r.useful)),
         engaging: dim(rows.map((r) => r.engaging)),
         broke: rows.filter((r) => r.worked === "no").length,
+        started: prog.length,
+        finished: finished.length,
+        // Timed from FINISHED sessions only. An abandoned session's clock says
+        // how long someone lasted before giving up, which is a different
+        // question — averaging the two would answer neither.
+        medianActiveMs: medianMs(finished.map((p) => p.activeMs)),
       };
     }
 
@@ -224,7 +257,7 @@ export default function AdminFeedbackView({
       .filter((id) => !knownIds.has(id))
       .map((id) => build(id, null));
     return [...inProgramme, ...orphans];
-  }, [moduleFeedback, modules]);
+  }, [moduleFeedback, modules, progress]);
 
   const [sortKey, setSortKey] = useState<SortKey>("order");
   // For scores, ascending puts the weakest modules first (the useful default);
@@ -360,6 +393,10 @@ export default function AdminFeedbackView({
       "issue",
       "comment",
       "timestamp_utc",
+      // Joined from this person's progress on this session.
+      "active_seconds",
+      "visits",
+      "completed_at_utc",
       // Joined from the participant's baseline.
       "age",
       "age_band",
@@ -373,6 +410,7 @@ export default function AdminFeedbackView({
     ];
     const rows = moduleFeedback.map((r) => {
       const b = baselineByUser.get(r.userId);
+      const p = progressByUserModule.get(`${r.userId} ${r.moduleId}`);
       return [
         r.userId,
         r.moduleId,
@@ -383,6 +421,9 @@ export default function AdminFeedbackView({
         r.issue ?? "",
         r.comment ?? "",
         r.createdAt,
+        p ? String(Math.round(p.activeMs / 1000)) : "",
+        p ? String(p.visits) : "",
+        p?.completedAt ?? "",
         b?.age !== null && b?.age !== undefined ? String(b.age) : "",
         b?.ageBand ?? "",
         b?.gender ?? "",
@@ -609,10 +650,15 @@ export default function AdminFeedbackView({
           <section>
             <div style={S.toolbar}>
               <p style={S.help}>
-                One row per session, in programme order. Scores are the average of
-                the testers&apos; 1–5 ratings (with the number who answered in
-                brackets). <strong>Problems</strong> counts the people who said
-                something didn&apos;t work — read those in Comments. Click{" "}
+                One row per session, in programme order. <strong>Finished</strong>{" "}
+                is how many people completed it out of how many opened it — the
+                gap is drop-off. <strong>Typical time</strong> is the median time
+                actually spent on screen by people who finished (not the elapsed
+                wall-clock, which would count the days someone left it open).
+                Scores average the 1–5 ratings, with the number who answered in
+                brackets — people can finish without rating, so these won&apos;t
+                match Finished. <strong>Problems</strong> counts the people who
+                said something didn&apos;t work — read those in Comments. Click{" "}
                 <strong>Useful</strong> or <strong>Engaging</strong> to sort — the
                 weakest sessions come first.
               </p>
@@ -630,6 +676,8 @@ export default function AdminFeedbackView({
                       <Th onClick={() => toggleSort("order")} active={sortKey === "order"}>
                         Module
                       </Th>
+                      <Th align="right">Finished</Th>
+                      <Th align="right">Typical time</Th>
                       <Th
                         onClick={() => toggleSort("responses")}
                         active={sortKey === "responses"}
@@ -669,6 +717,26 @@ export default function AdminFeedbackView({
                             <code style={S.code}>{row.id}</code>
                             <span> · {row.stageName}</span>
                           </div>
+                        </td>
+                        {/* Finished, out of started: "3 / 5" says both that
+                            people reach this session and whether they get
+                            through it — a drop-off shows as the gap. */}
+                        <td style={S.tdNum}>
+                          {row.started === 0 ? (
+                            <span style={S.muted}>—</span>
+                          ) : (
+                            <>
+                              <strong>{row.finished}</strong>
+                              <span style={S.avgOutOf}> / {row.started}</span>
+                            </>
+                          )}
+                        </td>
+                        <td style={S.tdNum}>
+                          {row.medianActiveMs === null ? (
+                            <span style={S.muted}>—</span>
+                          ) : (
+                            fmtDuration(row.medianActiveMs)
+                          )}
                         </td>
                         <td style={S.tdNum}>{row.responses}</td>
                         <td style={S.tdDist}>

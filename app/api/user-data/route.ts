@@ -5,6 +5,7 @@ import {
   deleteUserData,
   deleteAllUserData,
   deleteAllContextFacts,
+  anonymiseModuleProgress,
 } from "@/lib/db";
 import {
   ensureBackfill,
@@ -69,7 +70,18 @@ export async function DELETE(request: Request) {
     // inferred profile (values, dreams, dob) would survive a reset and then be
     // reconciled against the user's fresh picks. Feedback rows are deliberately
     // left in place: this is a restart, not account erasure.
-    await Promise.all([deleteAllUserData(userId), deleteAllContextFacts(userId)]);
+    //
+    // Progress analytics are kept but ANONYMISED rather than deleted: how long a
+    // session takes is a finding worth keeping, and so is the fact that someone
+    // restarted — but neither needs to stay attached to the person once they've
+    // asked to start again. The surviving rows are reassigned to a random id
+    // with no mapping back. It also frees the (user_id, module_id) slots so the
+    // fresh run records cleanly against the same sessions.
+    await Promise.all([
+      deleteAllUserData(userId),
+      deleteAllContextFacts(userId),
+      anonymiseModuleProgress(userId),
+    ]);
   } else if (typeof body.key === "string" && body.key.length > 0) {
     await deleteUserData(userId, body.key);
   } else {

@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuleFeedbackCard from "./ModuleFeedbackCard";
+import { useModuleTimer } from "@/lib/useModuleTimer";
 import VitaMark from "./VitaMark";
 import { ModuleIconChip } from "./module/ModuleIconChip";
 import { STAGE_KEYS } from "@/lib/stageColors";
@@ -653,6 +654,12 @@ export default function SessionContainer({
   const [editAckPending, setEditAckPending] = useState(false);
   // Whether this module is finished, and how many in the stage are finished.
   const [completed, setCompleted] = useState(false);
+
+  // Pilot analytics: how long this session actually took, and when it was
+  // finished. Driven off `completed` rather than the three places that set it,
+  // so no completion path can be missed. Reports nothing the member sees and
+  // never blocks them — see lib/useModuleTimer.
+  useModuleTimer(sessionId, completed);
   const [completedCount, setCompletedCount] = useState(0);
   // After a module finishes, the person can choose to keep talking, which
   // re-reveals the composer. Vita signing off again returns to the finished
