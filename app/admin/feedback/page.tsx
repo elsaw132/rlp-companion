@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { getAdminUser } from "@/lib/admin";
-import { getAllModuleFeedback, getAllFeedback } from "@/lib/db";
+import {
+  getAllModuleFeedback,
+  getAllFeedback,
+  getAllBaselineSurveys,
+} from "@/lib/db";
 import { allModulesInOrder } from "@/lib/modules";
 import AdminFeedbackView from "./AdminFeedbackView";
 
@@ -26,9 +30,10 @@ export default async function AdminFeedbackPage() {
   const admin = await getAdminUser();
   if (!admin) redirect("/admin/no-access");
 
-  const [moduleFeedback, generalFeedback] = await Promise.all([
+  const [moduleFeedback, generalFeedback, baseline] = await Promise.all([
     getAllModuleFeedback(),
     getAllFeedback(),
+    getAllBaselineSurveys(),
   ]);
 
   const modules = allModulesInOrder();
@@ -38,6 +43,7 @@ export default async function AdminFeedbackPage() {
       adminEmail={admin.email}
       moduleFeedback={moduleFeedback}
       generalFeedback={generalFeedback}
+      baseline={baseline}
       modules={modules}
     />
   );
