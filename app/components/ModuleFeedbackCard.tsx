@@ -13,13 +13,15 @@
 // can navigate on. Saving is best-effort — a failed save never traps anyone.
 
 import { useState } from "react";
+import { RATINGS, type Worked } from "@/lib/moduleFeedback";
 
-// A 0–10 scale, stored as the string of the number ("0".."10"). null means the
+// A 1–5 rating, stored as the string of the number ("1".."5"). null means the
 // question was skipped. The scale is anchored by an end label at each pole
-// (the middle numbers speak for themselves).
+// (the middle numbers speak for themselves), and defined in lib/moduleFeedback
+// so the card, the route that validates it and the admin portal agree.
 type Rating = string;
 
-const SCALE: Rating[] = Array.from({ length: 11 }, (_, i) => String(i));
+const SCALE: Rating[] = RATINGS;
 
 export default function ModuleFeedbackCard({
   moduleId,
@@ -35,6 +37,8 @@ export default function ModuleFeedbackCard({
 }) {
   const [useful, setUseful] = useState<Rating | null>(null);
   const [engaging, setEngaging] = useState<Rating | null>(null);
+  const [worked, setWorked] = useState<Worked | null>(null);
+  const [issue, setIssue] = useState("");
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -61,6 +65,8 @@ export default function ModuleFeedbackCard({
           moduleId,
           useful,
           engaging,
+          worked,
+          issue,
           comment,
         }),
       });
@@ -87,16 +93,55 @@ export default function ModuleFeedbackCard({
       />
 
       <Scale
-        label="How engaging was it?"
+        label="How emotionally engaging was this session?"
         lowLabel="Not engaging"
         highLabel="Very engaging"
         value={engaging}
         onPick={(v) => pick(engaging, v, setEngaging)}
       />
 
+      {/* The operational question: did the thing actually work. "What happened?"
+          appears only behind a No, so the card stays short for the (hopefully
+          many) people with nothing to report. */}
+      <fieldset className="question">
+        <legend className="q-label">Did everything work correctly?</legend>
+        {/* Same row/button treatment as the rating scales — one tap, tap again
+            to clear — so the card reads as one instrument, not three. */}
+        <div
+          className="scale-row"
+          role="group"
+          aria-label="Did everything work correctly?"
+        >
+          {(["yes", "no"] as Worked[]).map((v) => (
+            <button
+              key={v}
+              type="button"
+              className="opt"
+              aria-pressed={worked === v}
+              onClick={() => setWorked(worked === v ? null : v)}
+            >
+              {v === "yes" ? "Yes" : "No"}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      {worked === "no" && (
+        <label className="question">
+          <span className="q-label">What happened?</span>
+          <textarea
+            className="note"
+            rows={2}
+            value={issue}
+            placeholder="What went wrong?"
+            onChange={(e) => setIssue(e.target.value)}
+          />
+        </label>
+      )}
+
       <label className="question">
         <span className="q-label">
-          Anything confusing, or that you&apos;d change?{" "}
+          Any comments or suggestions?{" "}
           <span className="optional">(optional)</span>
         </span>
         <textarea
@@ -130,7 +175,7 @@ export default function ModuleFeedbackCard({
   );
 }
 
-// One 0–10 question: the label, a row of eleven numbered buttons, and a word
+// One 1–5 question: the label, a row of five numbered buttons, and a word
 // anchor under each end. Tapping the chosen number again clears it.
 function Scale({
   label,

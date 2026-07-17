@@ -450,10 +450,17 @@ function ensureModuleFeedbackTable(): Promise<void> {
           module_id text NOT NULL,
           useful text,
           engaging text,
+          worked text,
+          issue text,
           comment text,
           created_at timestamptz NOT NULL DEFAULT now()
         )
       `;
+      // For instances whose table predates the "did everything work?" question,
+      // add the columns in place. No default, so any pre-existing row reads back
+      // as NULL — "never asked", which is what it was.
+      await sql()`ALTER TABLE module_feedback ADD COLUMN IF NOT EXISTS worked text`;
+      await sql()`ALTER TABLE module_feedback ADD COLUMN IF NOT EXISTS issue text`;
       await sql()`
         CREATE INDEX IF NOT EXISTS module_feedback_module_idx
         ON module_feedback (module_id)
@@ -468,12 +475,17 @@ function ensureModuleFeedbackTable(): Promise<void> {
   return moduleFeedbackTableReady;
 }
 
-// A stored rating value. New submissions use the 0–10 scale, stored as the
-// string of the number ("0".."10"). A handful of early pilot rows used the old
-// three-point words ("very" | "somewhat" | "not_really"); those still read back
-// as-is (the admin portal treats them as legacy and keeps them out of the 0–10
-// averages). null means the question was skipped. The column has no DB-level
-// constraint, so the allowlist in /api/module-feedback is what bounds new writes.
+// A stored rating value: the string of a 1–5 number ("1".."5"), or null when the
+// question was skipped. The scale is defined once in lib/moduleFeedback.ts and
+// enforced by the allowlist in /api/module-feedback — the column itself has no
+// DB-level constraint.
+//
+// The table previously held 0–10 ratings and, before that, three-point words
+// ("very" | "somewhat" | "not_really"). All of it was internal testing from
+// before any external tester, and it was cleared on 2026-07-17 when the card
+// moved to 1–5 — deliberately, because a stored "3" cannot be read as both 3/10
+// and 3/5, and mixing the two would have quietly averaged into nonsense. So
+// every row now on this table is 1–5, and no scale marker is needed.
 export type ModuleRating = string | null;
 
 // Record one per-module feedback submission. user_id always comes from the
@@ -483,14 +495,22 @@ export async function insertModuleFeedback(input: {
   moduleId: string;
   useful: ModuleRating;
   engaging: ModuleRating;
+  // "yes" | "no", or null when the question was skipped — a skip and a "no" are
+  // very different things and must stay distinguishable.
+  worked: string | null;
+  // What went wrong, only ever set alongside worked = "no".
+  issue: string | null;
   comment: string | null;
 }): Promise<void> {
   await ensureModuleFeedbackTable();
   await sql()`
-    INSERT INTO module_feedback (user_id, module_id, useful, engaging, comment)
+    INSERT INTO module_feedback (
+      user_id, module_id, useful, engaging, worked, issue, comment
+    )
     VALUES (
       ${input.userId}, ${input.moduleId},
-      ${input.useful}, ${input.engaging}, ${input.comment}
+      ${input.useful}, ${input.engaging},
+      ${input.worked}, ${input.issue}, ${input.comment}
     )
   `;
 }
@@ -502,6 +522,8 @@ export type ModuleFeedbackRow = {
   moduleId: string;
   useful: ModuleRating;
   engaging: ModuleRating;
+  worked: string | null;
+  issue: string | null;
   comment: string | null;
   createdAt: string;
 };
@@ -514,7 +536,8 @@ export type ModuleFeedbackRow = {
 export async function getAllModuleFeedback(): Promise<ModuleFeedbackRow[]> {
   await ensureModuleFeedbackTable();
   const rows = (await sql()`
-    SELECT id, user_id, module_id, useful, engaging, comment, created_at
+    SELECT id, user_id, module_id, useful, engaging, worked, issue, comment,
+           created_at
     FROM module_feedback
     ORDER BY created_at DESC
   `) as {
@@ -523,6 +546,8 @@ export async function getAllModuleFeedback(): Promise<ModuleFeedbackRow[]> {
     module_id: string;
     useful: string | null;
     engaging: string | null;
+    worked: string | null;
+    issue: string | null;
     comment: string | null;
     created_at: string | Date;
   }[];
@@ -532,6 +557,8 @@ export async function getAllModuleFeedback(): Promise<ModuleFeedbackRow[]> {
     moduleId: r.module_id,
     useful: (r.useful as ModuleRating) ?? null,
     engaging: (r.engaging as ModuleRating) ?? null,
+    worked: r.worked,
+    issue: r.issue,
     comment: r.comment,
     createdAt: toIso(r.created_at) ?? new Date().toISOString(),
   }));
