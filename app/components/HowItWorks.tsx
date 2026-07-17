@@ -15,9 +15,10 @@
 import Link from "next/link";
 import VitaMark from "./VitaMark";
 
-// The external privacy page (the marketing site's privacy.html) — there's no
-// in-app privacy route yet, so "Privacy & data" points here.
-const PRIVACY_URL = "https://chorus-life.com/privacy.html";
+// The in-app Privacy Notice (app.chorus-life.com/privacy) — the notice that
+// covers the app itself, which "Privacy & data" points to. (The marketing site
+// has its own separate privacy.html for the chorus-life.com site.)
+const PRIVACY_URL = "https://app.chorus-life.com/privacy";
 const SUPPORT_EMAIL = "hello@chorus-life.com";
 
 // The five stages, tagged with their stage number so the dot pulls its own
@@ -75,10 +76,6 @@ const FAQS = [
   {
     q: "Stage 5 looks almost empty — is that right?",
     a: "Yes — and it means you've done the hard part. Reaching Stage 5 means your Retirement Life Plan is complete. During the pilot, Stage 5 (Act) is deliberately light: if you have a partner, you'll find a session for exploring your plans together — and more ways to help you put your plan into action are on their way. For now, take a moment to enjoy what you've built.",
-  },
-  {
-    q: "Stage 5 looks empty — is that right?",
-    a: "Yes — and it's good news: it means you've completed your Retirement Life Plan. Stage 5 (Act) is where you'll put that plan into action, and we're still building it out during the pilot. For now it holds one optional session, for those with a partner, with more to come. So a quiet Stage 5 simply means you've reached the end of what's ready today — well done!",
   },
   {
     q: "Can anyone at Chorus see what I share?",

@@ -74,6 +74,7 @@ export default function MobileAppBar() {
   if (
     pathname.startsWith("/sign-in") ||
     pathname.startsWith("/sign-up") ||
+    pathname.startsWith("/privacy") ||
     pathname === "/"
   ) {
     return null;
@@ -215,6 +216,7 @@ export default function MobileAppBar() {
             <button type="button" className="ab-item" role="menuitem" onClick={handleStartOver}>
               Start over
             </button>
+            <Link href="/privacy" className="ab-item" role="menuitem" onClick={closeMenu}>Privacy</Link>
             <button type="button" className="ab-item ab-signout" role="menuitem" onClick={handleLogout}>
               Log out
             </button>

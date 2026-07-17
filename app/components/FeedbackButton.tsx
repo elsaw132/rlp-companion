@@ -13,9 +13,10 @@ export default function FeedbackButton() {
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
 
-  // The public marketing home has no in-app chrome — a logged-out visitor
-  // shouldn't see the tester feedback pill. (MobileAppBar hides on "/" likewise.)
-  if (pathname === "/") return null;
+  // The public marketing home and the standalone privacy notice have no in-app
+  // chrome — a logged-out visitor shouldn't see the tester feedback pill.
+  // (MobileAppBar hides on these likewise.)
+  if (pathname === "/" || pathname.startsWith("/privacy")) return null;
 
   return (
     <>
