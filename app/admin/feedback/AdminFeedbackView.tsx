@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ModuleFeedbackRow, FeedbackRow } from "@/lib/db";
+import { RATING_MIN, RATING_MAX } from "@/lib/moduleFeedback";
 import AdminSignOut from "../AdminSignOut";
 
 // The read-only admin view over both feedback sources. All data is passed in
@@ -24,16 +25,27 @@ type Props = {
   modules: ModuleMeta[];
 };
 
-const SCALE_MAX = 10;
+// The rating scale, imported rather than restated: the card, the route and this
+// portal must agree, and a portal reading 1–5 answers on a 0–10 scale would
+// silently average every session down to "weak".
+//
+// The table previously held 0–10 ratings (and, earlier, three-point words). All
+// of it was pre-pilot internal testing and was cleared on 2026-07-17 when the
+// card moved to 1–5, precisely so the two scales could never be mixed: a stored
+// "3" cannot mean both 3/10 and 3/5. Every row here is now 1–5. The legacy
+// branches below survive only so any straggler row displays readably instead of
+// being counted as a real score.
+const SCALE_MIN = RATING_MIN;
+const SCALE_MAX = RATING_MAX;
 
-// A stored rating is the string of a 0–10 number for current submissions. A few
-// early rows used the old three words; those aren't on the 0–10 scale, so they
-// parse to null here and are counted as "legacy" instead of skewing an average.
+// A stored rating is the string of a 1–5 number. Anything else (an older 0–10
+// value, an old three-point word) parses to null and is counted as "legacy"
+// rather than skewing an average.
 function parseScore(v: string | null): number | null {
   if (v === null) return null;
   if (!/^\d+$/.test(v)) return null;
   const n = Number(v);
-  return n >= 0 && n <= SCALE_MAX ? n : null;
+  return n >= SCALE_MIN && n <= SCALE_MAX ? n : null;
 }
 
 // Legacy word ratings we still want to show readably in the comments context.
@@ -43,25 +55,29 @@ const LEGACY_LABEL: Record<string, string> = {
   not_really: "Not really",
 };
 
-// How one stored rating reads in the comments view: "8 / 10" for a scale value,
+// How one stored rating reads in the comments view: "4 / 5" for a scale value,
 // the old word for a legacy value, "—" when skipped.
 function ratingDisplay(v: string | null): string {
   const n = parseScore(v);
   if (n !== null) return `${n} / ${SCALE_MAX}`;
   if (v && LEGACY_LABEL[v]) return LEGACY_LABEL[v];
+  // A numeric value outside 1–5 can only be an old 0–10 row; say so rather than
+  // showing a bare number that reads as if it were on the current scale.
+  if (v && /^\d+$/.test(v)) return `${v} / 10 (old scale)`;
   return "—";
 }
 
-// A colour cue for an average: green when strong, orange in the middle, muted
-// when weak — so weak modules read at a glance, not just by their number.
+// A colour cue for an average, on the 1–5 scale: green when strong, orange in
+// the middle, muted when weak — so weak sessions read at a glance, not just by
+// their number.
 function scoreColor(avg: number | null): string {
   if (avg === null) return "var(--text-faint)";
-  if (avg >= 7) return "var(--success)";
-  if (avg >= 4) return "var(--accent)";
+  if (avg >= 4) return "var(--success)";
+  if (avg >= 3) return "var(--accent)";
   return "var(--text-muted)";
 }
 
-// One dimension's rollup for a module: the mean of the 0–10 answers, how many
+// One dimension's rollup for a module: the mean of the 1–5 answers, how many
 // gave one, and how many older word-ratings were set aside.
 type DimStat = { avg: number | null; answered: number; legacy: number };
 
@@ -73,6 +89,10 @@ type SummaryRow = {
   responses: number; // total rows for this module
   useful: DimStat;
   engaging: DimStat;
+  // How many people said something did NOT work correctly. Counted separately
+  // from the ratings because it is not a matter of degree — one report of a
+  // broken session is worth more than a dip in an average.
+  broke: number;
 };
 
 const MONTHS = [
@@ -100,7 +120,7 @@ function shortUser(userId: string): string {
   return userId.length > 8 ? `…${userId.slice(-6)}` : userId;
 }
 
-// The mean of a list of 0–10 scores, to one decimal, or null when empty.
+// The mean of a list of 1–5 scores, to one decimal, or null when empty.
 function mean(nums: number[]): number | null {
   if (nums.length === 0) return null;
   const sum = nums.reduce((a, b) => a + b, 0);
@@ -152,7 +172,7 @@ export default function AdminFeedbackView({
       for (const v of values) {
         const n = parseScore(v);
         if (n !== null) scores.push(n);
-        else if (v !== null) legacy++; // a non-null value that isn't a 0–10 score
+        else if (v !== null) legacy++; // a non-null value that isn't a 1–5 score
       }
       return { avg: mean(scores), answered: scores.length, legacy };
     }
@@ -167,6 +187,7 @@ export default function AdminFeedbackView({
         responses: rows.length,
         useful: dim(rows.map((r) => r.useful)),
         engaging: dim(rows.map((r) => r.engaging)),
+        broke: rows.filter((r) => r.worked === "no").length,
       };
     }
 
@@ -221,8 +242,16 @@ export default function AdminFeedbackView({
   }
 
   // --- Comments -------------------------------------------------------------
+  // Anything with words in it. A "what happened?" report counts even with no
+  // comment attached — a broken session someone bothered to describe is the last
+  // thing that should be invisible here.
   const comments = useMemo(
-    () => moduleFeedback.filter((r) => r.comment && r.comment.trim().length > 0),
+    () =>
+      moduleFeedback.filter(
+        (r) =>
+          (r.comment && r.comment.trim().length > 0) ||
+          (r.issue && r.issue.trim().length > 0)
+      ),
     [moduleFeedback]
   );
   const moduleTitle = useMemo(() => {
@@ -286,13 +315,17 @@ export default function AdminFeedbackView({
 
   // --- CSV exports ----------------------------------------------------------
   function exportModuleCsv() {
+    // The rating columns are named with their scale: a bare "4" in a spreadsheet
+    // is unreadable a month later, and this table has held other scales before.
     const header = [
       "user_id",
       "module_id",
       "module_title",
-      "useful",
-      "engaging",
-      "note",
+      "useful_1_5",
+      "engaging_1_5",
+      "worked",
+      "issue",
+      "comment",
       "timestamp_utc",
     ];
     const rows = moduleFeedback.map((r) => [
@@ -301,6 +334,8 @@ export default function AdminFeedbackView({
       moduleTitle.get(r.moduleId) ?? "",
       r.useful ?? "",
       r.engaging ?? "",
+      r.worked ?? "",
+      r.issue ?? "",
       r.comment ?? "",
       r.createdAt,
     ]);
@@ -364,10 +399,12 @@ export default function AdminFeedbackView({
           <section>
             <div style={S.toolbar}>
               <p style={S.help}>
-                One row per module, in programme order. Scores are the average of
-                the testers&apos; 0–10 ratings (with the number who answered in
-                brackets). Click <strong>Useful</strong> or{" "}
-                <strong>Engaging</strong> to sort — the weakest modules come first.
+                One row per session, in programme order. Scores are the average of
+                the testers&apos; 1–5 ratings (with the number who answered in
+                brackets). <strong>Problems</strong> counts the people who said
+                something didn&apos;t work — read those in Comments. Click{" "}
+                <strong>Useful</strong> or <strong>Engaging</strong> to sort — the
+                weakest sessions come first.
               </p>
               <button style={S.csvBtn} onClick={exportModuleCsv}>
                 ↓ Download CSV
@@ -405,6 +442,7 @@ export default function AdminFeedbackView({
                       >
                         Engaging
                       </Th>
+                      <Th align="right">Problems</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -428,6 +466,17 @@ export default function AdminFeedbackView({
                         </td>
                         <td style={S.tdDist}>
                           <AvgCell stat={row.engaging} />
+                        </td>
+                        {/* A zero here is good news and shouldn't shout; any
+                            count at all should be the thing you notice. */}
+                        <td style={S.tdNum}>
+                          {row.broke > 0 ? (
+                            <span style={S.brokeCount}>{row.broke}</span>
+                          ) : (
+                            <span style={S.brokeZero}>
+                              {row.responses > 0 ? "0" : "—"}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -489,7 +538,15 @@ export default function AdminFeedbackView({
                       </span>
                       <span style={S.cardDate}>{fmtDate(c.createdAt)}</span>
                     </div>
-                    <p style={S.cardBody}>{c.comment}</p>
+                    {/* The problem report leads: if something broke, that is the
+                        headline, and the comment is context beneath it. */}
+                    {c.worked === "no" && (
+                      <div style={S.problem}>
+                        <span style={S.problemTag}>Didn&rsquo;t work</span>
+                        {c.issue && <p style={S.problemBody}>{c.issue}</p>}
+                      </div>
+                    )}
+                    {c.comment && <p style={S.cardBody}>{c.comment}</p>}
                     <div style={S.cardFoot}>
                       <RatingPill label="Useful" value={c.useful} />
                       <RatingPill label="Engaging" value={c.engaging} />
@@ -617,16 +674,18 @@ function TabButton({
   );
 }
 
+// A table header. onClick/active are optional: not every column sorts (Problems
+// is a plain count), and a header with no sort must not look clickable.
 function Th({
   children,
   onClick,
-  active,
+  active = false,
   dir = "",
   align = "left",
 }: {
   children: React.ReactNode;
-  onClick: () => void;
-  active: boolean;
+  onClick?: () => void;
+  active?: boolean;
   dir?: string;
   align?: "left" | "right";
 }) {
@@ -637,6 +696,7 @@ function Th({
         ...S.th,
         textAlign: align,
         color: active ? "var(--text)" : "var(--text-muted)",
+        ...(onClick ? {} : { cursor: "default" }),
       }}
     >
       {children} {dir && <span style={S.sortArrow}>{dir}</span>}
@@ -961,6 +1021,37 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: "var(--fs-body)",
     lineHeight: "var(--lh-body)",
     whiteSpace: "pre-wrap",
+  },
+  // A reported breakage: flagged on the warning surface so it reads as a problem
+  // to act on rather than another comment to browse.
+  problem: {
+    margin: "10px 0 0",
+    padding: "10px 12px",
+    background: "var(--accent-surface)",
+    border: "1px solid var(--accent-line)",
+    borderRadius: "var(--r-sm)",
+  },
+  problemTag: {
+    display: "inline-block",
+    fontSize: "10px",
+    fontWeight: 700,
+    color: "var(--accent-strong)",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  },
+  problemBody: {
+    margin: "6px 0 0",
+    fontSize: "var(--fs-body)",
+    lineHeight: "var(--lh-body)",
+    whiteSpace: "pre-wrap",
+    color: "var(--text)",
+  },
+  brokeCount: {
+    fontWeight: 700,
+    color: "var(--accent-strong)",
+  },
+  brokeZero: {
+    color: "var(--text-faint)",
   },
   cardFoot: {
     display: "flex",
