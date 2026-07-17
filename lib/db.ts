@@ -706,6 +706,159 @@ export async function getAllBaselineSurveys(): Promise<BaselineSurveyRow[]> {
   }));
 }
 
+// --- Module progress (pilot analytics) ------------------------------------
+// How long each session actually took, and whether it was finished. One row per
+// (user, session), upserted as they work.
+//
+// Its own table, like module_feedback and baseline_survey, for the same reason:
+// it is cross-user research data read by the admin portal. Keeping it here also
+// means the portal never has to read `user_data` — the store holding
+// conversations and answers — to report on progress. The portal reads no member
+// content today and this keeps it that way.
+//
+// active_ms is time the session was actually on screen, accumulated by the
+// client. Elapsed time (started_at → completed_at) is deliberately NOT the
+// measure of how long a session takes: the programme suggests one session a day,
+// so people open one, leave, and finish tomorrow. Elapsed would report that as
+// 1,400 minutes and quietly make "are these really 10–20 minutes?"
+// unanswerable. Both are stored — active answers "how much effort", elapsed
+// answers "did they do it in one sitting" — but they answer different questions
+// and must not be confused.
+//
+// This is an ANALYTICS record, deliberately separate from the app's own progress
+// state (the `completed` list in user_data, which stays the source of truth for
+// what the member sees). It is never read to decide anything the member
+// experiences.
+let moduleProgressTableReady: Promise<void> | null = null;
+
+function ensureModuleProgressTable(): Promise<void> {
+  if (!moduleProgressTableReady) {
+    moduleProgressTableReady = (async () => {
+      await sql()`
+        CREATE TABLE IF NOT EXISTS module_progress (
+          user_id text NOT NULL,
+          module_id text NOT NULL,
+          active_ms bigint NOT NULL DEFAULT 0,
+          visits int NOT NULL DEFAULT 0,
+          started_at timestamptz NOT NULL DEFAULT now(),
+          completed_at timestamptz,
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (user_id, module_id)
+        )
+      `;
+      await sql()`
+        CREATE INDEX IF NOT EXISTS module_progress_module_idx
+        ON module_progress (module_id)
+      `;
+    })()
+      .then(() => undefined)
+      .catch((err) => {
+        moduleProgressTableReady = null;
+        throw err;
+      });
+  }
+  return moduleProgressTableReady;
+}
+
+// Add time to a session and, optionally, mark it finished. user_id always comes
+// from the authenticated Clerk session at the call site, never from client input.
+//
+// active_ms ACCUMULATES (+=) rather than being set: the client sends how much
+// time has passed since its last flush, so a lost or duplicated flush costs a
+// slice rather than the whole total, and a second visit adds to the first
+// instead of replacing it.
+//
+// completed_at uses COALESCE so it keeps the FIRST completion. Revisiting a
+// finished session must not rewrite when it was done.
+export async function recordModuleProgress(input: {
+  userId: string;
+  moduleId: string;
+  addMs: number;
+  newVisit: boolean;
+  completed: boolean;
+}): Promise<void> {
+  await ensureModuleProgressTable();
+  await sql()`
+    INSERT INTO module_progress (
+      user_id, module_id, active_ms, visits, completed_at, updated_at
+    )
+    VALUES (
+      ${input.userId}, ${input.moduleId}, ${input.addMs},
+      ${input.newVisit ? 1 : 0},
+      ${input.completed ? new Date().toISOString() : null}, now()
+    )
+    ON CONFLICT (user_id, module_id) DO UPDATE SET
+      active_ms = module_progress.active_ms + ${input.addMs},
+      visits = module_progress.visits + ${input.newVisit ? 1 : 0},
+      completed_at = COALESCE(
+        module_progress.completed_at, EXCLUDED.completed_at
+      ),
+      updated_at = now()
+  `;
+}
+
+export type ModuleProgressRow = {
+  userId: string;
+  moduleId: string;
+  activeMs: number;
+  visits: number;
+  startedAt: string;
+  completedAt: string | null;
+};
+
+// Every progress row, for the admin portal. Reads across all users, so it is
+// only ever called behind the admin gate.
+export async function getAllModuleProgress(): Promise<ModuleProgressRow[]> {
+  await ensureModuleProgressTable();
+  const rows = (await sql()`
+    SELECT user_id, module_id, active_ms, visits, started_at, completed_at
+    FROM module_progress
+    ORDER BY started_at
+  `) as {
+    user_id: string;
+    module_id: string;
+    active_ms: string | number;
+    visits: number;
+    started_at: string | Date;
+    completed_at: string | Date | null;
+  }[];
+  return rows.map((r) => ({
+    userId: r.user_id,
+    moduleId: r.module_id,
+    // bigint comes back as a string from the driver — Number is safe here, an
+    // eternity of session time still fits well inside a JS integer.
+    activeMs: Number(r.active_ms),
+    visits: r.visits,
+    startedAt: toIso(r.started_at) ?? new Date().toISOString(),
+    completedAt: toIso(r.completed_at),
+  }));
+}
+
+// "Start over" — keep the analytics, cut the person out of them.
+//
+// The rows stay (how long a session takes is a finding worth keeping, and so is
+// the fact that someone restarted), but they are reassigned to a fresh random id
+// that is NOT derived from the user's, and no mapping is kept anywhere. Nothing
+// links the surviving rows back to the person: this is anonymisation, not the
+// pseudonymisation the live rows carry.
+//
+// One token for the whole reset, not one per row, so a single run stays readable
+// as a run.
+//
+// It also has to happen for a plain functional reason: (user_id, module_id) is
+// the primary key, so the old rows must vacate their slots before the fresh run
+// can record against the same sessions.
+export async function anonymiseModuleProgress(userId: string): Promise<void> {
+  await ensureModuleProgressTable();
+  // crypto.randomUUID is unrelated to the user id — that's the point.
+  const anonId = `anon_${crypto.randomUUID()}`;
+  await sql()`
+    UPDATE module_progress
+    SET user_id = ${anonId}, updated_at = now()
+    WHERE user_id = ${userId}
+  `;
+}
+
 // --- Per-user hard deletes ------------------------------------------------
 // Row-level erasure helpers, one per table. Each is scoped to a single user_id
 // and removes rows outright (no soft-delete / status flip): the correction loop
@@ -742,4 +895,14 @@ export async function deleteAllModuleFeedback(userId: string): Promise<void> {
 export async function deleteAllBaselineSurvey(userId: string): Promise<void> {
   await ensureBaselineSurveyTable();
   await sql()`DELETE FROM baseline_survey WHERE user_id = ${userId}`;
+}
+
+// The member's progress rows. Erasure deletes outright — "start over" anonymises
+// them instead (see anonymiseModuleProgress), but erasure means erasure, and
+// leaving rows behind for someone who asked to be deleted is not the place to be
+// clever. Any rows already anonymised by an earlier reset are beyond reach by
+// design: they no longer carry this (or any) user id.
+export async function deleteAllModuleProgress(userId: string): Promise<void> {
+  await ensureModuleProgressTable();
+  await sql()`DELETE FROM module_progress WHERE user_id = ${userId}`;
 }

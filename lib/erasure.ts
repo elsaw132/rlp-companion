@@ -6,6 +6,7 @@ import {
   deleteAllFeedback,
   deleteAllModuleFeedback,
   deleteAllBaselineSurvey,
+  deleteAllModuleProgress,
 } from "@/lib/db";
 
 // True erasure for one person — the mechanism the end-of-pilot "delete it all"
@@ -21,6 +22,9 @@ import {
 //   - feedback           — free-text bodies can name the person, so delete, not scrub
 //   - module_feedback    — same reasoning (optional free-text comment)
 //   - baseline_survey    — same reasoning (free-text expectations)
+//   - module_progress    — the timing/completion analytics. "Start over"
+//                          anonymises these; erasure deletes them, because
+//                          erasure means erasure.
 //   - the Clerk user account itself (done last — see below)
 //
 // The Postgres deletes run first and together; the Clerk account is deleted last
@@ -43,6 +47,7 @@ export async function deleteAllUserContext(userId: string): Promise<void> {
     deleteAllFeedback(userId),
     deleteAllModuleFeedback(userId),
     deleteAllBaselineSurvey(userId),
+    deleteAllModuleProgress(userId),
   ]);
 
   // Account last: deleting the Clerk user invalidates their sessions and removes
