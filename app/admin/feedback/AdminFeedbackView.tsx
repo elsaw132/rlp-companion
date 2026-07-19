@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   ModuleFeedbackRow,
   FeedbackRow,
@@ -194,13 +194,64 @@ type ParticipantProgress = {
 
 export default function AdminFeedbackView({
   adminEmail,
-  moduleFeedback,
-  generalFeedback,
+  // The *unfiltered* data as it arrives from the server. Everything below reads
+  // date-filtered views of these (see the date filter just after), so that a
+  // pilot start date can drop early tester accounts out of every tab at once.
+  moduleFeedback: moduleFeedbackAll,
+  generalFeedback: generalFeedbackAll,
   baseline,
-  progress,
+  progress: progressAll,
   modules,
 }: Props) {
   const [tab, setTab] = useState<Tab>("participants");
+
+  // --- Date filter ----------------------------------------------------------
+  // Two optional bounds, entered as calendar dates. The point of this is to
+  // separate real pilot data from the tester accounts that came before it: set
+  // "From" to the day the pilot opened and every earlier record — baselines,
+  // sessions, comments — disappears from all the counts and tables.
+  //
+  // Both are inclusive: "From" starts at the first instant of that day and "To"
+  // runs to the last instant, both in UTC (the stored timestamps are UTC, and
+  // the tables already show UTC). Blank means unbounded on that side.
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const from = fromDate ? `${fromDate}T00:00:00.000Z` : "";
+  const to = toDate ? `${toDate}T23:59:59.999Z` : "";
+  const filterActive = from !== "" || to !== "";
+
+  // A row's ISO timestamp is in range when it's on or after "From" and on or
+  // before "To". ISO-8601 UTC strings sort lexically, so a string compare is a
+  // correct time compare here — no Date parsing needed.
+  const inRange = useCallback(
+    (iso: string) => (!from || iso >= from) && (!to || iso <= to),
+    [from, to]
+  );
+
+  // The filtered views the rest of the component works from. A feedback row is
+  // placed by when it was given; a progress row by when the session was started.
+  const moduleFeedback = useMemo(
+    () => moduleFeedbackAll.filter((r) => inRange(r.createdAt)),
+    [moduleFeedbackAll, inRange]
+  );
+  const generalFeedback = useMemo(
+    () => generalFeedbackAll.filter((g) => inRange(g.createdAt)),
+    [generalFeedbackAll, inRange]
+  );
+  const progress = useMemo(
+    () => progressAll.filter((p) => inRange(p.startedAt)),
+    [progressAll, inRange]
+  );
+
+  // How many records the current filter is hiding, for a plain-language note so
+  // it's never a mystery why a count dropped.
+  const hiddenCount =
+    moduleFeedbackAll.length -
+    moduleFeedback.length +
+    (generalFeedbackAll.length - generalFeedback.length) +
+    (progressAll.length - progress.length) +
+    (baseline.length -
+      baseline.filter((b) => inRange(b.createdAt)).length);
 
   // --- Baseline -------------------------------------------------------------
   // One row per participant, oldest first: the order people joined the pilot is
@@ -209,8 +260,9 @@ export default function AdminFeedbackView({
     () =>
       [...baseline]
         .map(toAnalysisRow)
+        .filter((r) => inRange(r.takenAt))
         .sort((a, b) => a.takenAt.localeCompare(b.takenAt)),
-    [baseline]
+    [baseline, inRange]
   );
 
   // The participant's demographics, keyed by user id, so a session rating can be
@@ -697,6 +749,58 @@ export default function AdminFeedbackView({
           <Stat label="Testers (modules)" value={totals.moduleTesters} />
           <Stat label="Written comments" value={totals.commentCount} />
           <Stat label="General messages" value={totals.generalCount} />
+        </div>
+
+        <div style={S.dateBar}>
+          <div style={S.dateFields}>
+            <label style={S.filterLabel}>
+              <span style={S.filterText}>From</span>
+              <input
+                type="date"
+                style={S.dateInput}
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </label>
+            <label style={S.filterLabel}>
+              <span style={S.filterText}>To</span>
+              <input
+                type="date"
+                style={S.dateInput}
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </label>
+            {filterActive && (
+              <button
+                style={S.clearBtn}
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                }}
+              >
+                Clear dates
+              </button>
+            )}
+          </div>
+          <p style={S.dateHelp}>
+            {filterActive ? (
+              <>
+                Showing data{fromDate ? ` from ${fromDate}` : ""}
+                {toDate ? ` to ${toDate}` : ""} (UTC).{" "}
+                {hiddenCount > 0 && (
+                  <strong>{hiddenCount} earlier record(s) hidden.</strong>
+                )}
+              </>
+            ) : (
+              <>
+                Showing all data. Set <strong>From</strong> to your pilot start
+                date to leave early tester accounts out of every tab.
+              </>
+            )}
+          </p>
         </div>
 
         <nav style={S.tabs}>
@@ -1508,6 +1612,48 @@ const S: Record<string, React.CSSProperties> = {
     minWidth: 180,
   },
   count: { fontSize: "var(--fs-sm)", color: "var(--text-muted)" },
+  dateBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    gap: 16,
+    flexWrap: "wrap",
+    padding: "14px 16px",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-md)",
+    marginBottom: 20,
+  },
+  dateFields: { display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap" },
+  dateInput: {
+    appearance: "auto",
+    background: "var(--bg)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-sm)",
+    padding: "7px 10px",
+    fontSize: "var(--fs-body)",
+    color: "var(--text)",
+    fontFamily: "var(--font-sans)",
+  },
+  clearBtn: {
+    appearance: "none",
+    background: "none",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-pill)",
+    padding: "8px 14px",
+    fontSize: "var(--fs-sm)",
+    color: "var(--text)",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+  dateHelp: {
+    fontSize: "var(--fs-sm)",
+    color: "var(--text-muted)",
+    margin: 0,
+    maxWidth: 360,
+    lineHeight: 1.5,
+    textAlign: "right",
+  },
   csvBtn: {
     appearance: "none",
     background: "var(--brand-primary)",
