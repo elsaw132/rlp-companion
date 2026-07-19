@@ -1894,6 +1894,15 @@ export default function SessionContainer({
         )
       : [];
 
+  // Where this session sits in its stage. Shown in the header so "which session
+  // am I on" is answered outright, rather than left to be inferred from a
+  // completion count ("5 of 6 complete" reads as a position it isn't). Falls
+  // back to just-after the completed ones if the id somehow isn't in the list.
+  const sessionPosition =
+    stageModuleIds.indexOf(sessionId) >= 0
+      ? stageModuleIds.indexOf(sessionId) + 1
+      : completedCount + 1;
+
   return (
     <div style={styles.container}>
       <style>{focusCss + primerMediaCss}</style>
@@ -1913,7 +1922,7 @@ export default function SessionContainer({
         </div>
         <div style={styles.progress}>
           <div style={styles.progressLabel}>
-            {completedCount} of {modulesInStage} sessions complete
+            Session {sessionPosition} of {modulesInStage}
           </div>
           <div style={styles.progressTrack}>
             <div
