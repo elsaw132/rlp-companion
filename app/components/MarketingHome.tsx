@@ -55,10 +55,10 @@ export default function MarketingHome() {
         <div className="wrap">
           <div className="copy">
             <span className="eyebrow">Retirement Life Planning</span>
-            <h1>Design a life after work you’ll love.</h1>
+            <h1>Create a retirement you’ll love living</h1>
             <p className="lede">
-              Chorus helps you picture, shape and plan the years ahead — one bite-sized session at a
-              time. You’ll build your own Retirement Life Plan, and we’ll help you bring it to life.
+              Chorus helps you picture and shape the years ahead — one bite-sized session at a
+              time. You’ll build your own Retirement Life Plan, and we’ll help you make it happen.
             </p>
             <div className="cta">
               <Link className="btn btn-primary" href="/sign-up">Get started →</Link>
@@ -111,7 +111,7 @@ export default function MarketingHome() {
                   <path d="M9.5 20h5M10.5 22h3" />
                 </svg>
               </div>
-              <h3>Bring it to life</h3>
+              <h3>Make it happen</h3>
               <p>With your plan in place, Chorus keeps supporting you with practical next steps and guidance to help you thrive in the years ahead.</p>
             </div>
           </div>
@@ -200,7 +200,7 @@ export default function MarketingHome() {
         <div className="wrap">
           <span className="eyebrow">Beyond the plan</span>
           <h2>Your best years, by design.</h2>
-          <p>A plan is just the start. Chorus stays with you — with practical next steps and encouragement to help you thrive in the years ahead.</p>
+          <p>Your plan is just the beginning. Chorus stays with you — with practical next steps and encouragement to help you thrive in the years ahead.</p>
           <Link className="btn btn-primary" href="/sign-up">Get started →</Link>
         </div>
       </section>

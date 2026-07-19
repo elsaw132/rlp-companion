@@ -123,7 +123,7 @@ export default function MarketingJourney({ pathway }: { pathway?: JourneyKey }) 
         <div className="sec-head">
           <span className="eyebrow">The journey</span>
           <h2>Five stages, at your own pace.</h2>
-          <p>Each stage builds gently on the last — and Vita guides you the whole way.</p>
+          <p>Each stage builds gently on the last — with Vita alongside you throughout.</p>
         </div>
 
         {hasTabs && (
