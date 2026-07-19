@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   ModuleFeedbackRow,
   FeedbackRow,
@@ -192,6 +192,16 @@ type ParticipantProgress = {
   byModule: Map<string, ModuleProgressRow>;
 };
 
+// The pilot opened on this date (UTC). The date filter defaults here so the
+// portal opens on pilot-only data; an admin can Clear dates to see the earlier
+// tester accounts again.
+const PILOT_START = "2026-07-20";
+
+// localStorage key for the per-browser list of excluded (tester) account ids.
+// Per-browser and not in the database on purpose: excluding an account is an
+// admin's view preference, not a change to anyone's data.
+const EXCLUDED_KEY = "rlp_admin_excluded_ids";
+
 export default function AdminFeedbackView({
   adminEmail,
   // The *unfiltered* data as it arrives from the server. Everything below reads
@@ -214,7 +224,9 @@ export default function AdminFeedbackView({
   // Both are inclusive: "From" starts at the first instant of that day and "To"
   // runs to the last instant, both in UTC (the stored timestamps are UTC, and
   // the tables already show UTC). Blank means unbounded on that side.
-  const [fromDate, setFromDate] = useState("");
+  // Defaults to the pilot start date, so the portal opens on pilot-only data;
+  // "Clear dates" empties both and reveals the earlier tester accounts again.
+  const [fromDate, setFromDate] = useState(PILOT_START);
   const [toDate, setToDate] = useState("");
   const from = fromDate ? `${fromDate}T00:00:00.000Z` : "";
   const to = toDate ? `${toDate}T23:59:59.999Z` : "";
@@ -228,30 +240,86 @@ export default function AdminFeedbackView({
     [from, to]
   );
 
+  // --- Excluded accounts ----------------------------------------------------
+  // A date cut-off can't catch a tester who's active *during* the pilot, so
+  // individual accounts can also be excluded by id. The choice is the admin's
+  // and personal to this browser, so it lives in localStorage — nothing here
+  // writes member data. Loaded after mount (not during render) so the server
+  // and first client render agree; the excluded rows drop a beat later.
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(EXCLUDED_KEY);
+      if (raw) setExcludedIds(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      // A corrupt value just means "nothing excluded" — never block the portal.
+    }
+  }, []);
+  const persistExcluded = useCallback((next: Set<string>) => {
+    setExcludedIds(next);
+    try {
+      localStorage.setItem(EXCLUDED_KEY, JSON.stringify([...next]));
+    } catch {
+      // Private mode or full storage: the exclusion still holds for this
+      // session, it just won't be remembered next time.
+    }
+  }, []);
+  const toggleExcluded = useCallback(
+    (userId: string) => {
+      const next = new Set(excludedIds);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      persistExcluded(next);
+    },
+    [excludedIds, persistExcluded]
+  );
+
+  // A row survives when it's inside the date window AND its account isn't
+  // excluded. Both filters meet here, so every tab sees the same people.
+  const keep = useCallback(
+    (userId: string, iso: string) => inRange(iso) && !excludedIds.has(userId),
+    [inRange, excludedIds]
+  );
+
   // The filtered views the rest of the component works from. A feedback row is
   // placed by when it was given; a progress row by when the session was started.
   const moduleFeedback = useMemo(
-    () => moduleFeedbackAll.filter((r) => inRange(r.createdAt)),
-    [moduleFeedbackAll, inRange]
+    () => moduleFeedbackAll.filter((r) => keep(r.userId, r.createdAt)),
+    [moduleFeedbackAll, keep]
   );
   const generalFeedback = useMemo(
-    () => generalFeedbackAll.filter((g) => inRange(g.createdAt)),
-    [generalFeedbackAll, inRange]
+    () => generalFeedbackAll.filter((g) => keep(g.userId, g.createdAt)),
+    [generalFeedbackAll, keep]
   );
   const progress = useMemo(
-    () => progressAll.filter((p) => inRange(p.startedAt)),
-    [progressAll, inRange]
+    () => progressAll.filter((p) => keep(p.userId, p.startedAt)),
+    [progressAll, keep]
   );
 
-  // How many records the current filter is hiding, for a plain-language note so
-  // it's never a mystery why a count dropped.
-  const hiddenCount =
-    moduleFeedbackAll.length -
-    moduleFeedback.length +
-    (generalFeedbackAll.length - generalFeedback.length) +
-    (progressAll.length - progress.length) +
-    (baseline.length -
-      baseline.filter((b) => inRange(b.createdAt)).length);
+  // How many records the date window alone is hiding — counted independently of
+  // the account exclusions (which get their own count), so each note is honest
+  // about its own effect.
+  const hiddenByDate = useMemo(() => {
+    const off = (iso: string) => !inRange(iso);
+    return (
+      moduleFeedbackAll.filter((r) => off(r.createdAt)).length +
+      generalFeedbackAll.filter((g) => off(g.createdAt)).length +
+      progressAll.filter((p) => off(p.startedAt)).length +
+      baseline.filter((b) => off(b.createdAt)).length
+    );
+  }, [moduleFeedbackAll, generalFeedbackAll, progressAll, baseline, inRange]);
+
+  // Every account we know of, with its baseline (if any) for a label — so an
+  // excluded account can still be listed and restored after it has vanished
+  // from the tables.
+  const excludedAccounts = useMemo(() => {
+    const byUser = new Map<string, BaselineAnalysisRow>();
+    for (const b of baseline) byUser.set(b.userId, toAnalysisRow(b));
+    return [...excludedIds].map((userId) => ({
+      userId,
+      baseline: byUser.get(userId) ?? null,
+    }));
+  }, [baseline, excludedIds]);
 
   // --- Baseline -------------------------------------------------------------
   // One row per participant, oldest first: the order people joined the pilot is
@@ -260,9 +328,9 @@ export default function AdminFeedbackView({
     () =>
       [...baseline]
         .map(toAnalysisRow)
-        .filter((r) => inRange(r.takenAt))
+        .filter((r) => keep(r.userId, r.takenAt))
         .sort((a, b) => a.takenAt.localeCompare(b.takenAt)),
-    [baseline, inRange]
+    [baseline, keep]
   );
 
   // The participant's demographics, keyed by user id, so a session rating can be
@@ -790,8 +858,8 @@ export default function AdminFeedbackView({
               <>
                 Showing data{fromDate ? ` from ${fromDate}` : ""}
                 {toDate ? ` to ${toDate}` : ""} (UTC).{" "}
-                {hiddenCount > 0 && (
-                  <strong>{hiddenCount} earlier record(s) hidden.</strong>
+                {hiddenByDate > 0 && (
+                  <strong>{hiddenByDate} earlier record(s) hidden.</strong>
                 )}
               </>
             ) : (
@@ -802,6 +870,29 @@ export default function AdminFeedbackView({
             )}
           </p>
         </div>
+
+        {excludedAccounts.length > 0 && (
+          <div style={S.excludedBar}>
+            <span style={S.excludedTitle}>
+              {excludedAccounts.length} account
+              {excludedAccounts.length === 1 ? "" : "s"} excluded as tester
+              {excludedAccounts.length === 1 ? "" : "s"} — hidden from every tab
+            </span>
+            <div style={S.excludedChips}>
+              {excludedAccounts.map((a) => (
+                <button
+                  key={a.userId}
+                  style={S.excludedChip}
+                  onClick={() => toggleExcluded(a.userId)}
+                  title={`${a.userId}\nClick to put this account back in`}
+                >
+                  <span>{shortUser(a.userId)}</span>
+                  <span style={S.excludedRestore}>Restore</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <nav style={S.tabs}>
           <TabButton
@@ -865,13 +956,22 @@ export default function AdminFeedbackView({
                           )}
                         </span>
                       </div>
-                      <span style={S.cardDate}>
-                        {p.lastActive ? (
-                          <>Last seen {fmtDate(p.lastActive)}</>
-                        ) : (
-                          <span style={S.muted}>never active</span>
-                        )}
-                      </span>
+                      <div style={S.progressHeadRight}>
+                        <span style={S.cardDate}>
+                          {p.lastActive ? (
+                            <>Last seen {fmtDate(p.lastActive)}</>
+                          ) : (
+                            <span style={S.muted}>never active</span>
+                          )}
+                        </span>
+                        <button
+                          style={S.excludeBtn}
+                          onClick={() => toggleExcluded(p.userId)}
+                          title="Hide this account's data from every tab (mark it as a tester). You can undo this from the bar at the top."
+                        >
+                          Exclude as tester
+                        </button>
+                      </div>
                     </div>
 
                     <div style={S.progressStatusRow}>
@@ -1653,6 +1753,63 @@ const S: Record<string, React.CSSProperties> = {
     maxWidth: 360,
     lineHeight: 1.5,
     textAlign: "right",
+  },
+  excludedBar: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 12,
+    padding: "12px 16px",
+    background: "var(--accent-surface)",
+    border: "1px solid var(--accent-line)",
+    borderRadius: "var(--r-md)",
+    marginBottom: 20,
+    marginTop: -4,
+  },
+  excludedTitle: {
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    color: "var(--accent-strong)",
+  },
+  excludedChips: { display: "flex", gap: 8, flexWrap: "wrap" },
+  excludedChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    appearance: "none",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-pill)",
+    padding: "4px 10px",
+    fontSize: "var(--fs-sm)",
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+    color: "var(--text)",
+    cursor: "pointer",
+  },
+  excludedRestore: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-eyebrow)",
+    fontWeight: 600,
+    color: "var(--brand-primary)",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  },
+  progressHeadRight: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  excludeBtn: {
+    appearance: "none",
+    background: "none",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-pill)",
+    padding: "5px 12px",
+    fontSize: "var(--fs-eyebrow)",
+    color: "var(--text-muted)",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
   },
   csvBtn: {
     appearance: "none",
