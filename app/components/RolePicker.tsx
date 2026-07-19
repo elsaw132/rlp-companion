@@ -140,7 +140,7 @@ export default function RolePicker({
     ? "Tap the ones you'd like"
     : "Tap each one you'd like — as many or few as you want";
   let helperText = allowCustom
-    ? `${tapClause}, then type your own and press Add.`
+    ? `${tapClause}. You can also type your own and press Add.`
     : `${tapClause}.`;
   if (starrable) helperText += " Then star up to three that feel most alive.";
 
