@@ -76,9 +76,12 @@ export function PrimerImage({ src, alt }: { src: string; alt?: string }) {
 // nothing here frames the set as progress to be completed.
 //
 // Paging is native scroll-snap rather than a transform, so a touch swipe gets
-// real momentum for free. The frame is a fixed height with the image contained
-// inside it, because a set can mix portrait and landscape slides (1-week does)
-// and the layout must not jump as you page.
+// real momentum for free. The frame hugs the images: it takes the aspect ratio
+// of the tallest slide in the set (measured as they load) rather than a fixed
+// band, so a uniform landscape set sits flush with no dead space around it —
+// which matters most on a narrow phone. It's the *tallest* slide, not each
+// slide in turn, so a set that mixes portrait and landscape (1-week does) still
+// can't jump as you page; any shorter slide is simply centred inside the frame.
 export function PrimerSlideshow({
   images,
 }: {
@@ -87,6 +90,17 @@ export function PrimerSlideshow({
   const trackRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [failed, setFailed] = useState<Set<number>>(new Set());
+  // Smallest width/height ratio seen so far — the tallest slide, which sets the
+  // frame's shape. null until the first image reports its size; a landscape
+  // guess stands in for that first paint so the common uniform-landscape set
+  // never has to resize once its images arrive.
+  const [minAspect, setMinAspect] = useState<number | null>(null);
+
+  function noteAspect(w: number, h: number) {
+    if (!w || !h) return;
+    const a = w / h;
+    setMinAspect((prev) => (prev === null ? a : Math.min(prev, a)));
+  }
 
   if (images.length === 0) return null;
 
@@ -130,7 +144,14 @@ export function PrimerSlideshow({
       <div
         ref={trackRef}
         className="primer-slide-track"
-        style={styles.slideTrack}
+        style={{
+          ...styles.slideTrack,
+          // Hug the tallest slide. maxHeight caps a very portrait set on a wide
+          // screen so it can't run away vertically; aspect-ratio gives it back
+          // its natural shape everywhere below that cap.
+          aspectRatio: String(minAspect ?? 1.6),
+          maxHeight: "440px",
+        }}
         onScroll={syncIndex}
       >
         {images.map((img, i) => (
@@ -143,6 +164,12 @@ export function PrimerSlideshow({
                 src={img.src}
                 alt={img.alt ?? ""}
                 style={styles.slideImage}
+                onLoad={(e) =>
+                  noteAspect(
+                    e.currentTarget.naturalWidth,
+                    e.currentTarget.naturalHeight,
+                  )
+                }
                 onError={() =>
                   setFailed((prev) => new Set(prev).add(i))
                 }
@@ -409,10 +436,13 @@ const styles: Record<string, React.CSSProperties> = {
   slide: {
     flex: "0 0 100%",
     scrollSnapAlign: "center",
-    height: "380px",
+    // No fixed height: the slide stretches to the track, which is sized to the
+    // tallest image's aspect ratio. Centring keeps any shorter slide (or the
+    // "didn't load" note) in the middle of that frame.
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 0,
   },
   slideImage: {
     // Contained, not cropped: a set can mix portrait and landscape slides, and
