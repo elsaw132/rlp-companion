@@ -55,7 +55,7 @@ export default function MarketingHome() {
         <div className="wrap">
           <div className="copy">
             <span className="eyebrow">Retirement Life Planning</span>
-            <h1>Create a retirement you’ll love living</h1>
+            <h1>Create a retirement you love</h1>
             <p className="lede">
               Chorus helps you picture and shape the years ahead — one bite-sized session at a
               time. You’ll build your own Retirement Life Plan, and we’ll help you make it happen.
