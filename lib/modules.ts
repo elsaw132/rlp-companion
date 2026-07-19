@@ -2763,7 +2763,7 @@ This conversation isn't about becoming fearless. It's about understanding what y
         interaction: {
           type: "hopes-fears",
           instruction:
-            "Most of these won't be yours — set those aside. For the few that land, say a little more if you want, and mark any that weigh heavily enough that you'd want the plan to take account of them.",
+            "Here are some of the worries and fears people can feel around retirement and later life.\n\nFor each one, tap the response that fits. Most won't apply to you, and that's expected. For the ones that do ring true, add a line about the worry underneath if you want, and tick any you'd want your plan to take account of.",
           hopesLabel: "What you've been hoping for",
           reactionLabels: {
             onMyMind: "On my mind",

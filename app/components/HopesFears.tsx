@@ -226,10 +226,23 @@ export default function HopesFears({
         </div>
       )}
 
-      <p style={styles.instruction}>{interaction.instruction}</p>
+      {/* The instruction can carry a framing lead-in above the how-to; blank
+          lines separate paragraphs. A single-paragraph instruction still renders
+          as one <p>, exactly as before. */}
+      <div style={styles.instructionBlock}>
+        {interaction.instruction
+          .split(/\n{2,}/)
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .map((para, i) => (
+            <p key={i} style={styles.instruction}>
+              {para}
+            </p>
+          ))}
+      </div>
 
       <div style={styles.helperGroup}>
-        <HelperLine>Tap how each one sits with you.</HelperLine>
+        <HelperLine>Go with your first instinct.</HelperLine>
         <div style={styles.horizonList}>
       {horizons.map((horizon) => {
         const cardsHere = cards
@@ -449,6 +462,11 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--ink)",
     margin: 0,
+  },
+  instructionBlock: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
   },
   instruction: {
     fontFamily: "var(--font-sans)",
