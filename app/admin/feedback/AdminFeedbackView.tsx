@@ -161,8 +161,36 @@ function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url);
 }
 
-type Tab = "summary" | "baseline" | "comments" | "general";
+type Tab = "participants" | "summary" | "baseline" | "comments" | "general";
 type SortKey = "order" | "responses" | "useful" | "engaging";
+
+// One stage's modules, in programme order — used to draw a participant's
+// progress as a strip of dots grouped by stage.
+type StageGroup = {
+  number: number;
+  name: string;
+  moduleIds: string[];
+};
+
+// Everything about where one participant has got to. Built by joining their
+// progress rows (per session) against the programme order, so "where they're up
+// to" is the furthest session they've touched, not just a count.
+type ParticipantProgress = {
+  userId: string;
+  hasBaseline: boolean;
+  baselineDate: string | null;
+  age: number | null;
+  horizon: string;
+  completed: number; // sessions finished
+  inProgress: number; // sessions started but not finished
+  totalModules: number; // sessions in the programme
+  furthestOrder: number; // programme index of the furthest session touched, -1 if none
+  currentLabel: string; // human sentence for where they are
+  currentDetail: string; // the stage/session under that sentence
+  lastActive: string | null; // most recent activity across their sessions
+  totalActiveMs: number;
+  byModule: Map<string, ModuleProgressRow>;
+};
 
 export default function AdminFeedbackView({
   adminEmail,
@@ -172,7 +200,7 @@ export default function AdminFeedbackView({
   progress,
   modules,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("summary");
+  const [tab, setTab] = useState<Tab>("participants");
 
   // --- Baseline -------------------------------------------------------------
   // One row per participant, oldest first: the order people joined the pilot is
@@ -201,6 +229,133 @@ export default function AdminFeedbackView({
     for (const p of progress) m.set(`${p.userId} ${p.moduleId}`, p);
     return m;
   }, [progress]);
+
+  // --- Participants (per-person progress) -----------------------------------
+  // The programme in order, so a session id can be placed ("how far in is
+  // this?") and grouped by stage for the dot strip.
+  const stageGroups = useMemo<StageGroup[]>(() => {
+    const byNumber = new Map<number, StageGroup>();
+    for (const m of modules) {
+      const g =
+        byNumber.get(m.stageNumber) ??
+        ({ number: m.stageNumber, name: m.stageName, moduleIds: [] } as StageGroup);
+      g.moduleIds.push(m.id);
+      byNumber.set(m.stageNumber, g);
+    }
+    return [...byNumber.values()].sort((a, b) => a.number - b.number);
+  }, [modules]);
+
+  // A session's place and name, keyed by id: its 0-based programme order (for
+  // "furthest reached") and its stage/title (for the label under the sentence).
+  const moduleMetaById = useMemo(() => {
+    const m = new Map<
+      string,
+      { order: number; title: string; stageNumber: number; stageName: string }
+    >();
+    modules.forEach((mod, i) =>
+      m.set(mod.id, {
+        order: i,
+        title: mod.title,
+        stageNumber: mod.stageNumber,
+        stageName: mod.stageName,
+      })
+    );
+    return m;
+  }, [modules]);
+
+  // One row per participant, most-advanced first. A participant is anyone we've
+  // seen at all — someone can have a baseline but not have started, or (an older
+  // tester) have progress but no baseline, and both should show up.
+  const participants = useMemo<ParticipantProgress[]>(() => {
+    const byUser = new Map<string, ModuleProgressRow[]>();
+    for (const p of progress) {
+      const list = byUser.get(p.userId) ?? [];
+      list.push(p);
+      byUser.set(p.userId, list);
+    }
+
+    const userIds = new Set<string>([
+      ...baselineRows.map((b) => b.userId),
+      ...byUser.keys(),
+    ]);
+
+    const rows: ParticipantProgress[] = [];
+    for (const userId of userIds) {
+      const b = baselineByUser.get(userId);
+      const theirs = byUser.get(userId) ?? [];
+      const byModule = new Map<string, ModuleProgressRow>();
+      for (const p of theirs) byModule.set(p.moduleId, p);
+
+      const completed = theirs.filter((p) => p.completedAt !== null).length;
+      const inProgress = theirs.length - completed;
+
+      // The furthest session they've reached, by programme order. Sessions not in
+      // the programme (an old id) don't count towards position, but their time
+      // still counts towards totals below.
+      let furthestOrder = -1;
+      let furthestId: string | null = null;
+      let furthestDone = false;
+      for (const p of theirs) {
+        const meta = moduleMetaById.get(p.moduleId);
+        if (!meta) continue;
+        if (meta.order > furthestOrder) {
+          furthestOrder = meta.order;
+          furthestId = p.moduleId;
+          furthestDone = p.completedAt !== null;
+        }
+      }
+
+      let currentLabel: string;
+      let currentDetail: string;
+      if (furthestId === null) {
+        currentLabel = b ? "Signed up — not started" : "Not started";
+        currentDetail = "";
+      } else {
+        const meta = moduleMetaById.get(furthestId)!;
+        const done = completed >= modules.length;
+        currentLabel = done
+          ? "Finished the programme"
+          : furthestDone
+            ? "Ready for the next session"
+            : "In this session now";
+        currentDetail = `Stage ${meta.stageNumber} · ${meta.stageName} — ${meta.title}`;
+      }
+
+      // Most recent moment we can see: a completion if there is one, else when
+      // they started it. Good enough to sort "who's gone quiet".
+      let lastActive: string | null = null;
+      for (const p of theirs) {
+        const t = p.completedAt ?? p.startedAt;
+        if (lastActive === null || t.localeCompare(lastActive) > 0) lastActive = t;
+      }
+
+      rows.push({
+        userId,
+        hasBaseline: !!b,
+        baselineDate: b?.takenAt ?? null,
+        age: b?.age ?? null,
+        horizon: b?.horizon ?? "",
+        completed,
+        inProgress,
+        totalModules: modules.length,
+        furthestOrder,
+        currentLabel,
+        currentDetail,
+        lastActive,
+        totalActiveMs: theirs.reduce((a, p) => a + p.activeMs, 0),
+        byModule,
+      });
+    }
+
+    // Most advanced first, then most recently active — the people to look at
+    // (furthest along, or most recently seen) rise to the top.
+    rows.sort((a, b) => {
+      if (b.furthestOrder !== a.furthestOrder)
+        return b.furthestOrder - a.furthestOrder;
+      return (b.lastActive ?? "").localeCompare(a.lastActive ?? "");
+    });
+    return rows;
+  }, [progress, baselineRows, baselineByUser, moduleMetaById, modules.length]);
 
   // --- Per-module summary ---------------------------------------------------
   const summary = useMemo<SummaryRow[]>(() => {
@@ -474,6 +629,34 @@ export default function AdminFeedbackView({
     downloadCsv("baseline-survey.csv", [header, ...rows]);
   }
 
+  // One row per participant: where they are in the programme, for a spreadsheet
+  // read of the whole cohort's progress at a glance.
+  function exportParticipantsCsv() {
+    const header = [
+      "user_id",
+      "has_baseline",
+      "sessions_completed",
+      "sessions_in_progress",
+      "sessions_total",
+      "current_position",
+      "current_session",
+      "total_active_seconds",
+      "last_active_utc",
+    ];
+    const rows = participants.map((p) => [
+      p.userId,
+      p.hasBaseline ? "yes" : "no",
+      String(p.completed),
+      String(p.inProgress),
+      String(p.totalModules),
+      p.currentLabel,
+      p.currentDetail,
+      String(Math.round(p.totalActiveMs / 1000)),
+      p.lastActive ?? "",
+    ]);
+    downloadCsv("participant-progress.csv", [header, ...rows]);
+  }
+
   function exportGeneralCsv() {
     const header = [
       "user_id",
@@ -517,6 +700,12 @@ export default function AdminFeedbackView({
         </div>
 
         <nav style={S.tabs}>
+          <TabButton
+            active={tab === "participants"}
+            onClick={() => setTab("participants")}
+          >
+            Participants ({participants.length})
+          </TabButton>
           <TabButton active={tab === "summary"} onClick={() => setTab("summary")}>
             Per-module summary
           </TabButton>
@@ -530,6 +719,127 @@ export default function AdminFeedbackView({
             General &amp; support ({generalFeedback.length})
           </TabButton>
         </nav>
+
+        {tab === "participants" && (
+          <section>
+            <div style={S.toolbar}>
+              <p style={S.help}>
+                One card per person, furthest along first. The headline says where
+                they are right now; the dots below show every session, grouped by
+                stage — a <strong>filled</strong> dot is finished, a{" "}
+                <strong>half</strong> dot is started but not yet done, and an{" "}
+                <strong>empty</strong> dot is not yet reached. Hover a dot for the
+                session name. <strong>Last seen</strong> is the most recent moment
+                we recorded any activity for them.
+              </p>
+              <button style={S.csvBtn} onClick={exportParticipantsCsv}>
+                ↓ Download CSV
+              </button>
+            </div>
+            {participants.length === 0 ? (
+              <Empty>
+                No participants yet. Someone appears here as soon as they finish
+                onboarding or open their first session.
+              </Empty>
+            ) : (
+              <ul style={S.cardList}>
+                {participants.map((p) => (
+                  <li key={p.userId} style={S.card}>
+                    <div style={S.cardHead}>
+                      <div>
+                        <span style={S.progressWho} title={p.userId}>
+                          {shortUser(p.userId)}
+                        </span>
+                        <span style={S.progressMeta}>
+                          {p.hasBaseline ? (
+                            <>
+                              {p.age !== null && <>{p.age} · </>}
+                              {p.horizon || "baseline on file"}
+                            </>
+                          ) : (
+                            <span style={S.muted}>no baseline</span>
+                          )}
+                        </span>
+                      </div>
+                      <span style={S.cardDate}>
+                        {p.lastActive ? (
+                          <>Last seen {fmtDate(p.lastActive)}</>
+                        ) : (
+                          <span style={S.muted}>never active</span>
+                        )}
+                      </span>
+                    </div>
+
+                    <div style={S.progressStatusRow}>
+                      <span style={S.progressStatus}>{p.currentLabel}</span>
+                      {p.currentDetail && (
+                        <span style={S.progressDetail}>{p.currentDetail}</span>
+                      )}
+                    </div>
+
+                    <div style={S.progressCounts}>
+                      <span>
+                        <strong style={S.progressBig}>{p.completed}</strong>
+                        <span style={S.avgOutOf}> / {p.totalModules} sessions done</span>
+                      </span>
+                      {p.inProgress > 0 && (
+                        <span style={S.progressInFlight}>
+                          {p.inProgress} in progress
+                        </span>
+                      )}
+                      {p.totalActiveMs > 0 && (
+                        <span style={S.progressTime}>
+                          {fmtDuration(p.totalActiveMs)} on screen
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={S.stageStrips}>
+                      {stageGroups.map((g) => (
+                        <div key={g.number} style={S.stageStrip}>
+                          <span style={S.stageStripLabel}>
+                            {g.number}. {g.name}
+                          </span>
+                          <div style={S.dotRow}>
+                            {g.moduleIds.map((id) => {
+                              const row = p.byModule.get(id);
+                              const state = !row
+                                ? "none"
+                                : row.completedAt !== null
+                                  ? "done"
+                                  : "started";
+                              const meta = moduleMetaById.get(id);
+                              const status =
+                                state === "done"
+                                  ? "finished"
+                                  : state === "started"
+                                    ? "started, not finished"
+                                    : "not reached";
+                              return (
+                                <span
+                                  key={id}
+                                  style={{
+                                    ...S.dot2,
+                                    ...(state === "done"
+                                      ? S.dotDone
+                                      : state === "started"
+                                        ? S.dotStarted
+                                        : S.dotNone),
+                                  }}
+                                  title={`${meta?.title ?? id} — ${status}`}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
 
         {tab === "baseline" && (
           <section>
@@ -1412,6 +1722,78 @@ const S: Record<string, React.CSSProperties> = {
   },
   ratingPill: { display: "inline-flex", alignItems: "center", gap: 6 },
   dot: { width: 8, height: 8, borderRadius: "50%", display: "inline-block" },
+
+  // --- Participants (progress cards) ---
+  progressWho: {
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+    fontSize: "var(--fs-body)",
+    fontWeight: 600,
+    color: "var(--text)",
+  },
+  progressMeta: {
+    fontSize: "var(--fs-sm)",
+    color: "var(--text-muted)",
+    marginLeft: 10,
+  },
+  progressStatusRow: {
+    marginTop: 12,
+    display: "flex",
+    alignItems: "baseline",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  progressStatus: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-section)",
+    color: "var(--text)",
+  },
+  progressDetail: { fontSize: "var(--fs-sm)", color: "var(--text-muted)" },
+  progressCounts: {
+    marginTop: 8,
+    display: "flex",
+    gap: 16,
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    fontSize: "var(--fs-sm)",
+    color: "var(--text-muted)",
+  },
+  progressBig: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "20px",
+    color: "var(--text)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  progressInFlight: { color: "var(--accent-strong)", fontWeight: 600 },
+  progressTime: { color: "var(--text-muted)" },
+  stageStrips: {
+    marginTop: 14,
+    display: "flex",
+    gap: 18,
+    flexWrap: "wrap",
+  },
+  stageStrip: { display: "flex", flexDirection: "column", gap: 6 },
+  stageStripLabel: {
+    fontSize: "var(--fs-eyebrow)",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: "var(--text-muted)",
+  },
+  dotRow: { display: "flex", gap: 5 },
+  dot2: {
+    width: 12,
+    height: 12,
+    borderRadius: "50%",
+    display: "inline-block",
+    boxSizing: "border-box",
+  },
+  dotDone: { background: "var(--brand-primary)" },
+  // Half-filled: a brand-coloured ring with a lighter centre, so "started" reads
+  // as visibly between empty and done at a glance.
+  dotStarted: {
+    background: "var(--brand-primary-tint)",
+    border: "2px solid var(--brand-primary)",
+  },
+  dotNone: { background: "var(--muted-surface)", border: "1px solid var(--border)" },
   testerTag: {
     marginLeft: "auto",
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
