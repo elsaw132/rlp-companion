@@ -27,7 +27,7 @@ import ScreeningCheck, {
   screeningCheckSummaryText,
 } from "./ScreeningCheck";
 import ScreeningCommitment from "./ScreeningCommitment";
-import LetterFlow from "./LetterFlow";
+import LetterFlow, { LetterSummary } from "./LetterFlow";
 import StageIntro, { type StageIntroData } from "./StageIntro";
 import {
   PrimerAudio,
@@ -391,6 +391,9 @@ function InteractionSummary({
     case "spark-prompts":
       body = <SparkPromptsSummary result={result} />;
       break;
+    case "letter":
+      body = <LetterSummary result={result} />;
+      break;
     case "screening-check":
       body = <ScreeningCheckSummary result={result} />;
       break;
@@ -454,7 +457,7 @@ function InteractionSummary({
         style={styles.editLink}
         onClick={onEdit}
       >
-        Edit your selections ›
+        {result.type === "letter" ? "Edit your letter" : "Edit your selections"} ›
       </button>
     </section>
   );

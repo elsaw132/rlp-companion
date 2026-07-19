@@ -308,6 +308,49 @@ export default function LetterFlow({
   );
 }
 
+// The read-only recap of a saved letter, shown above Vita's first message and
+// kept visible through the conversation. The letter itself is the thing the
+// person made, so it's shown in full — the address line, then the body with its
+// own paragraph breaks preserved — rather than reduced to a label or a count.
+export function LetterSummary({ result }: { result: LetterResult }) {
+  return (
+    <>
+      <p style={summaryStyles.heading}>Your letter</p>
+      <p style={summaryStyles.addressLine}>To {result.recipientLabel},</p>
+      <p style={summaryStyles.body}>{result.body}</p>
+    </>
+  );
+}
+
+const summaryStyles: Record<string, React.CSSProperties> = {
+  heading: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 700,
+    color: "var(--ink)",
+    margin: "0 0 14px",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  },
+  addressLine: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-body)",
+    fontWeight: 600,
+    color: "var(--ink)",
+    margin: "0 0 10px",
+  },
+  body: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-body)",
+    lineHeight: "var(--lh-body)",
+    color: "var(--ink)",
+    margin: 0,
+    // The letter is written as paragraphs; keep every break the person made
+    // rather than collapsing it into one block.
+    whiteSpace: "pre-line",
+  },
+};
+
 const styles: Record<string, React.CSSProperties> = {
   wrap: {
     display: "flex",
