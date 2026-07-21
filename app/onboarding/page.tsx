@@ -790,6 +790,48 @@ function NameStep({
   );
 }
 
+// The DOB is stored canonically as an ISO string (YYYY-MM-DD), but people type
+// it as DD/MM/YYYY. These two helpers convert between the two.
+function formatIsoAsDisplay(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return "";
+  const [, y, mm, dd] = m;
+  return `${dd}/${mm}/${y}`;
+}
+
+// Parse a typed "DD/MM/YYYY" string into an ISO date, or return null if it
+// isn't a real, plausible date of birth.
+function parseDobDisplay(display: string): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(display.trim());
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+
+  const date = new Date(year, month - 1, day);
+  // Reject impossible dates like 31/02/1960 — Date silently rolls them over,
+  // so check the parts survived the round-trip.
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  // Light plausibility floor/ceiling: born no earlier than 1900, and at least
+  // 16 years ago (never in the future).
+  const now = new Date();
+  const sixteenYearsAgo = new Date(
+    now.getFullYear() - 16,
+    now.getMonth(),
+    now.getDate()
+  );
+  if (year < 1900 || date > sixteenYearsAgo) return null;
+
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
 function DateStep({
   dob,
   setDob,
@@ -801,14 +843,41 @@ function DateStep({
   onContinue: () => void;
   onSkip: () => void;
 }) {
-  // The latest date a 16-year-old could have been born — a light floor so the
-  // picker can't take an implausibly recent date.
-  const maxDob = (() => {
-    const d = new Date();
-    return `${d.getFullYear() - 16}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate()
-    ).padStart(2, "0")}`;
-  })();
+  // What the user sees and types: a DD/MM/YYYY string, seeded from any ISO
+  // value the parent already holds.
+  const [text, setText] = useState(() => formatIsoAsDisplay(dob));
+  const [error, setError] = useState("");
+
+  const handleChange = (raw: string) => {
+    // Keep only digits (max 8 for DDMMYYYY) and re-insert the slashes as they
+    // type, so the field always reads DD/MM/YYYY without the user typing "/".
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    let next = digits;
+    if (digits.length > 4) {
+      next = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    } else if (digits.length > 2) {
+      next = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    }
+    setText(next);
+    setError("");
+    // Keep the canonical ISO value in sync; clear it while the date is
+    // incomplete or invalid so nothing partial gets saved.
+    setDob(parseDobDisplay(next) ?? "");
+  };
+
+  const handleContinue = () => {
+    // Empty is allowed — that's the same as skipping.
+    if (text.trim() === "") {
+      onContinue();
+      return;
+    }
+    if (!parseDobDisplay(text)) {
+      setError("Please enter a real date as DD/MM/YYYY — for example 07/03/1962.");
+      return;
+    }
+    onContinue();
+  };
+
   return (
     <>
       <h1 className="step-heading">What&apos;s your date of birth?</h1>
@@ -819,15 +888,22 @@ function DateStep({
       <div className="name-field">
         <input
           id="date-of-birth"
-          type="date"
+          type="text"
+          inputMode="numeric"
           className="name-input"
-          value={dob}
-          max={maxDob}
-          onChange={(e) => setDob(e.target.value)}
+          value={text}
+          placeholder="DD/MM/YYYY"
+          maxLength={10}
+          onChange={(e) => handleChange(e.target.value)}
           autoComplete="bday"
         />
       </div>
-      <button type="button" className="btn btn-navy" onClick={onContinue}>
+      {error && (
+        <p className="paragraph" role="alert" style={{ color: "var(--accent-strong)" }}>
+          {error}
+        </p>
+      )}
+      <button type="button" className="btn btn-navy" onClick={handleContinue}>
         Continue
       </button>
       <button type="button" onClick={onSkip} className="skip">
