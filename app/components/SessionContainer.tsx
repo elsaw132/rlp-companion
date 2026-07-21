@@ -637,9 +637,9 @@ export default function SessionContainer({
   // from the snapshot on hydration, or fetched fresh in the "seeding" phase.
   const [seed, setSeed] = useState<Stage3Seed | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  // The composer is an auto-growing textarea; this lets it size to its content.
-  const composerRef = useRef<HTMLTextAreaElement>(null);
+  // The type-answer box (Composer, below) owns its own text state so that typing
+  // only re-renders that small box — not this whole session with its growing
+  // list of message bubbles. It hands the text up only on send.
   // Flips true once we've read this module's saved state out of the snapshot, so
   // the persist effect can't overwrite a saved conversation with an empty one
   // before hydration.
@@ -1700,16 +1700,6 @@ export default function SessionContainer({
     setCommitmentDone(true);
   }
 
-  // Grow the composer to fit what's typed (up to a cap, then it scrolls), so a
-  // longer message is comfortable to write and read back. Resets to one line
-  // once the field is cleared after a send.
-  useEffect(() => {
-    const el = composerRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
-  }, [input]);
-
   // Keep the newest streamed text in view. Runs on each smoothed frame (messages
   // update), but only follows when the reader is already near the bottom — if
   // they've scrolled up to re-read, we never yank them back down. We scroll the
@@ -1730,13 +1720,13 @@ export default function SessionContainer({
     }
   }, [messages]);
 
-  async function handleSend() {
-    const text = input.trim();
-    if (!text || sending) return;
+  // Returns true if Vita replied, false if the send failed — the Composer uses
+  // this to hand the person's words back to the box for a clean retry.
+  async function handleSend(text: string): Promise<boolean> {
+    if (!text || sending) return false;
 
     const conversation: Message[] = [...messages, { role: "user", text }];
     setMessages(conversation);
-    setInput("");
     setSending(true);
     setError(null);
     streamingRef.current = true;
@@ -1794,14 +1784,16 @@ export default function SessionContainer({
       if (editAckPending) setEditAckPending(false);
 
       if (isClosing) setPendingClose(true);
+      return true;
     } catch {
-      // Roll the user's bubble back off the conversation and hand their words
-      // back to the composer, so retrying is clean. The error is a transient
-      // notice only — never added to the conversation or saved to localStorage,
-      // so it can't be replayed to the API as one of Vita's turns.
+      // Roll the user's bubble back off the conversation; the Composer hands
+      // their words back to the box (via the false return) so retrying is clean.
+      // The error is a transient notice only — never added to the conversation
+      // or saved to localStorage, so it can't be replayed to the API as one of
+      // Vita's turns.
       setMessages(messages);
-      setInput(text);
       setError(COACH_ERROR_REPLY);
+      return false;
     } finally {
       // Flip off before returning, so the effect for the final setMessages (run
       // by React after this function settles) persists the completed exchange.
@@ -2153,59 +2145,12 @@ export default function SessionContainer({
               onWrapUp={() => finalizeClose(messages)}
             />
           ) : (
-            <>
-              {error && (
-                <div style={styles.errorNotice} role="status">
-                  {error}
-                </div>
-              )}
-
-              <div style={styles.composer}>
-                <textarea
-                  ref={composerRef}
-                  className="composer-input"
-                  style={styles.input}
-                  placeholder="Type your message…"
-                  rows={1}
-                  value={input}
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  onFocus={() => {
-                    // On mobile the composer sits at the end of a long scrolling
-                    // page, so when the on-screen keyboard opens it can be left
-                    // off-screen. Once the keyboard has had a moment to animate in,
-                    // ensure the input is visible — but only just: block "nearest"
-                    // scrolls the minimum needed, so an already-visible composer
-                    // stays put rather than being yanked to the centre of the
-                    // viewport (which threw the page upward when tapping to type).
-                    setTimeout(() => {
-                      composerRef.current?.scrollIntoView({
-                        block: "nearest",
-                        behavior: "smooth",
-                      });
-                    }, 300);
-                  }}
-                  onKeyDown={(e) => {
-                    // Enter sends; Shift+Enter starts a new line, so a longer
-                    // thought can be written without firing it half-finished.
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="send-btn"
-                  style={styles.sendButton}
-                  onClick={handleSend}
-                >
-                  Send →
-                </button>
-              </div>
-            </>
+            <Composer
+              onSend={handleSend}
+              sending={sending}
+              error={error}
+              onClearError={() => setError(null)}
+            />
           )}
         </section>
       )}
@@ -2881,6 +2826,167 @@ function CompositeStep({
   );
 }
 
+// The type-answer box. It owns its own text so that typing re-renders ONLY this
+// small box — not the whole session with its ever-growing list of message
+// bubbles. When the text lived on SessionContainer, every keystroke re-rendered
+// the entire conversation AND forced a full-page re-measure (to auto-grow the
+// box), so typing got laggier the longer the chat grew — the "type answer box
+// hanging" pilots reported, worse the deeper into the programme they were.
+//
+// It only reaches up to the parent on real events: onSend (returns whether Vita
+// replied, so a failed send hands the words back for a clean retry) and — only
+// while an error notice is actually showing — onClearError. Normal typing stays
+// entirely inside this component.
+function Composer({
+  onSend,
+  sending,
+  error,
+  onClearError,
+}: {
+  onSend: (text: string) => Promise<boolean>;
+  sending: boolean;
+  error: string | null;
+  onClearError: () => void;
+}) {
+  const [input, setInput] = useState("");
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // How many pixels of the bottom of the screen the on-screen keyboard is
+  // covering (0 when it's closed). iOS slides the keyboard *over* the page
+  // without resizing it, so a normal-flow box at the bottom ends up hidden
+  // behind it — the "box drops below the keyboard" that testers were fighting.
+  // We read this from the visual viewport (the part of the page actually visible
+  // above the keyboard) and, when it's open, park the box just above it.
+  const [kbInset, setKbInset] = useState(0);
+  // The bar's own height, so we can reserve the same space in the scrolling page
+  // below the last message (the bar is lifted out of the flow while pinned).
+  const [barHeight, setBarHeight] = useState(88);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return; // Older browsers keep the old inline box — no pinning.
+    const update = () => {
+      const overlap = window.innerHeight - vv.height - vv.offsetTop;
+      // Ignore tiny changes (URL-bar show/hide); only a real keyboard clears
+      // this threshold. Re-measure on the keyboard opening/closing (resize),
+      // not on every scroll frame, which is what kept it steady rather than
+      // jittery in earlier attempts.
+      setKbInset(overlap > 120 ? overlap : 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    return () => vv.removeEventListener("resize", update);
+  }, []);
+
+  const pinned = kbInset > 0;
+
+  // While pinned, keep the reserved spacer matched to the bar's real height (it
+  // grows as the message wraps to more lines), so the last message always clears
+  // it. ResizeObserver fires on every height change.
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el || !pinned) return;
+    setBarHeight(el.offsetHeight);
+    const ro = new ResizeObserver(() => setBarHeight(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [pinned]);
+
+  // Grow the box to fit what's typed (up to a cap, then it scrolls), so a longer
+  // message is comfortable to write and read back. Resets to one line once the
+  // field is cleared after a send.
+  //
+  // Measuring the box's natural height (reading scrollHeight) forces the browser
+  // to re-lay-out the page, which on a long conversation and an older device is
+  // the last thing that can make typing lag behind the keys. We defer it to the
+  // next animation frame and cancel any still-pending measure when another key
+  // lands first — so a fast burst of typing measures at most once, off the
+  // keystroke's critical path, and characters always echo instantly.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    const raf = requestAnimationFrame(() => {
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [input]);
+
+  async function send() {
+    const text = input.trim();
+    // Ignore an empty box, or a tap while Vita is still replying (the guard here
+    // means we never clear the box on an ignored send — no flicker).
+    if (!text || sending) return;
+    setInput(""); // clear immediately, as before
+    const ok = await onSend(text);
+    if (!ok) setInput(text); // failed send: hand the words back for a clean retry
+  }
+
+  // The box itself — identical whether it's sitting inline or pinned.
+  const field = (
+    <div style={styles.composer}>
+      <textarea
+        ref={composerRef}
+        className="composer-input"
+        style={styles.input}
+        placeholder="Type your message…"
+        rows={1}
+        value={input}
+        onChange={(e) => {
+          setInput(e.target.value);
+          // Only reaches the parent when a notice is actually up, so normal
+          // typing never re-renders the session behind us.
+          if (error) onClearError();
+        }}
+        onKeyDown={(e) => {
+          // Enter sends; Shift+Enter starts a new line, so a longer thought can
+          // be written without firing it half-finished.
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            send();
+          }
+        }}
+      />
+      <button
+        type="button"
+        className="send-btn"
+        style={styles.sendButton}
+        onClick={send}
+      >
+        Send →
+      </button>
+    </div>
+  );
+
+  const inner = (
+    <>
+      {error && (
+        <div style={styles.errorNotice} role="status">
+          {error}
+        </div>
+      )}
+      {field}
+    </>
+  );
+
+  // Keyboard closed (or no visual-viewport support, e.g. desktop): the box sits
+  // inline after the last message, exactly as before.
+  if (!pinned) return inner;
+
+  // Keyboard open: lift the box out of the flow and park it directly above the
+  // keyboard so it can never be covered. The spacer holds its place in the
+  // scrolling page so the last message still scrolls clear of it.
+  return (
+    <>
+      <div aria-hidden style={{ height: barHeight }} />
+      <div ref={barRef} style={{ ...styles.composerBar, bottom: kbInset }}>
+        <div style={styles.composerBarInner}>{inner}</div>
+      </div>
+    </>
+  );
+}
+
 // Vita is told to write plain prose, but strip any stray markdown emphasis she
 // slips in — the bubble renders raw text, so a leftover ** or * would otherwise
 // show as literal asterisks.
@@ -3418,6 +3524,28 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "12px",
     alignItems: "flex-end",
     marginTop: "4px",
+  },
+  // The fixed footer the box lives in while the keyboard is open. `bottom` is
+  // set inline to the keyboard's height so it parks just above it. A solid
+  // background + top hairline keep the messages scrolling behind it legible.
+  composerBar: {
+    position: "fixed",
+    left: 0,
+    right: 0,
+    zIndex: 40,
+    background: "var(--bg)",
+    borderTop: "1px solid var(--border-strong)",
+    boxShadow: "0 -6px 20px rgba(0, 0, 0, 0.05)",
+    padding: "10px 24px calc(10px + env(safe-area-inset-bottom))",
+    boxSizing: "border-box",
+  },
+  composerBarInner: {
+    width: "100%",
+    maxWidth: "var(--content-max)",
+    margin: "0 auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
   },
   input: {
     flex: 1,
