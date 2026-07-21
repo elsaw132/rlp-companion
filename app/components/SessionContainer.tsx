@@ -2852,46 +2852,55 @@ function Composer({
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
-  // How many pixels of the bottom of the screen the on-screen keyboard is
-  // covering (0 when it's closed). iOS slides the keyboard *over* the page
-  // without resizing it, so a normal-flow box at the bottom ends up hidden
-  // behind it — the "box drops below the keyboard" that testers were fighting.
-  // We read this from the visual viewport (the part of the page actually visible
-  // above the keyboard) and, when it's open, park the box just above it.
+  // The box is ALWAYS docked to the bottom of the screen (a fixed footer). This
+  // value is how many pixels the on-screen keyboard is covering (0 when it's
+  // closed); we lift the docked bar by exactly that much so it rides just above
+  // the keyboard. iOS slides the keyboard *over* the page without resizing it,
+  // so we read the covered height from the visual viewport (the part of the page
+  // actually visible above the keyboard).
+  //
+  // Crucially, the bar never switches between "inline" and "fixed" — it is fixed
+  // the whole time. Switching modes mid-tap is what made iOS jump the page to
+  // the top when the box was focused, and rebuilding the box is what dropped the
+  // keyboard on Android. A box that never changes mode avoids both.
   const [kbInset, setKbInset] = useState(0);
-  // The bar's own height, so we can reserve the same space in the scrolling page
-  // below the last message (the bar is lifted out of the flow while pinned).
+  // The bar's own height, so we can reserve the same space at the bottom of the
+  // scrolling page (the bar is out of the flow, so the last message would sit
+  // behind it without this spacer).
   const [barHeight, setBarHeight] = useState(88);
 
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return; // Older browsers keep the old inline box — no pinning.
+    if (!vv) return; // No visual-viewport support: bar just sits at bottom: 0.
     const update = () => {
       const overlap = window.innerHeight - vv.height - vv.offsetTop;
       // Ignore tiny changes (URL-bar show/hide); only a real keyboard clears
-      // this threshold. Re-measure on the keyboard opening/closing (resize),
-      // not on every scroll frame, which is what kept it steady rather than
-      // jittery in earlier attempts.
+      // this threshold. Track BOTH resize (keyboard opening/closing) and scroll:
+      // on iOS the visual viewport shifts under your finger as you scroll with
+      // the keyboard up, so recomputing on scroll keeps the bar glued above the
+      // keyboard instead of drifting — that drift was the jitter testers saw.
       setKbInset(overlap > 120 ? overlap : 0);
     };
     update();
     vv.addEventListener("resize", update);
-    return () => vv.removeEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
   }, []);
 
-  const pinned = kbInset > 0;
-
-  // While pinned, keep the reserved spacer matched to the bar's real height (it
-  // grows as the message wraps to more lines), so the last message always clears
-  // it. ResizeObserver fires on every height change.
+  // Keep the reserved spacer matched to the bar's real height (it grows as the
+  // message wraps to more lines), so the last message always clears it.
+  // ResizeObserver fires on every height change.
   useEffect(() => {
     const el = barRef.current;
-    if (!el || !pinned) return;
+    if (!el) return;
     setBarHeight(el.offsetHeight);
     const ro = new ResizeObserver(() => setBarHeight(el.offsetHeight));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [pinned]);
+  }, []);
 
   // Grow the box to fit what's typed (up to a cap, then it scrolls), so a longer
   // message is comfortable to write and read back. Resets to one line once the
@@ -2923,7 +2932,7 @@ function Composer({
     if (!ok) setInput(text); // failed send: hand the words back for a clean retry
   }
 
-  // The box itself — identical whether it's sitting inline or pinned.
+  // The box itself, which lives inside the docked footer bar.
   const field = (
     <div style={styles.composer}>
       <textarea
@@ -2970,17 +2979,17 @@ function Composer({
     </>
   );
 
-  // Keyboard closed (or no visual-viewport support, e.g. desktop): the box sits
-  // inline after the last message, exactly as before.
-  if (!pinned) return inner;
-
-  // Keyboard open: lift the box out of the flow and park it directly above the
-  // keyboard so it can never be covered. The spacer holds its place in the
-  // scrolling page so the last message still scrolls clear of it.
+  // The box is a fixed footer, docked to the bottom of the screen at all times.
+  // `bottom` is normally 0; when the keyboard opens it becomes the keyboard's
+  // height, lifting the bar to sit just above it. The spacer reserves the bar's
+  // height at the end of the scrolling page so the last message clears it.
   return (
     <>
       <div aria-hidden style={{ height: barHeight }} />
-      <div ref={barRef} style={{ ...styles.composerBar, bottom: kbInset }}>
+      <div
+        ref={barRef}
+        style={{ ...styles.composerBar, transform: `translateY(${-kbInset}px)` }}
+      >
         <div style={styles.composerBarInner}>{inner}</div>
       </div>
     </>
@@ -3525,19 +3534,25 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "flex-end",
     marginTop: "4px",
   },
-  // The fixed footer the box lives in while the keyboard is open. `bottom` is
-  // set inline to the keyboard's height so it parks just above it. A solid
-  // background + top hairline keep the messages scrolling behind it legible.
+  // The fixed footer the box lives in. It's docked at the bottom (`bottom: 0`)
+  // and lifted above the keyboard with a `transform: translateY` set inline —
+  // transforms are composited by the browser rather than re-laid-out, so the bar
+  // tracks the keyboard smoothly instead of stuttering a frame behind on scroll.
+  // `willChange: transform` keeps it on its own display layer so scrolling the
+  // page behind it doesn't repaint it (that repaint was the residual jitter). A
+  // solid background + top hairline keep the messages scrolling behind it legible.
   composerBar: {
     position: "fixed",
     left: 0,
     right: 0,
+    bottom: 0,
     zIndex: 40,
     background: "var(--bg)",
     borderTop: "1px solid var(--border-strong)",
     boxShadow: "0 -6px 20px rgba(0, 0, 0, 0.05)",
     padding: "10px 24px calc(10px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
+    willChange: "transform",
   },
   composerBarInner: {
     width: "100%",
