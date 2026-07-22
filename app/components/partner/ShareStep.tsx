@@ -99,7 +99,9 @@ export default function ShareStep() {
         }),
       });
       if (!res.ok) throw new Error();
-      // The page re-resolves and moves to the waiting or comparison surface.
+      // Drop any ?edit=1 and re-resolve: the page moves to the waiting or
+      // comparison surface.
+      router.replace("/partner");
       router.refresh();
     } catch {
       setSubmitting(false);

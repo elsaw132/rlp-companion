@@ -355,6 +355,14 @@ export default function ComparisonView() {
         either of you stops, this shared view closes for you both, and each plan
         goes back to being your own. Nothing here is added to either plan unless you
         choose to add it.{" "}
+        <button
+          type="button"
+          style={styles.stopLink}
+          onClick={() => router.push("/partner?edit=1")}
+        >
+          Change what you&rsquo;re sharing
+        </button>
+        {" · "}
         <button type="button" style={styles.stopLink} onClick={stopSharing}>
           Stop sharing
         </button>
