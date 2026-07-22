@@ -11,7 +11,7 @@ import type { ShareItem, ShareGroup } from "@/lib/coupleShare";
 // primary action POSTs the selection with complete:true, then the page re-routes
 // to the waiting or comparison surface.
 
-type ShareData = {
+export type ShareData = {
   items: ShareItem[];
   sharedRefs: string[];
   aboutPartnerRefs: string[];
@@ -42,14 +42,16 @@ const GROUP_META: Record<
 
 const GROUP_ORDER: ShareGroup[] = ["plan", "hopes", "fears"];
 
-export default function ShareStep() {
+export default function ShareStep({ preview }: { preview?: ShareData } = {}) {
   const router = useRouter();
-  const [data, setData] = useState<ShareData | null>(null);
+  const [data, setData] = useState<ShareData | null>(preview ?? null);
   const [error, setError] = useState(false);
-  const [on, setOn] = useState<Set<string>>(new Set());
+  const [on, setOn] = useState<Set<string>>(new Set(preview?.sharedRefs ?? []));
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // Preview mode (dummy data injected): skip the network entirely.
+    if (preview) return;
     let live = true;
     fetch("/api/partner/share")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -62,7 +64,7 @@ export default function ShareStep() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [preview]);
 
   const name = data?.partnerFirstName ?? "your partner";
 
@@ -87,6 +89,7 @@ export default function ShareStep() {
 
   async function share() {
     if (!data || submitting) return;
+    if (preview) return; // inert in the dummy-data preview
     setSubmitting(true);
     try {
       const res = await fetch("/api/partner/share", {
@@ -136,9 +139,7 @@ export default function ShareStep() {
       </p>
       <h1 style={styles.h1}>Choose what to share with {name}</h1>
       <p style={styles.lede}>
-        Before your plans sit side by side, you decide what of yours {name} sees.
-        I&rsquo;ve suggested a starting point — most things are switched on. Turn
-        off anything you&rsquo;d rather keep to yourself.
+        {`Before your plans sit side by side, you decide what of yours ${name} sees. I've suggested a starting point — most things are switched on. Turn off anything you'd rather keep to yourself.`}
       </p>
 
       <div style={styles.vitaCard}>
@@ -146,10 +147,7 @@ export default function ShareStep() {
           <span style={styles.vitaAvatar}>V</span>From Vita
         </span>
         <p style={styles.vitaCardText}>
-          Sharing openly makes for the better conversation, so I&rsquo;ve
-          switched most things on. The one place I&rsquo;ve held back is your
-          fears that are about {name} — those felt like your call to make, not
-          mine.
+          {`Sharing openly makes for the better conversation, so I've switched most things on. The one place I've held back is your fears that are about ${name} — those felt like your call to make, not mine.`}
         </p>
       </div>
 
@@ -211,10 +209,7 @@ export default function ShareStep() {
           {total} things.
         </p>
         <p style={styles.honesty}>
-          Only what&rsquo;s switched on reaches the shared view. {name} won&rsquo;t
-          see the rest — and won&rsquo;t see that anything&rsquo;s switched off.
-          You can change this whenever you like, and either of you can stop
-          sharing later.
+          {`Only what's switched on reaches the shared view. ${name} won't see the rest — and won't see that anything's switched off. You can change this whenever you like, and either of you can stop sharing later.`}
         </p>
         <button
           type="button"

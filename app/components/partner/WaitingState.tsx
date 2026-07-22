@@ -72,15 +72,14 @@ export default function WaitingState({
 
         <h1 style={styles.h1}>You&rsquo;re all set.</h1>
         <p style={styles.body}>
-          We&rsquo;ll open your shared view here as soon as {name} has done the
-          same — pop back any time to check.
+          {`We'll open your shared view here as soon as ${name} has done the same — pop back any time to check.`}
         </p>
         <p style={styles.rush}>
-          There&rsquo;s no rush. {name} can do theirs whenever they&rsquo;re ready.
+          {`There's no rush. ${name} can do theirs whenever they're ready.`}
         </p>
 
         <Link href="/home" style={styles.primary}>
-          Back to Act
+          Back to Home
         </Link>
         <div>
           <Link href="/partner?edit=1" style={styles.secondary}>
