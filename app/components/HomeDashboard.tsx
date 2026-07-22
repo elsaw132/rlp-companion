@@ -56,7 +56,14 @@ function shortenRecap(text: string): string {
   return out;
 }
 
-export default function HomeDashboard() {
+export default function HomeDashboard({
+  hasActivePairing = false,
+}: {
+  // True when the signed-in user has been admin-paired with a partner: the Act
+  // "Plan with your partner" card (5.1) becomes an active link instead of the
+  // "Coming soon" placeholder. Defaults false, so unpaired users are unchanged.
+  hasActivePairing?: boolean;
+} = {}) {
   const { user } = useUser();
   const userData = useUserData();
   // The person's retirement stage, used to tailor stage-intro and module-card
@@ -322,8 +329,18 @@ export default function HomeDashboard() {
   // (see moduleVisibleFor). Shown on the dashboard only, and only to people the
   // module is for (e.g. partner-gated modules need a partner).
   const comingSoonModules = viewedStageData.modules.filter(
-    (m) => m.comingSoon && (!m.requiresPartner || userData.hasPartner())
+    (m) =>
+      m.comingSoon &&
+      (!m.requiresPartner || userData.hasPartner()) &&
+      // A paired user gets 5.1 as an ACTIVE card (below), not a placeholder.
+      !(m.id === "5.1" && hasActivePairing)
   );
+  // The "Plan with your partner" card, shown active only to a paired user and
+  // only while viewing the stage it lives on (Act).
+  const activePartnerModule =
+    hasActivePairing
+      ? viewedStageData.modules.find((m) => m.id === "5.1") ?? null
+      : null;
   const stagePct =
     totalInStage > 0 ? Math.round((doneInStage / totalInStage) * 100) : 0;
 
@@ -759,7 +776,9 @@ export default function HomeDashboard() {
               </div>
             )}
 
-            {totalInStage === 0 && comingSoonModules.length === 0 ? (
+            {totalInStage === 0 &&
+            comingSoonModules.length === 0 &&
+            !activePartnerModule ? (
               <div className="info" style={{ marginBottom: "34px" }}>
                 <div className="av" aria-hidden="true">
                   🌱
@@ -845,6 +864,23 @@ export default function HomeDashboard() {
                     <span className="badge badge-soon">Coming soon</span>
                   </div>
                 ))}
+                {activePartnerModule && (
+                  <div className="scard">
+                    <ModuleIconChip
+                      className="thumb"
+                      stageKey={STAGE_KEYS[viewedStageData.number - 1]}
+                      moduleId={activePartnerModule.id}
+                      size="md"
+                    />
+                    <div>
+                      <div className="title">{activePartnerModule.title}</div>
+                      <div className="desc">{activePartnerModule.description}</div>
+                    </div>
+                    <Link className="btn btn-navy" href="/partner">
+                      Open
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
 

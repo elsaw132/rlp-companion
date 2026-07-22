@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { getUserData } from "@/lib/db";
+import { getUserData, getActivePairingFor } from "@/lib/db";
 import ProviderBand from "../components/ProviderBand";
 import HomeDashboard from "../components/HomeDashboard";
 
@@ -18,10 +18,13 @@ export default async function HomePage() {
   const onboardingComplete = await getUserData(userId, "onboarding-complete");
   if (onboardingComplete !== true) redirect("/onboarding");
 
+  // Whether to activate the Act "Plan with your partner" card for this user.
+  const activePairing = await getActivePairingFor(userId);
+
   return (
     <>
       <ProviderBand />
-      <HomeDashboard />
+      <HomeDashboard hasActivePairing={activePairing !== null} />
     </>
   );
 }
