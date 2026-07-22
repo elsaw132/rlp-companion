@@ -355,6 +355,8 @@ function ensureFeedbackTable(): Promise<void> {
       // For instances whose table predates the type column, add it in place.
       // No default, so existing rows read back as NULL ("unknown" in the portal).
       await sql()`ALTER TABLE feedback ADD COLUMN IF NOT EXISTS type text`;
+      // Optional free-text source tag (e.g. the couples talk-list empty state).
+      await sql()`ALTER TABLE feedback ADD COLUMN IF NOT EXISTS context text`;
     })()
       .then(() => undefined)
       .catch((err) => {
@@ -374,13 +376,14 @@ export async function insertFeedback(input: {
   replyEmail: string | null;
   page: string | null;
   type: FeedbackType;
+  context?: string | null;
 }): Promise<void> {
   await ensureFeedbackTable();
   await sql()`
-    INSERT INTO feedback (user_id, message, reply_email, page, type)
+    INSERT INTO feedback (user_id, message, reply_email, page, type, context)
     VALUES (
       ${input.userId}, ${input.message}, ${input.replyEmail},
-      ${input.page}, ${input.type}
+      ${input.page}, ${input.type}, ${input.context ?? null}
     )
   `;
 }
@@ -1285,6 +1288,88 @@ export async function upsertShareSelection(input: {
       completed_at = COALESCE(share_selection.completed_at, EXCLUDED.completed_at),
       updated_at = now()
   `;
+}
+
+// The cached generated comparison for a pairing (payload + the input hash it was
+// generated from), or null on a miss.
+export async function getCachedComparison(
+  pairingId: string
+): Promise<{ payload: unknown; inputHash: string } | null> {
+  await ensureGeneratedComparisonTable();
+  const rows = (await sql()`
+    SELECT payload_json, input_hash FROM generated_comparison
+    WHERE pairing_id = ${pairingId} LIMIT 1
+  `) as { payload_json: unknown; input_hash: string }[];
+  return rows.length
+    ? { payload: rows[0].payload_json, inputHash: rows[0].input_hash }
+    : null;
+}
+
+// Upsert the cached comparison for a pairing (one row per pairing).
+export async function saveCachedComparison(input: {
+  pairingId: string;
+  payload: unknown;
+  inputHash: string;
+}): Promise<void> {
+  await ensureGeneratedComparisonTable();
+  const payload = JSON.stringify(input.payload);
+  await sql()`
+    INSERT INTO generated_comparison (pairing_id, payload_json, input_hash, generated_at)
+    VALUES (${input.pairingId}, ${payload}::jsonb, ${input.inputHash}, now())
+    ON CONFLICT (pairing_id) DO UPDATE SET
+      payload_json = EXCLUDED.payload_json,
+      input_hash = EXCLUDED.input_hash,
+      generated_at = now()
+  `;
+}
+
+export type TalkTopicRow = {
+  id: string;
+  pairingId: string;
+  authorParticipantId: string;
+  body: string;
+  createdAt: string;
+};
+
+function mapTalkTopic(r: {
+  id: number | string;
+  pairing_id: number | string;
+  author_participant_id: string;
+  body: string;
+  created_at: string | Date;
+}): TalkTopicRow {
+  return {
+    id: String(r.id),
+    pairingId: String(r.pairing_id),
+    authorParticipantId: r.author_participant_id,
+    body: r.body,
+    createdAt: toIso(r.created_at) ?? new Date().toISOString(),
+  };
+}
+
+// The user-added talk topics for a pairing, oldest first (Vita seeds live in the
+// generated payload, not here).
+export async function listTalkTopics(pairingId: string): Promise<TalkTopicRow[]> {
+  await ensureTalkTopicTable();
+  const rows = (await sql()`
+    SELECT * FROM talk_topic WHERE pairing_id = ${pairingId} ORDER BY created_at ASC
+  `) as Parameters<typeof mapTalkTopic>[0][];
+  return rows.map(mapTalkTopic);
+}
+
+// Add one user talk topic; returns the created row.
+export async function addTalkTopic(input: {
+  pairingId: string;
+  authorParticipantId: string;
+  body: string;
+}): Promise<TalkTopicRow> {
+  await ensureTalkTopicTable();
+  const rows = (await sql()`
+    INSERT INTO talk_topic (pairing_id, author_participant_id, body)
+    VALUES (${input.pairingId}, ${input.authorParticipantId}, ${input.body})
+    RETURNING *
+  `) as Parameters<typeof mapTalkTopic>[0][];
+  return mapTalkTopic(rows[0]);
 }
 
 // Full erasure of one user's couples footprint, for the end-of-pilot "delete it
