@@ -7,6 +7,7 @@ import {
   deleteAllModuleFeedback,
   deleteAllBaselineSurvey,
   deleteAllModuleProgress,
+  deleteAllCoupleData,
 } from "@/lib/db";
 
 // True erasure for one person — the mechanism the end-of-pilot "delete it all"
@@ -25,6 +26,10 @@ import {
 //   - module_progress    — the timing/completion analytics. "Start over"
 //                          anonymises these; erasure deletes them, because
 //                          erasure means erasure.
+//   - couples data       — every couple_pairing this user is in (and the
+//                          partner's link to it), both share_selections, the
+//                          talk_topic rows, and any generated_comparison. The
+//                          shared artefact can't survive one party being erased.
 //   - the Clerk user account itself (done last — see below)
 //
 // The Postgres deletes run first and together; the Clerk account is deleted last
@@ -48,6 +53,7 @@ export async function deleteAllUserContext(userId: string): Promise<void> {
     deleteAllModuleFeedback(userId),
     deleteAllBaselineSurvey(userId),
     deleteAllModuleProgress(userId),
+    deleteAllCoupleData(userId),
   ]);
 
   // Account last: deleting the Clerk user invalidates their sessions and removes

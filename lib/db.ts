@@ -906,3 +906,320 @@ export async function deleteAllModuleProgress(userId: string): Promise<void> {
   await ensureModuleProgressTable();
   await sql()`DELETE FROM module_progress WHERE user_id = ${userId}`;
 }
+
+// ===========================================================================
+// Couples — "Plan with your partner" (module 5.1)
+//
+// Four tables, all created lazily like the rest of this file. Two participants
+// who each finished their own plan are linked by an admin into a couple_pairing;
+// each privately records what they'll share in share_selection (their consent);
+// once both have, a generated_comparison is cached and either partner can add to
+// a shared talk_topic list. Everything derived is deleted on withdrawal — only
+// the minimal pairing + consent-timestamp audit is kept. There are no foreign
+// keys (house convention — Clerk text ids, app-managed integrity), so child-row
+// deletion is always explicit.
+// ===========================================================================
+
+export type PairingStatus = "active" | "withdrawn";
+
+// One active pairing per participant is NOT structurally guaranteed by the DB:
+// the two partial unique indexes only stop the same id appearing twice in the
+// SAME slot (a vs b). The real guard is the atomic guarded INSERT in
+// createPairing() below, which refuses to insert when either id is already in an
+// active pairing. If it ever needs to be DB-guaranteed, the robust shape is a
+// pairing_membership table (one row per participant per pairing) with a partial
+// unique index on participant_id WHERE active.
+let couplePairingReady: Promise<void> | null = null;
+function ensureCouplePairingTable(): Promise<void> {
+  if (!couplePairingReady) {
+    couplePairingReady = (async () => {
+      await sql()`
+        CREATE TABLE IF NOT EXISTS couple_pairing (
+          id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+          participant_a_id text NOT NULL,
+          participant_b_id text NOT NULL,
+          created_by_admin_id text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          status text NOT NULL DEFAULT 'active',
+          withdrawn_by_id text,
+          withdrawn_at timestamptz,
+          CHECK (participant_a_id < participant_b_id),
+          CHECK (status IN ('active','withdrawn'))
+        )
+      `;
+      await sql()`
+        CREATE UNIQUE INDEX IF NOT EXISTS couple_pairing_active_a
+          ON couple_pairing (participant_a_id) WHERE status = 'active'
+      `;
+      await sql()`
+        CREATE UNIQUE INDEX IF NOT EXISTS couple_pairing_active_b
+          ON couple_pairing (participant_b_id) WHERE status = 'active'
+      `;
+    })()
+      .then(() => undefined)
+      .catch((err) => {
+        couplePairingReady = null;
+        throw err;
+      });
+  }
+  return couplePairingReady;
+}
+
+// Per participant per pairing: the ids of the plan items they chose to share
+// (their selection) plus completed_at (their consent timestamp). Editable and
+// revocable. about_partner_refs caches the one-off classification of which of
+// their fears are about the partner/relationship (defaulted off in the UI).
+// updated_at is set explicitly by the app on every write, never left to the
+// insert default.
+let shareSelectionReady: Promise<void> | null = null;
+function ensureShareSelectionTable(): Promise<void> {
+  if (!shareSelectionReady) {
+    shareSelectionReady = (async () => {
+      await sql()`
+        CREATE TABLE IF NOT EXISTS share_selection (
+          id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+          pairing_id bigint NOT NULL,
+          participant_id text NOT NULL,
+          shared_item_refs jsonb NOT NULL DEFAULT '[]'::jsonb,
+          about_partner_refs jsonb NOT NULL DEFAULT '[]'::jsonb,
+          completed_at timestamptz,
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (pairing_id, participant_id)
+        )
+      `;
+    })()
+      .then(() => undefined)
+      .catch((err) => {
+        shareSelectionReady = null;
+        throw err;
+      });
+  }
+  return shareSelectionReady;
+}
+
+// The shared "worth talking about" list holds ONLY user additions — the Vita
+// seed topics live in generated_comparison.payload_json and are regenerated
+// freely, so there is no source column and nothing to reconcile.
+let talkTopicReady: Promise<void> | null = null;
+function ensureTalkTopicTable(): Promise<void> {
+  if (!talkTopicReady) {
+    talkTopicReady = (async () => {
+      await sql()`
+        CREATE TABLE IF NOT EXISTS talk_topic (
+          id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+          pairing_id bigint NOT NULL,
+          author_participant_id text NOT NULL,
+          body text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+      await sql()`
+        CREATE INDEX IF NOT EXISTS talk_topic_pairing ON talk_topic (pairing_id)
+      `;
+    })()
+      .then(() => undefined)
+      .catch((err) => {
+        talkTopicReady = null;
+        throw err;
+      });
+  }
+  return talkTopicReady;
+}
+
+// Cache of the Vita-generated comparison payload, one row per pairing.
+// input_hash is regenerated when either selection or the underlying plan data
+// changes; a miss triggers a fresh generation.
+let generatedComparisonReady: Promise<void> | null = null;
+function ensureGeneratedComparisonTable(): Promise<void> {
+  if (!generatedComparisonReady) {
+    generatedComparisonReady = (async () => {
+      await sql()`
+        CREATE TABLE IF NOT EXISTS generated_comparison (
+          pairing_id bigint PRIMARY KEY,
+          payload_json jsonb NOT NULL,
+          input_hash text NOT NULL,
+          generated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+    })()
+      .then(() => undefined)
+      .catch((err) => {
+        generatedComparisonReady = null;
+        throw err;
+      });
+  }
+  return generatedComparisonReady;
+}
+
+export type PairingRow = {
+  id: string;
+  participantAId: string;
+  participantBId: string;
+  createdByAdminId: string;
+  createdAt: string;
+  status: PairingStatus;
+  withdrawnById: string | null;
+  withdrawnAt: string | null;
+};
+
+type RawPairing = {
+  id: number | string;
+  participant_a_id: string;
+  participant_b_id: string;
+  created_by_admin_id: string;
+  created_at: string | Date;
+  status: string;
+  withdrawn_by_id: string | null;
+  withdrawn_at: string | Date | null;
+};
+
+function mapPairing(r: RawPairing): PairingRow {
+  return {
+    id: String(r.id),
+    participantAId: r.participant_a_id,
+    participantBId: r.participant_b_id,
+    createdByAdminId: r.created_by_admin_id,
+    createdAt: toIso(r.created_at) ?? new Date().toISOString(),
+    status: r.status === "withdrawn" ? "withdrawn" : "active",
+    withdrawnById: r.withdrawn_by_id,
+    withdrawnAt: toIso(r.withdrawn_at),
+  };
+}
+
+export type CreatePairingResult =
+  | { ok: true; pairingId: string }
+  | { ok: false; reason: "same-user" | "already-paired"; blockedId?: string };
+
+// Pair two participants. The pair is stored canonically (lower id in slot a) so
+// (A,B) == (B,A). The guard is a single atomic statement: the row inserts only
+// when NEITHER id is already in an active pairing — no check-then-insert race.
+// A zero-row result means it was blocked; we then look up which id is already
+// paired purely to give the admin a clear message.
+export async function createPairing(input: {
+  adminId: string;
+  participantAId: string;
+  participantBId: string;
+}): Promise<CreatePairingResult> {
+  await ensureCouplePairingTable();
+  const { adminId } = input;
+  if (input.participantAId === input.participantBId) {
+    return { ok: false, reason: "same-user" };
+  }
+  const [lo, hi] =
+    input.participantAId < input.participantBId
+      ? [input.participantAId, input.participantBId]
+      : [input.participantBId, input.participantAId];
+
+  const inserted = (await sql()`
+    INSERT INTO couple_pairing (participant_a_id, participant_b_id, created_by_admin_id)
+    SELECT ${lo}, ${hi}, ${adminId}
+    WHERE NOT EXISTS (
+      SELECT 1 FROM couple_pairing
+      WHERE status = 'active'
+        AND (participant_a_id IN (${lo}, ${hi}) OR participant_b_id IN (${lo}, ${hi}))
+    )
+    RETURNING id
+  `) as { id: number | string }[];
+
+  if (inserted.length === 0) {
+    const existing = (await sql()`
+      SELECT participant_a_id, participant_b_id FROM couple_pairing
+      WHERE status = 'active'
+        AND (participant_a_id IN (${lo}, ${hi}) OR participant_b_id IN (${lo}, ${hi}))
+      LIMIT 1
+    `) as { participant_a_id: string; participant_b_id: string }[];
+    const blockedId = existing.length
+      ? [existing[0].participant_a_id, existing[0].participant_b_id].find(
+          (id) => id === lo || id === hi
+        )
+      : undefined;
+    return { ok: false, reason: "already-paired", blockedId };
+  }
+  return { ok: true, pairingId: String(inserted[0].id) };
+}
+
+// The active pairing a participant belongs to, or null. This is the single
+// authorization link that lets one participant's data be read alongside another's.
+export async function getActivePairingFor(
+  userId: string
+): Promise<PairingRow | null> {
+  await ensureCouplePairingTable();
+  const rows = (await sql()`
+    SELECT * FROM couple_pairing
+    WHERE status = 'active'
+      AND (participant_a_id = ${userId} OR participant_b_id = ${userId})
+    LIMIT 1
+  `) as RawPairing[];
+  return rows.length ? mapPairing(rows[0]) : null;
+}
+
+export async function getPairingById(
+  pairingId: string
+): Promise<PairingRow | null> {
+  await ensureCouplePairingTable();
+  const rows = (await sql()`
+    SELECT * FROM couple_pairing WHERE id = ${pairingId} LIMIT 1
+  `) as RawPairing[];
+  return rows.length ? mapPairing(rows[0]) : null;
+}
+
+// Every active pairing, newest first — for the admin portal. Reads across all
+// users, so only ever called behind the admin gate.
+export async function getActivePairings(): Promise<PairingRow[]> {
+  await ensureCouplePairingTable();
+  const rows = (await sql()`
+    SELECT * FROM couple_pairing WHERE status = 'active' ORDER BY created_at DESC
+  `) as RawPairing[];
+  return rows.map(mapPairing);
+}
+
+// Stop sharing (either partner, or an admin). Collapses the shared view (status
+// → withdrawn, only if still active — idempotent), keeps each consent timestamp
+// but clears WHAT was shared (data minimisation), and deletes all derived
+// content. No FK cascade, so the child deletes are explicit. Safe to call more
+// than once.
+export async function withdrawPairing(input: {
+  pairingId: string;
+  withdrawnById: string;
+}): Promise<void> {
+  await ensureCouplePairingTable();
+  await ensureShareSelectionTable();
+  await ensureTalkTopicTable();
+  await ensureGeneratedComparisonTable();
+  const { pairingId, withdrawnById } = input;
+  await sql()`
+    UPDATE couple_pairing
+    SET status = 'withdrawn', withdrawn_by_id = ${withdrawnById}, withdrawn_at = now()
+    WHERE id = ${pairingId} AND status = 'active'
+  `;
+  await sql()`
+    UPDATE share_selection
+    SET shared_item_refs = '[]'::jsonb, about_partner_refs = '[]'::jsonb, updated_at = now()
+    WHERE pairing_id = ${pairingId}
+  `;
+  await sql()`DELETE FROM generated_comparison WHERE pairing_id = ${pairingId}`;
+  await sql()`DELETE FROM talk_topic WHERE pairing_id = ${pairingId}`;
+}
+
+// Full erasure of one user's couples footprint, for the end-of-pilot "delete it
+// all" flow. Erasure means erasure: for every pairing this user belongs to
+// (active or withdrawn), delete the derived content, both share_selections, and
+// the pairing row itself — the shared artefact can't survive one party being
+// erased, and this severs the partner's link too.
+export async function deleteAllCoupleData(userId: string): Promise<void> {
+  await ensureCouplePairingTable();
+  await ensureShareSelectionTable();
+  await ensureTalkTopicTable();
+  await ensureGeneratedComparisonTable();
+  const pairings = (await sql()`
+    SELECT id FROM couple_pairing
+    WHERE participant_a_id = ${userId} OR participant_b_id = ${userId}
+  `) as { id: number | string }[];
+  for (const p of pairings) {
+    const id = String(p.id);
+    await sql()`DELETE FROM generated_comparison WHERE pairing_id = ${id}`;
+    await sql()`DELETE FROM talk_topic WHERE pairing_id = ${id}`;
+    await sql()`DELETE FROM share_selection WHERE pairing_id = ${id}`;
+    await sql()`DELETE FROM couple_pairing WHERE id = ${id}`;
+  }
+}
