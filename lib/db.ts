@@ -1201,6 +1201,92 @@ export async function withdrawPairing(input: {
   await sql()`DELETE FROM talk_topic WHERE pairing_id = ${pairingId}`;
 }
 
+export type ShareSelectionRow = {
+  pairingId: string;
+  participantId: string;
+  sharedItemRefs: string[];
+  aboutPartnerRefs: string[];
+  completedAt: string | null;
+  updatedAt: string;
+};
+
+function mapShareSelection(r: {
+  pairing_id: number | string;
+  participant_id: string;
+  shared_item_refs: unknown;
+  about_partner_refs: unknown;
+  completed_at: string | Date | null;
+  updated_at: string | Date;
+}): ShareSelectionRow {
+  return {
+    pairingId: String(r.pairing_id),
+    participantId: r.participant_id,
+    sharedItemRefs: Array.isArray(r.shared_item_refs)
+      ? (r.shared_item_refs as string[])
+      : [],
+    aboutPartnerRefs: Array.isArray(r.about_partner_refs)
+      ? (r.about_partner_refs as string[])
+      : [],
+    completedAt: toIso(r.completed_at),
+    updatedAt: toIso(r.updated_at) ?? new Date().toISOString(),
+  };
+}
+
+// One participant's selection for a pairing, or null if they haven't started.
+export async function getShareSelection(
+  pairingId: string,
+  participantId: string
+): Promise<ShareSelectionRow | null> {
+  await ensureShareSelectionTable();
+  const rows = (await sql()`
+    SELECT * FROM share_selection
+    WHERE pairing_id = ${pairingId} AND participant_id = ${participantId}
+    LIMIT 1
+  `) as Parameters<typeof mapShareSelection>[0][];
+  return rows.length ? mapShareSelection(rows[0]) : null;
+}
+
+// Both participants' selections for a pairing (0, 1, or 2 rows).
+export async function getShareSelections(
+  pairingId: string
+): Promise<ShareSelectionRow[]> {
+  await ensureShareSelectionTable();
+  const rows = (await sql()`
+    SELECT * FROM share_selection WHERE pairing_id = ${pairingId}
+  `) as Parameters<typeof mapShareSelection>[0][];
+  return rows.map(mapShareSelection);
+}
+
+// Save (or update) a participant's selection. `complete` records consent: the
+// completed_at timestamp is set the first time they complete and preserved on
+// later edits (COALESCE), so editing what's shared never resets the consent
+// record. updated_at is always set here — never left to the insert default.
+export async function upsertShareSelection(input: {
+  pairingId: string;
+  participantId: string;
+  sharedItemRefs: string[];
+  aboutPartnerRefs: string[];
+  complete: boolean;
+}): Promise<void> {
+  await ensureShareSelectionTable();
+  const shared = JSON.stringify(input.sharedItemRefs);
+  const about = JSON.stringify(input.aboutPartnerRefs);
+  await sql()`
+    INSERT INTO share_selection
+      (pairing_id, participant_id, shared_item_refs, about_partner_refs, completed_at, updated_at)
+    VALUES (
+      ${input.pairingId}, ${input.participantId},
+      ${shared}::jsonb, ${about}::jsonb,
+      CASE WHEN ${input.complete} THEN now() ELSE NULL END, now()
+    )
+    ON CONFLICT (pairing_id, participant_id) DO UPDATE SET
+      shared_item_refs = EXCLUDED.shared_item_refs,
+      about_partner_refs = EXCLUDED.about_partner_refs,
+      completed_at = COALESCE(share_selection.completed_at, EXCLUDED.completed_at),
+      updated_at = now()
+  `;
+}
+
 // Full erasure of one user's couples footprint, for the end-of-pilot "delete it
 // all" flow. Erasure means erasure: for every pairing this user belongs to
 // (active or withdrawn), delete the derived content, both share_selections, and
