@@ -15,7 +15,7 @@ type Slot = "a" | "b";
 type PM = { name: string; cohort: string; planName: string; initial: string };
 type GoalEntry = { label: string; both: boolean };
 
-type Payload = {
+export type Payload = {
   partners: { a: PM; b: PM };
   framing: { opener: string; close: string };
   sharedGround: string[];
@@ -30,16 +30,20 @@ type Payload = {
 const colourFor = (slot: Slot) =>
   slot === "a" ? "var(--partner-a)" : "var(--partner-b)";
 
-export default function ComparisonView() {
+export default function ComparisonView({ preview }: { preview?: Payload } = {}) {
   const router = useRouter();
-  const [data, setData] = useState<Payload | null>(null);
+  const [data, setData] = useState<Payload | null>(preview ?? null);
   const [error, setError] = useState(false);
-  const [userTopics, setUserTopics] = useState<Payload["talk"]["user"]>([]);
+  const [userTopics, setUserTopics] = useState<Payload["talk"]["user"]>(
+    preview?.talk.user ?? []
+  );
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
+    // Preview mode (dummy data injected): skip the network entirely.
+    if (preview) return;
     let live = true;
     fetch("/api/partner/comparison")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -52,7 +56,7 @@ export default function ComparisonView() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [preview]);
 
   const slotForName = useMemo(() => {
     return (name: string): Slot | null => {
@@ -67,6 +71,14 @@ export default function ComparisonView() {
   async function addTopic() {
     const body = draft.trim();
     if (!body || adding) return;
+    if (preview) {
+      setUserTopics((prev) => [
+        ...prev,
+        { id: `local-${prev.length + 1}`, slot: "a", body },
+      ]);
+      setDraft("");
+      return;
+    }
     setAdding(true);
     try {
       const res = await fetch("/api/partner/talk-topics", {
@@ -88,6 +100,7 @@ export default function ComparisonView() {
   }
 
   async function stopSharing() {
+    if (preview) return; // inert in the dummy-data preview
     if (
       !window.confirm(
         "Stop sharing? This closes the shared view for both of you, and each plan goes back to being your own."
@@ -358,7 +371,9 @@ export default function ComparisonView() {
         <button
           type="button"
           style={styles.stopLink}
-          onClick={() => router.push("/partner?edit=1")}
+          onClick={() => {
+            if (!preview) router.push("/partner?edit=1");
+          }}
         >
           Change what you&rsquo;re sharing
         </button>
