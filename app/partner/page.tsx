@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { getActivePairingFor, getShareSelections } from "@/lib/db";
 import ShareStep from "@/app/components/partner/ShareStep";
+import ComparisonView from "@/app/components/partner/ComparisonView";
 
 // The single entry point for "Plan with your partner" (module 5.1). It resolves
 // the pairing and each side's completion (cheap DB reads only — no LLM in the
@@ -32,8 +33,7 @@ export default async function PartnerPage() {
   const partnerCompleted = Boolean(partner?.completedAt);
 
   if (iCompleted && partnerCompleted) {
-    // TODO(Phase 3): the comparison view.
-    return <Placeholder title="Bringing your plans together" note="The comparison view is coming in the next step of the build." />;
+    return <ComparisonView />;
   }
   if (iCompleted && !partnerCompleted) {
     // TODO(Phase 4): the real waiting state (interlocking-circles motif).
