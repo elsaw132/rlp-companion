@@ -990,6 +990,9 @@ function ensureShareSelectionTable(): Promise<void> {
           UNIQUE (pairing_id, participant_id)
         )
       `;
+      // The first name this participant confirmed for their partner (never
+      // guessed silently). Nullable — set at the confirm-name step.
+      await sql()`ALTER TABLE share_selection ADD COLUMN IF NOT EXISTS partner_name text`;
     })()
       .then(() => undefined)
       .catch((err) => {
@@ -1211,6 +1214,7 @@ export type ShareSelectionRow = {
   aboutPartnerRefs: string[];
   completedAt: string | null;
   updatedAt: string;
+  partnerName: string | null;
 };
 
 function mapShareSelection(r: {
@@ -1220,6 +1224,7 @@ function mapShareSelection(r: {
   about_partner_refs: unknown;
   completed_at: string | Date | null;
   updated_at: string | Date;
+  partner_name?: string | null;
 }): ShareSelectionRow {
   return {
     pairingId: String(r.pairing_id),
@@ -1232,7 +1237,25 @@ function mapShareSelection(r: {
       : [],
     completedAt: toIso(r.completed_at),
     updatedAt: toIso(r.updated_at) ?? new Date().toISOString(),
+    partnerName: r.partner_name ?? null,
   };
+}
+
+// Record the first name a participant confirmed for their partner. Creates a
+// draft selection row if none exists yet (completed_at stays null), or updates
+// the name on an existing row, without disturbing their selection.
+export async function setPartnerName(input: {
+  pairingId: string;
+  participantId: string;
+  name: string;
+}): Promise<void> {
+  await ensureShareSelectionTable();
+  await sql()`
+    INSERT INTO share_selection (pairing_id, participant_id, partner_name, updated_at)
+    VALUES (${input.pairingId}, ${input.participantId}, ${input.name}, now())
+    ON CONFLICT (pairing_id, participant_id) DO UPDATE SET
+      partner_name = EXCLUDED.partner_name, updated_at = now()
+  `;
 }
 
 // One participant's selection for a pairing, or null if they haven't started.

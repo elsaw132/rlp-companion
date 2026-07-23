@@ -1,19 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import FeedbackPanel from "@/app/components/FeedbackPanel";
+import VitaMark from "../VitaMark";
 
 // The comparison view: two plans side by side. Deterministic content (partner
-// labels, goals/hopes/fears) is rendered straight from the payload; the framing,
-// the shared/complementary/different observations, and the seed talk topics are
-// Vita-generated. It reads identically whichever partner opens it. No completion
-// state — it's persistent and revisitable.
+// labels, goals/values/strengths/hopes/fears/principles) is rendered straight
+// from the payload; the framing, the shared/complementary/different
+// observations, and the seed talk topics are Vita-generated. Goals, values and
+// strengths expand for detail (mirrors the RLP plan document). It reads
+// identically whichever partner opens it. No completion state.
 
 type Obs = { text: string; sides?: { name: string; text: string }[]; clearest?: boolean };
 type Slot = "a" | "b";
 type PM = { name: string; cohort: string; planName: string; initial: string };
-type GoalEntry = { label: string; both: boolean };
+type GoalDetail = {
+  note?: string;
+  cadence?: string;
+  season?: string;
+  looksLike?: string;
+  ordinaryWeek?: string;
+};
+type GoalEntry = { label: string; both: boolean; detail?: GoalDetail };
+type ValueEntry = { label: string; both: boolean; description?: string; nonNegotiable?: boolean };
+type StrengthEntry = { label: string; both: boolean; note?: string };
 
 export type Payload = {
   partners: { a: PM; b: PM };
@@ -22,8 +39,11 @@ export type Payload = {
   complementary: Obs[];
   different: Obs[];
   goals: { a: GoalEntry[]; b: GoalEntry[] };
+  values: { a: ValueEntry[]; b: ValueEntry[] };
+  strengths: { a: StrengthEntry[]; b: StrengthEntry[] };
   hopes: { slot: Slot; text: string }[];
   fears: { slot: Slot; text: string }[];
+  principles: { slot: Slot; text: string }[];
   talk: { seeds: string[]; user: { id: string; slot: Slot; body: string }[] };
 };
 
@@ -42,7 +62,6 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
   const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
-    // Preview mode (dummy data injected): skip the network entirely.
     if (preview) return;
     let live = true;
     fetch("/api/partner/comparison")
@@ -100,7 +119,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
   }
 
   async function stopSharing() {
-    if (preview) return; // inert in the dummy-data preview
+    if (preview) return;
     if (
       !window.confirm(
         "Stop sharing? This closes the shared view for both of you, and each plan goes back to being your own."
@@ -133,19 +152,13 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
   const { partners } = data;
   const hasTalk = data.talk.seeds.length > 0 || userTopics.length > 0;
 
-  const Dot = ({ slot, size = 26 }: { slot: Slot; size?: number }) => (
-    <span
-      style={{
-        ...styles.dot,
-        width: size,
-        height: size,
-        fontSize: size < 20 ? 9 : 12,
-        background: colourFor(slot),
-      }}
-    >
-      {partners[slot].initial}
-    </span>
-  );
+  const goalsHaveDetail =
+    data.goals.a.some((g) => g.detail) || data.goals.b.some((g) => g.detail);
+  const valuesHaveDetail =
+    data.values.a.some((v) => v.description) ||
+    data.values.b.some((v) => v.description);
+  const strengthsHaveDetail =
+    data.strengths.a.some((s) => s.note) || data.strengths.b.some((s) => s.note);
 
   return (
     <main style={styles.page}>
@@ -160,7 +173,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
       <div style={styles.people}>
         {(["a", "b"] as Slot[]).map((slot) => (
           <div key={slot} style={styles.person}>
-            <Dot slot={slot} />
+            <Dot partners={partners} slot={slot} />
             <span>
               <b style={styles.personName}>{partners[slot].name}</b>
               <span style={styles.personMeta}>
@@ -174,7 +187,8 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
       {/* Vita framing */}
       <div style={styles.vitaCard}>
         <span style={styles.vitaTag}>
-          <span style={styles.vitaAvatar}>V</span>From Vita
+          <VitaMark size={22} />
+          From Vita
         </span>
         <p style={styles.vitaCardText}>
           {data.framing.opener} {data.framing.close}
@@ -183,126 +197,163 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
 
       {/* Shared ground */}
       {data.sharedGround.length > 0 && (
-        <section style={styles.bucket}>
-          <div style={styles.bucketHead}>
-            <h2 style={styles.bucketH2}>Shared ground</h2>
-            <span style={styles.bucketSub}>where your plans landed together</span>
-          </div>
-          <p style={styles.note}>
-            A good place to start — the things you both put near the top.
-          </p>
+        <Section heading="Shared ground" subtitle="where your plans landed together" note="A good place to start — the things you both put near the top.">
           {data.sharedGround.map((t, i) => (
             <div key={i} style={{ ...styles.item, ...styles.itemShared }}>
               <p style={styles.obs}>{t}</p>
             </div>
           ))}
-        </section>
+        </Section>
       )}
 
       {/* Complementary */}
       {data.complementary.length > 0 && (
-        <section style={styles.bucket}>
-          <div style={styles.bucketHead}>
-            <h2 style={styles.bucketH2}>Where you complement each other</h2>
-          </div>
-          <p style={styles.note}>
-            Different choices that seem to fit together rather than pull apart.
-          </p>
+        <Section heading="Where you complement each other" note="Different choices that seem to fit together rather than pull apart.">
           {data.complementary.map((o, i) => (
             <Observation key={i} o={o} kind="comp" slotForName={slotForName} />
           ))}
-        </section>
+        </Section>
       )}
 
       {/* Different */}
       {data.different.length > 0 && (
-        <section style={styles.bucket}>
-          <div style={styles.bucketHead}>
-            <h2 style={styles.bucketH2}>Where your plans differ</h2>
-          </div>
-          <p style={styles.note}>
-            Not problems — just places your two pictures don&rsquo;t line up. These
-            are often the most useful things to talk about, and the conversation is
-            usually less about the what than the why beneath it.
-          </p>
+        <Section heading="Where your plans differ" note="Not problems — just places your two pictures don't line up. These are often the most useful things to talk about, and the conversation is usually less about the what than the why beneath it.">
           {data.different.map((o, i) => (
             <Observation key={i} o={o} kind="diff" slotForName={slotForName} />
           ))}
-        </section>
+        </Section>
       )}
 
-      {/* Goals — full picture */}
+      {/* Goals */}
       {(data.goals.a.length > 0 || data.goals.b.length > 0) && (
-        <section style={styles.bucket}>
-          <div style={styles.bucketHead}>
-            <h2 style={styles.bucketH2}>Goals — the full picture</h2>
-          </div>
-          <p style={styles.note}>
-            You&rsquo;ve each taken time to work out the goals you want to pursue in
-            retirement. The ones that stood out are above; here&rsquo;s the full
-            picture — every goal each of you named, including those that are simply
-            your own.
-          </p>
-          <div style={styles.goalsWrap}>
-            {(["a", "b"] as Slot[]).map((slot) => (
-              <div key={slot} style={styles.goalsCol}>
-                <div style={styles.goalsColHead}>
-                  <Dot slot={slot} size={20} />
-                  <b style={styles.goalsColName}>{partners[slot].name}&rsquo;s goals</b>
-                </div>
-                {data.goals[slot].map((g, i) => (
-                  <div
-                    key={i}
-                    style={{ ...styles.goal, ...(g.both ? styles.goalShared : null) }}
-                  >
-                    <span>{g.label}</span>
+        <Section
+          heading="Goals — the full picture"
+          note="You've each taken time to work out the goals you want to pursue in retirement. The ones that stood out are above; here's the full picture — every goal each of you named, including those that are simply your own."
+          hint={goalsHaveDetail ? "Tap a goal to see more of what it means." : undefined}
+        >
+          <TwoColumns
+            partners={partners}
+            noun="goals"
+            a={data.goals.a}
+            b={data.goals.b}
+            render={(e) => {
+              const g = e as GoalEntry;
+              return {
+                pills: (
+                  <>
+                    {g.detail?.season && <span style={styles.seasonPill}>{g.detail.season}</span>}
                     {g.both && <span style={styles.bothPill}>Both of you</span>}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </section>
+                  </>
+                ),
+                detail: g.detail ? <GoalDetailBody d={g.detail} /> : null,
+              };
+            }}
+          />
+        </Section>
+      )}
+
+      {/* Values */}
+      {(data.values.a.length > 0 || data.values.b.length > 0) && (
+        <Section
+          heading="What you each value most"
+          note="The values at the heart of each of your plans. Where you share one, it's marked."
+          hint={valuesHaveDetail ? "Tap a value to read what it means to each of you." : undefined}
+        >
+          <TwoColumns
+            partners={partners}
+            noun="values"
+            a={data.values.a}
+            b={data.values.b}
+            render={(e) => {
+              const v = e as ValueEntry;
+              return {
+                pills: (
+                  <>
+                    {v.nonNegotiable && <span style={styles.nnPill}>Won&rsquo;t compromise</span>}
+                    {v.both && <span style={styles.bothPill}>Both of you</span>}
+                  </>
+                ),
+                detail: v.description ? <p style={styles.exWhy}>{v.description}</p> : null,
+              };
+            }}
+          />
+        </Section>
+      )}
+
+      {/* Strengths */}
+      {(data.strengths.a.length > 0 || data.strengths.b.length > 0) && (
+        <Section
+          heading="What you each bring"
+          note="The strengths each of you leans on. Different strengths often cover for each other."
+          hint={strengthsHaveDetail ? "Tap a strength to see how it shows up." : undefined}
+        >
+          <TwoColumns
+            partners={partners}
+            noun="strengths"
+            a={data.strengths.a}
+            b={data.strengths.b}
+            render={(e) => {
+              const s = e as StrengthEntry;
+              return {
+                pills: s.both ? <span style={styles.bothPill}>Both of you</span> : null,
+                detail: s.note ? <p style={styles.exWhy}>{s.note}</p> : null,
+              };
+            }}
+          />
+        </Section>
       )}
 
       {/* Hopes */}
       {data.hopes.length > 0 && (
-        <div style={styles.strip}>
-          <h3 style={styles.stripH3}>What you&rsquo;re each hoping for</h3>
-          <p style={styles.stripSub}>The hopes you each chose to share.</p>
+        <Section heading="What you're each hoping for" note="The hopes you each chose to share.">
           <div style={styles.lines}>
             {data.hopes.map((h, i) => (
               <div key={i} style={styles.line}>
-                <Dot slot={h.slot} size={18} />
+                <Dot partners={partners} slot={h.slot} size={18} />
                 <span style={styles.lineText}>{h.text}</span>
               </div>
             ))}
           </div>
-        </div>
+        </Section>
       )}
 
       {/* Fears */}
       {data.fears.length > 0 && (
-        <div style={styles.strip}>
-          <h3 style={styles.stripH3}>What you each fear</h3>
-          <p style={styles.stripSub}>The fears you each chose to share.</p>
+        <Section
+          heading="What you each fear"
+          note="The fears you each chose to share. Anything either of you kept private doesn't appear here."
+        >
           <div style={styles.lines}>
             {data.fears.map((f, i) => (
               <div key={i} style={styles.line}>
-                <Dot slot={f.slot} size={18} />
+                <Dot partners={partners} slot={f.slot} size={18} />
                 <span style={styles.lineText}>{f.text}</span>
               </div>
             ))}
           </div>
-          <p style={styles.fearNote}>
-            Anything either of you kept private doesn&rsquo;t appear here.
-          </p>
-        </div>
+        </Section>
+      )}
+
+      {/* Principles */}
+      {data.principles.length > 0 && (
+        <Section
+          heading="How you each decide"
+          note="The principles you each lead with when things pull against each other."
+        >
+          <div style={styles.lines}>
+            {data.principles.map((p, i) => (
+              <div key={i} style={styles.line}>
+                <Dot partners={partners} slot={p.slot} size={18} />
+                <span style={styles.lineText}>{p.text}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
       )}
 
       {/* Worth talking about */}
       <div style={styles.talk}>
-        <h3 style={styles.talkH3}>Worth talking about together</h3>
+        <h2 style={styles.talkH3}>Worth talking about together</h2>
         <p style={styles.talkIntro}>
           These aren&rsquo;t problems to solve or decisions to reach. Most of it
           won&rsquo;t line up neatly, and it doesn&rsquo;t need to — the point is to
@@ -329,11 +380,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
             Nothing here stood out as needing its own conversation — it sounds like
             the two of you are very well aligned. If that doesn&rsquo;t seem right,
             it may be a glitch on our side:{" "}
-            <button
-              type="button"
-              style={styles.linkBtn}
-              onClick={() => setReportOpen(true)}
-            >
+            <button type="button" style={styles.linkBtn} onClick={() => setReportOpen(true)}>
               let us know
             </button>
             .
@@ -352,12 +399,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
             aria-label="Add a topic to talk about"
             style={styles.addInput}
           />
-          <button
-            type="button"
-            style={styles.addBtn}
-            onClick={addTopic}
-            disabled={adding}
-          >
+          <button type="button" style={styles.addBtn} onClick={addTopic} disabled={adding}>
             Add
           </button>
         </div>
@@ -394,6 +436,156 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
   );
 }
 
+function Dot({
+  partners,
+  slot,
+  size = 26,
+}: {
+  partners: Payload["partners"];
+  slot: Slot;
+  size?: number;
+}) {
+  return (
+    <span
+      style={{
+        ...styles.dot,
+        width: size,
+        height: size,
+        fontSize: size < 20 ? 9 : 12,
+        background: colourFor(slot),
+      }}
+    >
+      {partners[slot].initial}
+    </span>
+  );
+}
+
+// A two-column dimension (goals / values / strengths), each item expandable.
+function TwoColumns({
+  partners,
+  noun,
+  a,
+  b,
+  render,
+}: {
+  partners: Payload["partners"];
+  noun: string;
+  a: { label: string; both: boolean }[];
+  b: { label: string; both: boolean }[];
+  render: (e: { label: string; both: boolean }) => {
+    pills: ReactNode;
+    detail: ReactNode | null;
+  };
+}) {
+  return (
+    <div style={styles.cols}>
+      {(["a", "b"] as Slot[]).map((slot) => {
+        const list = slot === "a" ? a : b;
+        return (
+          <div key={slot} style={styles.col}>
+            <div style={styles.colHead}>
+              <Dot partners={partners} slot={slot} size={20} />
+              <b style={styles.colName}>
+                {partners[slot].name}&rsquo;s {noun}
+              </b>
+            </div>
+            {list.map((e, i) => {
+              const { pills, detail } = render(e);
+              return <ExpandRow key={i} label={e.label} pills={pills} detail={detail} />;
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// A titled section with an optional subtitle, note and a "tap to expand" hint.
+function Section({
+  heading,
+  subtitle,
+  note,
+  hint,
+  children,
+}: {
+  heading: string;
+  subtitle?: string;
+  note?: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section style={styles.bucket}>
+      <div style={styles.bucketHead}>
+        <h2 style={styles.bucketH2}>{heading}</h2>
+        {subtitle && <span style={styles.bucketSub}>{subtitle}</span>}
+      </div>
+      {note && <p style={styles.note}>{note}</p>}
+      {hint && <p style={styles.hint}>{hint}</p>}
+      {children}
+    </section>
+  );
+}
+
+// A single expandable row (mirrors the RLP plan document's GoalCard). If there's
+// no detail, it renders as a plain, non-interactive row.
+function ExpandRow({
+  label,
+  pills,
+  detail,
+}: {
+  label: string;
+  pills?: ReactNode;
+  detail?: ReactNode | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const expandable = Boolean(detail);
+  return (
+    <div style={{ ...styles.exRow, ...(open ? styles.exRowOpen : null) }}>
+      <button
+        type="button"
+        style={{ ...styles.exTop, cursor: expandable ? "pointer" : "default" }}
+        onClick={() => expandable && setOpen(!open)}
+        aria-expanded={expandable ? open : undefined}
+      >
+        <span style={styles.exLabel}>{label}</span>
+        <span style={styles.exMeta}>
+          {pills}
+          {expandable && (
+            <span style={styles.exToggle} aria-hidden="true">
+              {open ? "–" : "+"}
+            </span>
+          )}
+        </span>
+      </button>
+      {open && detail && <div style={styles.exBody}>{detail}</div>}
+    </div>
+  );
+}
+
+function GoalDetailBody({ d }: { d: GoalDetail }) {
+  return (
+    <>
+      {d.note && <p style={styles.exWhy}>{d.note}</p>}
+      {d.looksLike && (
+        <p style={styles.exP}>
+          <span style={styles.exK}>What it looks like</span> {d.looksLike}
+        </p>
+      )}
+      {d.cadence && (
+        <p style={styles.exP}>
+          <span style={styles.exK}>Roughly when</span> {d.cadence}
+        </p>
+      )}
+      {d.ordinaryWeek && (
+        <p style={styles.exP}>
+          <span style={styles.exK}>In an ordinary week</span> {d.ordinaryWeek}
+        </p>
+      )}
+    </>
+  );
+}
+
 function Observation({
   o,
   kind,
@@ -404,12 +596,7 @@ function Observation({
   slotForName: (name: string) => Slot | null;
 }) {
   return (
-    <div
-      style={{
-        ...styles.item,
-        ...(kind === "comp" ? styles.itemComp : styles.itemDiff),
-      }}
-    >
+    <div style={{ ...styles.item, ...(kind === "comp" ? styles.itemComp : styles.itemDiff) }}>
       <p style={styles.obs}>
         {kind === "diff" && o.clearest && (
           <b style={styles.clearest}>The clearest difference. </b>
@@ -457,7 +644,7 @@ const styles: Record<string, CSSProperties> = {
     letterSpacing: "0.14em",
     textTransform: "uppercase",
     color: "var(--text-muted)",
-    fontWeight: 600,
+    fontWeight: 700,
     margin: "0 0 10px",
   },
   h1: {
@@ -476,7 +663,7 @@ const styles: Record<string, CSSProperties> = {
     maxWidth: "60ch",
     margin: "0 0 22px",
   },
-  people: { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 26 },
+  people: { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 34 },
   person: {
     display: "flex",
     alignItems: "center",
@@ -504,29 +691,18 @@ const styles: Record<string, CSSProperties> = {
   vitaCard: {
     background: "var(--warm-surface)",
     border: "1px solid var(--warm-line)",
-    borderRadius: "var(--r-md)",
-    padding: "22px 24px",
+    borderRadius: "var(--r-lg)",
+    padding: "24px 26px",
     marginBottom: 34,
   },
   vitaTag: {
     display: "inline-flex",
     alignItems: "center",
-    gap: 8,
+    gap: 9,
     color: "var(--color-vita)",
     fontWeight: 600,
     fontSize: "var(--fs-sm)",
-    marginBottom: 10,
-  },
-  vitaAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: "50%",
-    background: "var(--color-vita)",
-    color: "#fff",
-    display: "grid",
-    placeItems: "center",
-    fontSize: 11,
-    fontFamily: "var(--font-serif)",
+    marginBottom: 12,
   },
   vitaCardText: {
     fontFamily: "var(--font-serif)",
@@ -535,7 +711,7 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
     color: "var(--ink)",
   },
-  bucket: { marginBottom: 30 },
+  bucket: { marginBottom: 32 },
   bucketHead: {
     display: "flex",
     alignItems: "baseline",
@@ -554,9 +730,15 @@ const styles: Record<string, CSSProperties> = {
   note: {
     fontSize: "var(--fs-sm)",
     color: "var(--text-muted)",
-    margin: "0 0 14px",
+    margin: "0 0 10px",
     maxWidth: "62ch",
     lineHeight: "var(--lh-body)",
+  },
+  hint: {
+    fontSize: "var(--fs-sm)",
+    fontStyle: "italic",
+    color: "var(--text-faint)",
+    margin: "0 0 14px",
   },
   item: {
     border: "1px solid var(--border)",
@@ -564,6 +746,7 @@ const styles: Record<string, CSSProperties> = {
     padding: "16px 18px",
     marginBottom: 12,
     background: "var(--surface)",
+    boxShadow: "var(--shadow-sm)",
   },
   itemShared: {
     background: "color-mix(in srgb, var(--chorus-yellow) 30%, #fff)",
@@ -573,10 +756,7 @@ const styles: Record<string, CSSProperties> = {
     background: "color-mix(in srgb, var(--partner-a) 7%, #fff)",
     borderColor: "color-mix(in srgb, var(--partner-a) 22%, #fff)",
   },
-  itemDiff: {
-    background: "var(--bg-alt)",
-    borderColor: "var(--border-strong)",
-  },
+  itemDiff: { background: "var(--bg-alt)", borderColor: "var(--border-strong)" },
   obs: {
     fontFamily: "var(--font-serif)",
     fontSize: "var(--fs-body)",
@@ -585,12 +765,7 @@ const styles: Record<string, CSSProperties> = {
     color: "var(--text)",
   },
   clearest: { color: "var(--ink)", fontWeight: 600 },
-  split: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 14,
-    marginTop: 12,
-  },
+  split: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 12 },
   side: {
     background: "rgba(255,255,255,0.6)",
     border: "1px solid var(--border)",
@@ -622,43 +797,67 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.45,
     color: "var(--text)",
   },
-  goalsWrap: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 14,
-    marginTop: 6,
-  },
-  goalsCol: {
+  // two-column dimensions
+  cols: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 6 },
+  col: {
     border: "1px solid var(--border)",
     borderRadius: "var(--r-md)",
     padding: "14px 15px",
     background: "var(--surface)",
+    boxShadow: "var(--shadow-sm)",
   },
-  goalsColHead: {
+  colHead: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 },
+  colName: { fontSize: "var(--fs-sm)", color: "var(--ink)" },
+  // expandable row
+  exRow: {
+    background: "var(--bg-alt)",
+    border: "1px solid transparent",
+    borderRadius: "var(--r-sm)",
+    marginBottom: 6,
+    overflow: "hidden",
+  },
+  exRowOpen: { background: "#fff", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" },
+  exTop: {
     display: "flex",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
+    gap: 10,
+    width: "100%",
+    background: "none",
+    border: "none",
+    textAlign: "left",
+    padding: "9px 11px",
+    fontFamily: "inherit",
   },
-  goalsColName: { fontSize: "var(--fs-sm)", color: "var(--ink)" },
-  goal: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
+  exLabel: {
+    flex: 1,
     fontFamily: "var(--font-serif)",
     fontSize: "var(--fs-sm)",
     lineHeight: 1.4,
-    padding: "8px 10px",
-    borderRadius: "var(--r-sm)",
-    marginBottom: 6,
-    background: "var(--bg-alt)",
-    border: "1px solid transparent",
     color: "var(--text)",
   },
-  goalShared: {
-    background: "color-mix(in srgb, var(--chorus-yellow) 30%, #fff)",
-    borderColor: "color-mix(in srgb, var(--chorus-yellow) 55%, #fff)",
+  exMeta: { display: "flex", alignItems: "center", gap: 8, flex: "none" },
+  exToggle: {
+    fontSize: 18,
+    color: "var(--text-faint)",
+    width: 14,
+    textAlign: "center",
   },
+  exBody: {
+    padding: "0 12px 12px 12px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+  exWhy: {
+    fontFamily: "var(--font-serif)",
+    fontStyle: "italic",
+    fontSize: "var(--fs-body)",
+    color: "var(--text)",
+    margin: 0,
+    lineHeight: 1.5,
+  },
+  exP: { margin: 0, fontSize: "var(--fs-sm)", color: "var(--text)", lineHeight: 1.5 },
+  exK: { fontWeight: 700, color: "var(--ink)", marginRight: 4 },
   bothPill: {
     fontFamily: "var(--font-sans)",
     fontSize: 10,
@@ -668,24 +867,30 @@ const styles: Record<string, CSSProperties> = {
     background: "color-mix(in srgb, var(--reveal-strengths-fg) 14%, #fff)",
     borderRadius: "var(--r-pill)",
     padding: "2px 7px",
-    marginLeft: "auto",
     whiteSpace: "nowrap",
   },
-  strip: {
-    border: "1px solid var(--border)",
-    borderRadius: "var(--r-md)",
-    padding: "18px 20px",
-    marginBottom: 14,
-    background: "var(--surface)",
-  },
-  stripH3: {
-    fontFamily: "var(--font-serif)",
-    fontSize: "var(--fs-title)",
-    margin: "0 0 4px",
+  nnPill: {
+    fontFamily: "var(--font-sans)",
+    fontSize: 10,
     fontWeight: 600,
-    color: "var(--ink)",
+    letterSpacing: "0.03em",
+    color: "var(--info-text)",
+    background: "var(--info-surface)",
+    border: "1px solid var(--info-line)",
+    borderRadius: "var(--r-pill)",
+    padding: "2px 7px",
+    whiteSpace: "nowrap",
   },
-  stripSub: { fontSize: "var(--fs-sm)", color: "var(--text-muted)", margin: "0 0 14px" },
+  seasonPill: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-eyebrow)",
+    color: "var(--text-muted)",
+    background: "var(--bg-alt)",
+    borderRadius: "var(--r-pill)",
+    padding: "2px 8px",
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+  },
   lines: { display: "flex", flexDirection: "column", gap: 10 },
   line: { display: "flex", gap: 11, alignItems: "flex-start" },
   lineText: {
@@ -694,18 +899,11 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.45,
     color: "var(--text)",
   },
-  fearNote: {
-    fontSize: "var(--fs-label)",
-    color: "var(--text-muted)",
-    marginTop: 14,
-    paddingTop: 12,
-    borderTop: "1px dashed var(--border)",
-  },
   talk: {
     background: "var(--warm-surface)",
     border: "1px solid var(--warm-line)",
-    borderRadius: "var(--r-md)",
-    padding: "22px 24px",
+    borderRadius: "var(--r-lg)",
+    padding: "24px 26px",
     margin: "20px 0 26px",
   },
   talkH3: {

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import type { ShareItem, ShareGroup } from "@/lib/coupleShare";
+import VitaMark from "../VitaMark";
 
 // "Choose what to share" — private to each participant. Share-forward defaults;
 // fears that are about the partner start off (and carry a small flag). Only what
@@ -28,6 +29,16 @@ const GROUP_META: Record<
     vitaLine: () =>
       "None of this is especially private, and it's the substance of a good conversation. I'd share all of it.",
   },
+  values: {
+    heading: "Your values",
+    vitaLine: () =>
+      "Your values are the heart of your plan. Sharing them opens up the deepest conversation of all.",
+  },
+  strengths: {
+    heading: "Your strengths",
+    vitaLine: () =>
+      "What each of you brings. These are good to see side by side.",
+  },
   hopes: {
     heading: "Your hopes",
     vitaLine: () =>
@@ -38,9 +49,21 @@ const GROUP_META: Record<
     vitaLine: (name) =>
       `These are more personal. I've kept anything that's about ${name} switched off — that's yours to decide, not a default.`,
   },
+  principles: {
+    heading: "How you decide",
+    vitaLine: () =>
+      "The principles you lead with when things pull against each other — worth comparing.",
+  },
 };
 
-const GROUP_ORDER: ShareGroup[] = ["plan", "hopes", "fears"];
+const GROUP_ORDER: ShareGroup[] = [
+  "plan",
+  "values",
+  "strengths",
+  "hopes",
+  "fears",
+  "principles",
+];
 
 export default function ShareStep({ preview }: { preview?: ShareData } = {}) {
   const router = useRouter();
@@ -71,8 +94,11 @@ export default function ShareStep({ preview }: { preview?: ShareData } = {}) {
   const grouped = useMemo(() => {
     const out: Record<ShareGroup, ShareItem[]> = {
       plan: [],
+      values: [],
+      strengths: [],
       hopes: [],
       fears: [],
+      principles: [],
     };
     for (const it of data?.items ?? []) out[it.group].push(it);
     return out;
@@ -144,7 +170,8 @@ export default function ShareStep({ preview }: { preview?: ShareData } = {}) {
 
       <div style={styles.vitaCard}>
         <span style={styles.vitaTag}>
-          <span style={styles.vitaAvatar}>V</span>From Vita
+          <VitaMark size={22} />
+          From Vita
         </span>
         <p style={styles.vitaCardText}>
           {`Sharing openly makes for the better conversation, so I've switched most things on. The one place I've held back is your fears that are about ${name} — those felt like your call to make, not mine.`}
@@ -164,7 +191,7 @@ export default function ShareStep({ preview }: { preview?: ShareData } = {}) {
               </span>
             </div>
             <p style={styles.vitaLine}>
-              <span style={styles.vitaMini}>V</span>
+              <VitaMark size={17} style={{ marginTop: 1, flex: "none" }} />
               <span>{GROUP_META[g].vitaLine(name)}</span>
             </p>
             {rows.map((it) => {

@@ -44,14 +44,16 @@ export async function GET() {
     pairing.participantAId === userId
       ? pairing.participantBId
       : pairing.participantAId;
-  const name = await partnerFirstName(partnerId);
+  const existing = await getShareSelection(pairing.id, userId);
+  // Prefer the name this participant confirmed for their partner; fall back to
+  // the account name only if the confirm step was somehow skipped.
+  const name = existing?.partnerName || (await partnerFirstName(partnerId));
 
   const data = await getAllUserData(userId);
   const fears = fearItems(deriveShareableItems(data, []));
   const aboutPartnerRefs = await classifyPartnerFears(fears, name);
   const items = deriveShareableItems(data, aboutPartnerRefs);
 
-  const existing = await getShareSelection(pairing.id, userId);
   const sharedRefs = existing
     ? existing.sharedItemRefs
     : defaultSharedRefs(items);

@@ -1,7 +1,7 @@
 "use client";
 
-// TEMPORARY PREVIEW PAGE — a visual walk-through of the four "Plan with your
-// partner" surfaces with dummy Maya/Ray data. No auth, no database, no LLM: the
+// TEMPORARY PREVIEW PAGE — a visual walk-through of the "Plan with your partner"
+// surfaces with dummy Maya/Ray data. No auth, no database, no LLM: the
 // components are handed the data directly (their `preview` prop), so every
 // interaction is inert or local-only. Public via proxy.ts. Safe to delete once
 // reviewed.
@@ -9,9 +9,8 @@
 import { useState, type CSSProperties } from "react";
 import ShareStep, { type ShareData } from "@/app/components/partner/ShareStep";
 import WaitingState from "@/app/components/partner/WaitingState";
-import ComparisonView, {
-  type Payload,
-} from "@/app/components/partner/ComparisonView";
+import ComparisonView, { type Payload } from "@/app/components/partner/ComparisonView";
+import ConfirmPartnerName from "@/app/components/partner/ConfirmPartnerName";
 
 const SHARE: ShareData = {
   partnerFirstName: "Ray",
@@ -24,14 +23,21 @@ const SHARE: ShareData = {
     { ref: "goal:fit", group: "plan", label: "Get properly fit again — walking, swimming", defaultOn: true },
     { ref: "plan:travel", group: "plan", label: "Travel — your plans for trips and time away", defaultOn: true },
     { ref: "plan:leaving-work", group: "plan", label: "Leaving work — when and how you'll step back", defaultOn: true },
+    { ref: "value:family", group: "values", label: "Family", defaultOn: true },
+    { ref: "value:growth", group: "values", label: "Growth", defaultOn: true },
+    { ref: "strength:curiosity", group: "strengths", label: "Curiosity", defaultOn: true },
+    { ref: "strength:warmth", group: "strengths", label: "Warmth", defaultOn: true },
     { ref: "hope:main", group: "hopes", label: "To feel useful, not sidelined, once you step back from work.", defaultOn: true },
     { ref: "fear:regret", group: "fears", label: "That you'll regret not leaving work sooner.", defaultOn: true },
     { ref: "fear:health", group: "fears", label: "That your health won't keep up with the plans you're making.", defaultOn: true },
     { ref: "fear:want-different-things", group: "fears", label: "That the two of you want quite different things from these years, and drift.", defaultOn: false, aboutPartner: true },
+    { ref: "principle:family-first", group: "principles", label: "Family comes before ambition when the two pull against each other.", defaultOn: true },
   ],
   sharedRefs: [
     "plan:rhythm", "goal:grandchildren", "goal:painting", "goal:fit",
-    "plan:travel", "plan:leaving-work", "hope:main", "fear:regret", "fear:health",
+    "plan:travel", "plan:leaving-work", "value:family", "value:growth",
+    "strength:curiosity", "strength:warmth", "hope:main", "fear:regret",
+    "fear:health", "principle:family-first",
   ],
 };
 
@@ -49,6 +55,7 @@ const COMPARISON: Payload = {
   sharedGround: [
     "You both want slow, unhurried mornings — no alarm, coffee, an hour before the day asks anything of you.",
     "Time with the grandchildren, and staying in this house rather than moving — both near the top for each of you.",
+    "Family sits at the centre of both your plans.",
   ],
   complementary: [
     {
@@ -59,7 +66,7 @@ const COMPARISON: Payload = {
       ],
     },
     {
-      text: "Ray wants to take on more of the cooking and the running of the house; Maya wants to carry less of it. Those point the same way.",
+      text: "Ray's practicality and Maya's curiosity seem to cover for each other — one gets things done, one keeps asking what's worth doing.",
     },
   ],
   different: [
@@ -72,24 +79,48 @@ const COMPARISON: Payload = {
       ],
     },
     { text: "Ray pictures a loose week with few fixed points; Maya wants more anchors — regular things to plan around." },
-    { text: "Ray's decision is behind him. Maya hasn't set a date, and when the finances allow it is still open. One of you is settled here; the other's still deciding." },
   ],
   goals: {
     a: [
       { label: "Time with the grandchildren", both: true },
       { label: "Stay in this house", both: true },
-      { label: "Take painting seriously — not just a someday thing", both: false },
-      { label: "Keep two days of work, for now", both: false },
-      { label: "Get properly fit again — walking, swimming", both: false },
-      { label: "Sort the garden out and grow vegetables", both: false },
+      {
+        label: "Take painting seriously — not just a someday thing",
+        both: false,
+        detail: {
+          note: "It's been a someday thing for twenty years. I want to give it real time now.",
+          looksLike: "A regular class, and a corner of the spare room set up as a studio.",
+          cadence: "A couple of afternoons a week",
+          season: "Early",
+        },
+      },
+      { label: "Get properly fit again — walking, swimming", both: false, detail: { cadence: "Most mornings", season: "Early" } },
     ],
     b: [
       { label: "Time with the grandchildren", both: true },
       { label: "Stay in this house", both: true },
-      { label: "A big trip in the first year", both: false },
-      { label: "Photography — long walks with the camera", both: false },
+      { label: "A big trip in the first year", both: false, detail: { note: "The thing I'm most looking forward to — somewhere far, while we're both well.", season: "Early" } },
       { label: "Learn to cook properly and take over more of it", both: false },
-      { label: "Volunteer — maybe the local wildlife trust", both: false },
+    ],
+  },
+  values: {
+    a: [
+      { label: "Family", both: true, nonNegotiable: true, description: "Being close to the grandchildren while they're small, and not letting work crowd that out." },
+      { label: "Growth", both: false, description: "Still becoming — I don't want to stop learning just because I've stopped working." },
+    ],
+    b: [
+      { label: "Family", both: true, nonNegotiable: true, description: "Time with the people I love, now there's finally time to give them." },
+      { label: "Adventure", both: false, description: "Saying yes to things while we still can." },
+    ],
+  },
+  strengths: {
+    a: [
+      { label: "Curiosity", both: false, note: "I'm the one who signs us up for the thing neither of us has tried." },
+      { label: "Warmth", both: true },
+    ],
+    b: [
+      { label: "Practicality", both: false, note: "If it needs doing, I'll have worked out how by the morning." },
+      { label: "Warmth", both: true },
     ],
   },
   hopes: [
@@ -100,29 +131,30 @@ const COMPARISON: Payload = {
     { slot: "b", text: "That he'll lose his sense of purpose without work to structure his days." },
     { slot: "a", text: "That the two of you want quite different things from these years, and drift." },
   ],
+  principles: [
+    { slot: "a", text: "Family comes before ambition when the two pull against each other." },
+    { slot: "b", text: "Say yes to the once-in-a-lifetime things while we're both well." },
+  ],
   talk: {
     seeds: [
       "Time together and time apart — you're picturing that a little differently right now. Worth hearing what each of you needs.",
       "Travel — less about when, more about what an early trip means to Ray, and what holding off means to Maya.",
-      "The shape of the week — what a bit more structure gives Maya, and what a loose week gives Ray.",
+      "You both put Family at the centre. Worth naming what that looks like in practice, day to day.",
       "Ray's worry about losing his sense of purpose — and what, between you, might help hold on to it.",
-      "Maya wants to take painting seriously. Worth making space to hear what that's about.",
     ],
     user: [],
   },
 };
 
-const COMPARISON_EMPTY: Payload = {
-  ...COMPARISON,
-  talk: { seeds: [], user: [] },
-};
+const COMPARISON_EMPTY: Payload = { ...COMPARISON, talk: { seeds: [], user: [] } };
 
-type Surface = "share" | "waiting" | "comparison" | "comparison-empty";
+type Surface = "confirm" | "share" | "waiting" | "comparison" | "comparison-empty";
 const TABS: { id: Surface; label: string }[] = [
-  { id: "share", label: "1 · Share step" },
-  { id: "waiting", label: "2 · Waiting state" },
-  { id: "comparison", label: "3 · Comparison" },
-  { id: "comparison-empty", label: "4 · Talk-list empty state" },
+  { id: "confirm", label: "1 · Confirm name" },
+  { id: "share", label: "2 · Share step" },
+  { id: "waiting", label: "3 · Waiting" },
+  { id: "comparison", label: "4 · Comparison" },
+  { id: "comparison-empty", label: "5 · Empty talk-list" },
 ];
 
 export default function PartnerPreviewPage() {
@@ -131,19 +163,14 @@ export default function PartnerPreviewPage() {
     <div>
       <div style={banner.bar}>
         <strong style={banner.title}>Preview · Plan with your partner</strong>
-        <span style={banner.note}>
-          Dummy Maya &amp; Ray data. Nothing is saved; buttons are inert.
-        </span>
+        <span style={banner.note}>Dummy Maya &amp; Ray data. Nothing is saved; buttons are inert.</span>
         <span style={banner.tabs}>
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setSurface(t.id)}
-              style={{
-                ...banner.tab,
-                ...(surface === t.id ? banner.tabActive : null),
-              }}
+              style={{ ...banner.tab, ...(surface === t.id ? banner.tabActive : null) }}
             >
               {t.label}
             </button>
@@ -151,12 +178,11 @@ export default function PartnerPreviewPage() {
         </span>
       </div>
 
+      {surface === "confirm" && <ConfirmPartnerName guess="Ray" />}
       {surface === "share" && <ShareStep preview={SHARE} />}
       {surface === "waiting" && <WaitingState partnerFirstName="Ray" />}
       {surface === "comparison" && <ComparisonView preview={COMPARISON} />}
-      {surface === "comparison-empty" && (
-        <ComparisonView preview={COMPARISON_EMPTY} />
-      )}
+      {surface === "comparison-empty" && <ComparisonView preview={COMPARISON_EMPTY} />}
     </div>
   );
 }

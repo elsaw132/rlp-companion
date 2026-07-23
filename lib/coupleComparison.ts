@@ -14,6 +14,9 @@ import type {
   DayBuilderResult,
   ReadinessSnapshotResult,
   FirstYearResult,
+  ValueDefinitionsResult,
+  MirrorCardsResult,
+  TradeOffsResult,
 } from "@/lib/modules";
 import type { RetirementStage } from "@/lib/userData";
 import { cohortLabel, planNameFor } from "@/lib/couples";
@@ -30,16 +33,46 @@ export type PartnerMeta = {
   planName: string;
 };
 
-export type GoalEntry = { label: string; both: boolean };
+// Optional per-goal detail revealed in the expandable card. Only the fields the
+// member actually filled in are present.
+export type GoalDetail = {
+  note?: string;
+  cadence?: string;
+  season?: string;
+  looksLike?: string;
+  ordinaryWeek?: string;
+};
+export type GoalEntry = { label: string; both: boolean; detail?: GoalDetail };
+export type ValueEntry = {
+  label: string;
+  both: boolean;
+  description?: string;
+  nonNegotiable?: boolean;
+};
+export type StrengthEntry = { label: string; both: boolean; note?: string };
 
 export type ComparisonAssembly = {
   partners: { a: PartnerMeta; b: PartnerMeta };
   shared: { a: ParticipantShared; b: ParticipantShared };
   deterministic: {
     goals: { a: GoalEntry[]; b: GoalEntry[] };
+    values: { a: ValueEntry[]; b: ValueEntry[] };
+    strengths: { a: StrengthEntry[]; b: StrengthEntry[] };
     hopes: { slot: "a" | "b"; text: string }[];
     fears: { slot: "a" | "b"; text: string }[];
+    principles: { slot: "a" | "b"; text: string }[];
   };
+};
+
+// Everything one participant shared, in richer form than ParticipantShared:
+// carries the detail (descriptions/notes) the expandable view reveals. The
+// generation only ever sees the labels via `base`.
+type RichShared = {
+  base: ParticipantShared;
+  goals: { label: string; detail?: GoalDetail }[];
+  values: { label: string; description?: string; nonNegotiable?: boolean }[];
+  strengths: { label: string; note?: string }[];
+  principles: string[];
 };
 
 function result<T extends { type: string }>(
@@ -150,17 +183,9 @@ function buildShared(
   sharedRefs: string[],
   name: string,
   slot: "a" | "b"
-): ParticipantShared {
+): RichShared {
   const set = new Set(sharedRefs);
   const items = deriveShareableItems(data, []);
-
-  const goals = items
-    .filter((i) => i.group === "plan" && i.ref.startsWith("goal:") && set.has(i.ref))
-    .map((i) => i.label);
-  const hopeItem = items.find((i) => i.ref === "hope:main" && set.has(i.ref));
-  const fears = items
-    .filter((i) => i.group === "fears" && set.has(i.ref))
-    .map((i) => i.label);
 
   const rs = retirementStage(data);
   const week = result<WeekShapeResult>(data, "4.6", "week-shape");
@@ -168,13 +193,65 @@ function buildShared(
   const readiness = result<ReadinessSnapshotResult>(data, "4.1", "readiness-snapshot");
   const balanced = result<BalancedGoalsResult>(data, "4.3", "balanced-goals");
   const firstYear = result<FirstYearResult>(data, "4.7", "first-year");
+  const valueDefs = result<ValueDefinitionsResult>(data, "3.4", "value-definitions");
+  const mirror = result<MirrorCardsResult>(data, "3.1", "mirror-cards");
+  const tradeOffs = result<TradeOffsResult>(data, "4.5", "trade-offs");
 
-  return {
+  // Detail lookups, keyed by normalised label.
+  const goalDetail = new Map<string, GoalDetail>();
+  for (const g of balanced?.goals ?? []) {
+    const d: GoalDetail = {
+      ...(g.note ? { note: g.note } : {}),
+      ...(g.cadence ? { cadence: g.cadence } : {}),
+      ...(g.season ? { season: g.season } : {}),
+      ...(g.looksLike ? { looksLike: g.looksLike } : {}),
+      ...(g.ordinaryWeek ? { ordinaryWeek: g.ordinaryWeek } : {}),
+    };
+    if (Object.keys(d).length) goalDetail.set(norm(g.label), d);
+  }
+  const valueDesc = new Map<string, string>();
+  for (const v of valueDefs?.values ?? []) {
+    if (v.description?.trim()) valueDesc.set(norm(v.value), v.description.trim());
+  }
+  const nonNegotiable = new Set<string>();
+  for (const v of tradeOffs?.values ?? []) {
+    if (v.bucket === "non-negotiable") nonNegotiable.add(norm(v.value));
+  }
+  const strengthNote = new Map<string, string>();
+  for (const s of mirror?.kept ?? []) {
+    if (s.note?.trim()) strengthNote.set(norm(s.label), s.note.trim());
+  }
+
+  const goals = items
+    .filter((i) => i.ref.startsWith("goal:") && set.has(i.ref))
+    .map((i) => ({ label: i.label, detail: goalDetail.get(norm(i.label)) }));
+  const values = items
+    .filter((i) => i.group === "values" && set.has(i.ref))
+    .map((i) => ({
+      label: i.label,
+      description: valueDesc.get(norm(i.label)),
+      nonNegotiable: nonNegotiable.has(norm(i.label)) || undefined,
+    }));
+  const strengths = items
+    .filter((i) => i.group === "strengths" && set.has(i.ref))
+    .map((i) => ({ label: i.label, note: strengthNote.get(norm(i.label)) }));
+  const principles = items
+    .filter((i) => i.group === "principles" && set.has(i.ref))
+    .map((i) => i.label);
+  const hopeItem = items.find((i) => i.ref === "hope:main" && set.has(i.ref));
+  const fears = items
+    .filter((i) => i.group === "fears" && set.has(i.ref))
+    .map((i) => i.label);
+
+  const base: ParticipantShared = {
     slot,
     name,
     cohort: cohortLabel(rs),
     planName: planNameFor(rs),
-    goals,
+    goals: goals.map((g) => g.label),
+    values: values.map((v) => v.label),
+    nonNegotiables: values.filter((v) => v.nonNegotiable).map((v) => v.label),
+    strengths: strengths.map((s) => s.label),
     hope: hopeItem ? hopeItem.label : null,
     fears,
     rhythm: set.has("plan:rhythm") ? rhythmSummary(week, day) : null,
@@ -182,7 +259,10 @@ function buildShared(
     leavingWork: set.has("plan:leaving-work")
       ? leavingWorkSummary(readiness)
       : null,
+    principles,
   };
+
+  return { base, goals, values, strengths, principles };
 }
 
 export function buildComparisonAssembly(input: {
@@ -196,33 +276,76 @@ export function buildComparisonAssembly(input: {
   const a = buildShared(input.aData, input.aSharedRefs, input.aName, "a");
   const b = buildShared(input.bData, input.bSharedRefs, input.bName, "b");
 
-  const aSet = new Set(a.goals.map(norm));
-  const bSet = new Set(b.goals.map(norm));
-  const goalsA: GoalEntry[] = a.goals.map((label) => ({
-    label,
-    both: bSet.has(norm(label)),
+  // "both" marking: a labelled item is shared-in-common when the same label is
+  // in the other partner's shared set (case-insensitive).
+  const labelSet = (arr: { label: string }[]) => new Set(arr.map((x) => norm(x.label)));
+  const inB = labelSet(b.goals);
+  const inA = labelSet(a.goals);
+  const goalsA: GoalEntry[] = a.goals.map((g) => ({
+    label: g.label,
+    both: inB.has(norm(g.label)),
+    ...(g.detail ? { detail: g.detail } : {}),
   }));
-  const goalsB: GoalEntry[] = b.goals.map((label) => ({
-    label,
-    both: aSet.has(norm(label)),
+  const goalsB: GoalEntry[] = b.goals.map((g) => ({
+    label: g.label,
+    both: inA.has(norm(g.label)),
+    ...(g.detail ? { detail: g.detail } : {}),
   }));
+
+  const vInB = labelSet(b.values);
+  const vInA = labelSet(a.values);
+  const valueEntry = (
+    v: RichShared["values"][number],
+    otherSet: Set<string>
+  ): ValueEntry => ({
+    label: v.label,
+    both: otherSet.has(norm(v.label)),
+    ...(v.description ? { description: v.description } : {}),
+    ...(v.nonNegotiable ? { nonNegotiable: true } : {}),
+  });
+  const valuesA = a.values.map((v) => valueEntry(v, vInB));
+  const valuesB = b.values.map((v) => valueEntry(v, vInA));
+
+  const sInB = labelSet(b.strengths);
+  const sInA = labelSet(a.strengths);
+  const strengthEntry = (
+    s: RichShared["strengths"][number],
+    otherSet: Set<string>
+  ): StrengthEntry => ({
+    label: s.label,
+    both: otherSet.has(norm(s.label)),
+    ...(s.note ? { note: s.note } : {}),
+  });
+  const strengthsA = a.strengths.map((s) => strengthEntry(s, sInB));
+  const strengthsB = b.strengths.map((s) => strengthEntry(s, sInA));
 
   const hopes: { slot: "a" | "b"; text: string }[] = [];
-  if (a.hope) hopes.push({ slot: "a", text: a.hope });
-  if (b.hope) hopes.push({ slot: "b", text: b.hope });
+  if (a.base.hope) hopes.push({ slot: "a", text: a.base.hope });
+  if (b.base.hope) hopes.push({ slot: "b", text: b.base.hope });
 
   const fears: { slot: "a" | "b"; text: string }[] = [
-    ...a.fears.map((text) => ({ slot: "a" as const, text })),
-    ...b.fears.map((text) => ({ slot: "b" as const, text })),
+    ...a.base.fears.map((text) => ({ slot: "a" as const, text })),
+    ...b.base.fears.map((text) => ({ slot: "b" as const, text })),
+  ];
+  const principles: { slot: "a" | "b"; text: string }[] = [
+    ...a.principles.map((text) => ({ slot: "a" as const, text })),
+    ...b.principles.map((text) => ({ slot: "b" as const, text })),
   ];
 
   return {
     partners: {
-      a: { slot: "a", name: a.name, cohort: a.cohort, planName: a.planName },
-      b: { slot: "b", name: b.name, cohort: b.cohort, planName: b.planName },
+      a: { slot: "a", name: a.base.name, cohort: a.base.cohort, planName: a.base.planName },
+      b: { slot: "b", name: b.base.name, cohort: b.base.cohort, planName: b.base.planName },
     },
-    shared: { a, b },
-    deterministic: { goals: { a: goalsA, b: goalsB }, hopes, fears },
+    shared: { a: a.base, b: b.base },
+    deterministic: {
+      goals: { a: goalsA, b: goalsB },
+      values: { a: valuesA, b: valuesB },
+      strengths: { a: strengthsA, b: strengthsB },
+      hopes,
+      fears,
+      principles,
+    },
   };
 }
 

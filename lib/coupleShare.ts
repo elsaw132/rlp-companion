@@ -15,9 +15,18 @@ import type {
   ReadinessSnapshotResult,
   DayBuilderResult,
   FirstYearResult,
+  ValueTriageResult,
+  MirrorCardsResult,
+  TradeOffsResult,
 } from "@/lib/modules";
 
-export type ShareGroup = "plan" | "hopes" | "fears";
+export type ShareGroup =
+  | "plan"
+  | "values"
+  | "strengths"
+  | "hopes"
+  | "fears"
+  | "principles";
 
 export type ShareItem = {
   ref: string;
@@ -98,6 +107,9 @@ export function deriveShareableItems(
     "readiness-snapshot"
   );
   const firstYear = result<FirstYearResult>(data, "4.7", "first-year");
+  const valuesTriage = result<ValueTriageResult>(data, "3.2", "value-triage");
+  const strengths = result<MirrorCardsResult>(data, "3.1", "mirror-cards");
+  const tradeOffs = result<TradeOffsResult>(data, "4.5", "trade-offs");
 
   const items: ShareItem[] = [];
   const seen = new Set<string>();
@@ -143,6 +155,32 @@ export function deriveShareableItems(
     seen.add("plan:leaving-work");
   }
 
+  // --- Your values (the core few) ----------------------------------------
+  if (valuesTriage) {
+    for (const label of valuesTriage.core) {
+      if (!label?.trim()) continue;
+      items.push({
+        ref: slugRef("value", label, seen),
+        group: "values",
+        label,
+        defaultOn: true,
+      });
+    }
+  }
+
+  // --- Your strengths (the signature few) --------------------------------
+  if (strengths) {
+    for (const label of strengths.starred) {
+      if (!label?.trim()) continue;
+      items.push({
+        ref: slugRef("strength", label, seen),
+        group: "strengths",
+        label,
+        defaultOn: true,
+      });
+    }
+  }
+
   // --- Your hopes --------------------------------------------------------
   if (hopesFears?.hopes?.trim()) {
     items.push({
@@ -166,6 +204,19 @@ export function deriveShareableItems(
         label: f.label,
         defaultOn: !isAboutPartner,
         aboutPartner: isAboutPartner,
+      });
+    }
+  }
+
+  // --- Your principles (how you'll decide when things compete) -----------
+  if (tradeOffs) {
+    for (const p of tradeOffs.principles) {
+      if (!p?.trim()) continue;
+      items.push({
+        ref: slugRef("principle", p, seen),
+        group: "principles",
+        label: p,
+        defaultOn: true,
       });
     }
   }

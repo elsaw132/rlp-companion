@@ -152,8 +152,11 @@ export async function GET(request: Request) {
     complementary: comparison.complementary,
     different: comparison.different,
     goals: assembly.deterministic.goals,
+    values: assembly.deterministic.values,
+    strengths: assembly.deterministic.strengths,
     hopes: assembly.deterministic.hopes,
     fears: assembly.deterministic.fears,
+    principles: assembly.deterministic.principles,
     talk: {
       seeds: comparison.talkTopics,
       user: talk.map((t) => ({

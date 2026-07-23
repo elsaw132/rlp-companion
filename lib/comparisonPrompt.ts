@@ -4,7 +4,7 @@
 // the input shape (ParticipantShared) so the assembler and the model agree.
 
 // Bump when the prompt or input shape changes so caches regenerate.
-export const PROMPT_VERSION = "cmp-v1";
+export const PROMPT_VERSION = "cmp-v2";
 
 // Appended verbatim after the generated opener in the view — never produced by
 // the model.
@@ -19,11 +19,15 @@ export type ParticipantShared = {
   cohort: string; // human label, e.g. "Winding down"
   planName: string; // "Retirement Life Plan" | "Retirement Reset Plan"
   goals: string[];
+  values: string[];
+  nonNegotiables: string[]; // the values they won't compromise on
+  strengths: string[];
   hope: string | null;
   fears: string[];
   rhythm: string | null;
   travel: string | null;
   leavingWork: string | null;
+  principles: string[]; // how they decide when things compete
 };
 
 export function comparisonSystemPrompt(): string {
@@ -42,8 +46,8 @@ STRICT RULES
 
 WHAT TO PRODUCE (JSON)
 - framingOpener: name warmly and without judgement where the two of them are in the transition — the same place or different places — and let that set up the view. Different points → note that different positions naturally produce different plans. In step → say so plainly; do not manufacture a difference that isn't there. Draw only on their cohorts and plans; do not infer feeling. Do NOT append any closing line — that is added for you.
-- sharedGround: genuinely shared priorities, present tense, concrete, plain. Only what BOTH actually expressed. Surface all that are genuinely relevant — no fixed count.
-- complementary: differing choices that dovetail, and how — as many as genuinely relevant. Keep "seem to" (it's the couple's to confirm). For the clearest one, give a two-sided split via "sides" (each partner's own position, named).
+- sharedGround: genuinely shared priorities, present tense, concrete, plain. Only what BOTH actually expressed. A value, strength, hope or goal BOTH hold especially belongs here. Surface all that are genuinely relevant — no fixed count.
+- complementary: differing choices that dovetail, and how — as many as genuinely relevant. Different signature strengths that cover for each other often fit here. Keep "seem to" (it's the couple's to confirm). For the clearest one, give a two-sided split via "sides" (each partner's own position, named).
 - different: name each divergence neutrally, both poles, no judgement — all that are genuinely relevant. Give the SINGLE clearest one "clearest": true (the view adds the lead-in); the rest omit it. Two-sided "sides" where it helps.
 - talkTopics: governed by weight, not a count. Include a topic only where it opens a real conversation — a divergence worth exploring, or a hope/fear/goal that carries weight for the two of them. Never pad to a number; never drop a weighty one to stay short. Lead with a generative or shared one, then differences, weightiest first. Frame each as MEANING, not position — name where they differ or where a hope/fear sits and invite them to explore what it means to each, without asserting what it means. If nothing clears the bar, return an empty array.
 
@@ -54,11 +58,18 @@ Respond with ONLY a JSON object of exactly this shape, and nothing else:
 function block(p: ParticipantShared, label: string): string {
   const lines: string[] = [`${label} — ${p.name}`, `Cohort: ${p.cohort}`, `Plan: ${p.planName}`];
   if (p.goals.length) lines.push(`Goals:\n${p.goals.map((g) => `- ${g}`).join("\n")}`);
+  if (p.values.length) lines.push(`Core values:\n${p.values.map((v) => `- ${v}`).join("\n")}`);
+  if (p.nonNegotiables.length)
+    lines.push(`Won't compromise on: ${p.nonNegotiables.join(", ")}`);
+  if (p.strengths.length)
+    lines.push(`Signature strengths:\n${p.strengths.map((s) => `- ${s}`).join("\n")}`);
   if (p.hope) lines.push(`Hope: ${p.hope}`);
   if (p.fears.length) lines.push(`Fears:\n${p.fears.map((f) => `- ${f}`).join("\n")}`);
   if (p.rhythm) lines.push(`Days and rhythm: ${p.rhythm}`);
   if (p.travel) lines.push(`Travel: ${p.travel}`);
   if (p.leavingWork) lines.push(`Leaving work: ${p.leavingWork}`);
+  if (p.principles.length)
+    lines.push(`Decision principles:\n${p.principles.map((pr) => `- ${pr}`).join("\n")}`);
   return lines.join("\n");
 }
 

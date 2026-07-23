@@ -8,6 +8,7 @@ import {
 import ShareStep from "@/app/components/partner/ShareStep";
 import WaitingState from "@/app/components/partner/WaitingState";
 import ComparisonView from "@/app/components/partner/ComparisonView";
+import ConfirmPartnerName from "@/app/components/partner/ConfirmPartnerName";
 
 // The single entry point for "Plan with your partner" (module 5.1). It resolves
 // the pairing and each side's completion (cheap DB reads only — no LLM in the
@@ -56,13 +57,19 @@ export default async function PartnerPage({
   const iCompleted = Boolean(mine?.completedAt);
   const partnerCompleted = Boolean(partner?.completedAt);
 
+  // First: confirm the partner's name (never guessed silently). Prefilled with
+  // the account name; the person confirms or corrects it before anything else.
+  if (!mine?.partnerName) {
+    const guess = await resolvePartnerName(partnerId);
+    return <ConfirmPartnerName guess={guess} />;
+  }
+
   // Editing what's shared reopens the share step even after completion.
   if (edit === "1") return <ShareStep />;
 
   if (iCompleted && partnerCompleted) return <ComparisonView />;
   if (iCompleted && !partnerCompleted) {
-    const name = await resolvePartnerName(partnerId);
-    return <WaitingState partnerFirstName={name} />;
+    return <WaitingState partnerFirstName={mine.partnerName} />;
   }
   return <ShareStep />;
 }
