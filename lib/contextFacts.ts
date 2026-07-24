@@ -862,6 +862,9 @@ export type FactAdditionDelta = {
   label: string;
   description?: string;
   confidence?: FactConfidence;
+  // The person hedged this ("maybe", "possibly", "might") — store it as tentative
+  // so it is never treated as a settled commitment (never becomes an "anchor").
+  tentative?: boolean;
   [key: string]: unknown;
 };
 
@@ -894,12 +897,30 @@ export type FactReasonDelta = {
   domain?: RecurringDomain | null;
 };
 
+// A REVISION — the "reconcile, don't append" core. The person changed, renamed,
+// broadened, or firmed up something already on record. Instead of the old fact
+// surviving alongside a contradictory new one, the old fact is retired
+// (superseded_by → the new one) and the new version takes its place EVERYWHERE it
+// was captured. `oldLabel` names the existing fact to replace (matched against the
+// facts the model was shown); `quote` is the member's own words asking for the
+// change; `tentative` marks the new version as a "maybe" rather than settled.
+export type FactRevisionDelta = {
+  oldLabel: string;
+  label: string;
+  category?: FactCategory;
+  domain?: RecurringDomain | null;
+  quote?: string;
+  tentative?: boolean;
+  reason?: string;
+};
+
 export type ConversationalDeltas = {
   additions: FactAdditionDelta[];
   removals: FactRemovalDelta[];
   // Optional so existing {additions, removals} literals stay valid; normalizeDeltas
-  // always fills it, and planConversationalApply reads it defensively.
+  // always fills them, and planConversationalApply reads them defensively.
   reasons?: FactReasonDelta[];
+  revisions?: FactRevisionDelta[];
 };
 
 // A removal that matched an existing fact but is NOT yet confirmed — surfaced so
@@ -921,6 +942,7 @@ export function normalizeDeltas(raw: unknown): ConversationalDeltas {
   const additions = Array.isArray(obj.additions) ? obj.additions : [];
   const removals = Array.isArray(obj.removals) ? obj.removals : [];
   const reasons = Array.isArray(obj.reasons) ? obj.reasons : [];
+  const revisions = Array.isArray(obj.revisions) ? obj.revisions : [];
   return {
     additions: additions
       .filter((a): a is FactAdditionDelta => !!a && typeof a === "object" && typeof (a as FactAdditionDelta).label === "string")
@@ -937,6 +959,15 @@ export function normalizeDeltas(raw: unknown): ConversationalDeltas {
           typeof (r as FactReasonDelta).reason === "string"
       )
       .filter((r) => clean(r.label) !== "" && clean(r.reason) !== ""),
+    revisions: revisions
+      .filter(
+        (r): r is FactRevisionDelta =>
+          !!r &&
+          typeof r === "object" &&
+          typeof (r as FactRevisionDelta).oldLabel === "string" &&
+          typeof (r as FactRevisionDelta).label === "string"
+      )
+      .filter((r) => clean(r.oldLabel) !== "" && clean(r.label) !== ""),
   };
 }
 
@@ -1009,6 +1040,31 @@ export function filterGroundedReasons(
   return out;
 }
 
+// Ground revisions in the member's own words, exactly like removals: a revision
+// retires an on-record fact and replaces it, so it must only fire when the member
+// explicitly asked for the change. Requires both an oldLabel and a new label, and
+// a verbatim `quote` that actually appears in what the member said. Any revision
+// without a grounded quote is dropped — better to miss a rename (the member can
+// re-edit) than to wrongly retire something they only rephrased. Pure.
+export function filterGroundedRevisions(
+  revisions: unknown[],
+  memberText: string
+): FactRevisionDelta[] {
+  const haystack = normalizeForMatch(memberText);
+  const out: FactRevisionDelta[] = [];
+  for (const r of revisions) {
+    if (!r || typeof r !== "object") continue;
+    const rr = r as FactRevisionDelta;
+    if (typeof rr.oldLabel !== "string" || clean(rr.oldLabel) === "") continue;
+    if (typeof rr.label !== "string" || clean(rr.label) === "") continue;
+    const quote = typeof rr.quote === "string" ? normalizeForMatch(rr.quote) : "";
+    if (quote.length < 4) continue;
+    if (!haystack.includes(quote)) continue;
+    out.push(rr);
+  }
+  return out;
+}
+
 // Decide what to apply for a set of conversational deltas, given the facts
 // currently active for the module and the set of removal identities the person
 // has confirmed. PURE — the route executes the result. Additions that duplicate
@@ -1028,6 +1084,9 @@ export function planConversationalApply(
   // The route sets data.reason on that fact; it never overwrites the pick or a
   // widget-set description.
   reasonUpdates: { factId: string; reason: string }[];
+  // Revisions → retire an existing fact (by id) and add its replacement in place.
+  // The executor does addFact(replacement) then supersedeFact(factId, newId).
+  toSupersede: { factId: string; replacement: DraftFact }[];
 } {
   const activeByIdentity = new Map<string, Pick<StoredFact, "id" | "category" | "domain" | "data">>();
   for (const e of existing) activeByIdentity.set(factIdentity(e), e);
@@ -1110,7 +1169,41 @@ export function planConversationalApply(
     }
   }
 
-  return { toAdd, toRejectIds, pending, reasonUpdates };
+  // Revisions → retire the matched existing fact(s) and add the new version in
+  // place. Because `existing` is the person's FULL active set, a rename or
+  // broadening in one session retires every copy of the old label, everywhere.
+  // This is the "correct once, and it holds" core.
+  const toSupersede: { factId: string; replacement: DraftFact }[] = [];
+  for (const rev of deltas.revisions ?? []) {
+    const oldLabel = clean(rev.oldLabel).toLowerCase();
+    const newLabel = clean(rev.label);
+    if (!oldLabel || !newLabel) continue;
+    const matches = existing.filter((e) => {
+      if ((e.data.label ?? "").trim().toLowerCase() !== oldLabel) return false;
+      if (rev.category && e.category !== rev.category) return false;
+      if (rev.domain != null && e.domain !== rev.domain) return false;
+      return true;
+    });
+    for (const m of matches) {
+      const replacement = draft(
+        rev.category ?? m.category,
+        {
+          label: newLabel,
+          ...(rev.tentative ? { tentative: true } : {}),
+          ...(rev.reason && clean(rev.reason) ? { reason: clean(rev.reason) } : {}),
+        },
+        moduleId,
+        {
+          domain: rev.domain ?? m.domain ?? null,
+          source: "conversational_statement",
+          confidence: "certain",
+        }
+      );
+      toSupersede.push({ factId: m.id, replacement });
+    }
+  }
+
+  return { toAdd, toRejectIds, pending, reasonUpdates, toSupersede };
 }
 
 // ---- Merge facts of the same identity --------------------------------------
