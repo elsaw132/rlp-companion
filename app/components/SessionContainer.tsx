@@ -930,6 +930,9 @@ export default function SessionContainer({
     void (async () => {
       const seed = await fetchSeasonsCards(input);
       if (seed) void userData.saveSeasonsCardsSeed(sessionId, seed);
+      // Curation failed (all retries) — clear the guard so a later render can try
+      // again, rather than stranding the person on the raw fallback all session.
+      else seasonsCardsPrefetchedRef.current = false;
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interaction, sessionId]);

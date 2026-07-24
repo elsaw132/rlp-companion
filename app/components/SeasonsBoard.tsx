@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   SeasonsBoardInteraction,
   SeasonsBoardResult,
@@ -83,6 +83,27 @@ export default function SeasonsBoard({
     }));
   });
   const [draft, setDraft] = useState("");
+
+  // The board first renders from the raw fact list, then the curated cards arrive a
+  // few seconds later (the Claude tidy) and replace it. Because `items` was seeded
+  // once at mount, that upgrade used to be ignored and the person stayed on the
+  // rough list. Re-seed from the new cards when they land — but only while the board
+  // is still untouched (creating, nothing placed, nothing added of their own), so we
+  // never discard work in progress.
+  const seededSignature = cards.map((c) => c.label).join("|");
+  useEffect(() => {
+    if (initial) return; // editing an existing board — never re-seed
+    setItems((prev) => {
+      const untouched = prev.every((it) => it.seasons.length === 0 && !it.own);
+      if (!untouched) return prev;
+      return cards.map((c) => ({
+        label: c.label,
+        category: c.category,
+        seasons: [],
+      }));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seededSignature]);
 
   // Toggle a season for a card. The enduring lane and the three seasons are
   // mutually exclusive: a card runs across all of them, or sits in specific
