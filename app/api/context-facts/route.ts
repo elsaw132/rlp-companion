@@ -10,6 +10,7 @@ import {
   reconcileModuleFacts,
   applyConversationalDeltas,
 } from "@/lib/contextCapture";
+import { rejectFactsByModule } from "@/lib/db";
 
 // Write path for the canonical context profile. The browser never sends a user
 // id — it's derived from the Clerk session, so a request can only write its own
@@ -22,6 +23,9 @@ import {
 //  - conversational   : apply conversational deltas (additions + confirmed
 //                       removals), returning any removals still awaiting
 //                       confirmation
+//  - resetModule      : reject every fact a module contributed, so restarting one
+//                       session ("Start over") also clears its facts from the
+//                       profile — not just its cached answers
 //
 // Every branch self-guards: a malformed body returns 400 and never throws.
 
@@ -33,7 +37,8 @@ type Body =
       moduleId?: string;
       deltas?: unknown;
       confirmedRemovalKeys?: string[];
-    };
+    }
+  | { action: "resetModule"; moduleId?: string };
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -88,6 +93,14 @@ export async function POST(request: Request) {
           Array.isArray(body.confirmedRemovalKeys) ? body.confirmedRemovalKeys : []
         );
         return Response.json({ ok: true, ...result });
+      }
+
+      case "resetModule": {
+        if (!body.moduleId) {
+          return new Response("Missing moduleId", { status: 400 });
+        }
+        await rejectFactsByModule(userId, body.moduleId);
+        return Response.json({ ok: true });
       }
 
       default:

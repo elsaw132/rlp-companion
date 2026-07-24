@@ -241,6 +241,23 @@ export async function rejectFact(
   `;
 }
 
+// Reject every active fact a single module contributed to the profile. Used when
+// that module is restarted ("Start over" on one session), so its facts leave the
+// canonical profile too — not only its cached answers. Without this, a restart
+// re-drafts from a pool that still holds the old module's facts (which is why the
+// seasons board kept showing last run's cards). Returns how many were rejected.
+export async function rejectFactsByModule(
+  userId: string,
+  moduleId: string
+): Promise<void> {
+  await ensureContextFactsTable();
+  await sql()`
+    UPDATE context_facts
+    SET status = 'rejected'
+    WHERE user_id = ${userId} AND provenance_module = ${moduleId} AND status = 'active'
+  `;
+}
+
 // Attach a conversational REASON to an existing fact, additively. Merges a single
 // `reason` key into the jsonb `data` with `||`, so every other field — the label,
 // the pick, and any widget-set `description` — is left exactly as it was. Guarded
