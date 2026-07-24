@@ -900,6 +900,22 @@ export default function SessionContainer({
     if (interaction?.type !== "week-shape") return;
     if (weekShapePrefetchedRef.current || userData.getWeekShapeSeed(sessionId))
       return;
+    // Wait for the fact snapshot before drafting. Prefetching from a not-yet-loaded
+    // snapshot yields a factless, generic week that then gets cached and shown as if
+    // it were real. This effect re-runs when userData.loading flips — the same guard
+    // the goals and seasons prefetches carry.
+    if (userData.loading) return;
+    const goals = weekShapeGoalInputs(
+      (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
+    );
+    // The real, recurring activities come from structured recurring_activity facts —
+    // not a scrape of prior transcripts.
+    const recurring = recurringSeedFromFacts(
+      resolveSeedItems(sessionId, userData.getActiveFacts(), "recurring_activity")
+    );
+    // Nothing real to build a week from yet — don't draft, and don't cache a generic
+    // seed. The surface drafts on its own once there's something to use.
+    if (recurring.length === 0 && goals.length === 0) return;
     weekShapePrefetchedRef.current = true;
     void (async () => {
       const draft = await fetchWeekShapeDraft({
@@ -907,22 +923,16 @@ export default function SessionContainer({
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
         retirementStage: userData.getRetirementStage(),
-        goals: weekShapeGoalInputs(
-          (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
-        ),
+        goals,
         transition: transitionShape(
           (userData.getBuild("4.1") as ReadinessSnapshotResult | null) ?? null
         ),
-        // The real, recurring activities now come from structured
-        // recurring_activity facts — not a scrape of prior transcripts.
-        recurring: recurringSeedFromFacts(
-          resolveSeedItems(sessionId, userData.getActiveFacts(), "recurring_activity")
-        ),
+        recurring,
       });
       if (draft) void userData.saveWeekShapeSeed(sessionId, draft);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interaction, sessionId]);
+  }, [interaction, sessionId, userData.loading]);
 
   // The seasons board (4.2) draws its cards from the person's real priorities across
   // the whole programme. The narrow, aspiration-first seasonCardsFromFacts used to

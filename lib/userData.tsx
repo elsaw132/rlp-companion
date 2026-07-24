@@ -189,7 +189,10 @@ const KEYS = {
   // ranked) instead of the AI-distilled stage3-values summary, so v1 caches (which
   // may hold the wrong values) are left unread and re-drafted.
   tradeOffSeed: (id: string) => `trade-off-v2:${id}`,
-  weekShapeSeed: (id: string) => `week-shape-v2:${id}`,
+  // v3: a prefetch race could draft the week from a not-yet-loaded fact snapshot and
+  // cache a generic fallback rhythm in its place; v2 caches may hold that generic
+  // seed, so they are left unread and re-drafted from the real activities.
+  weekShapeSeed: (id: string) => `week-shape-v3:${id}`,
   // The curated seasons-board cards Vita chose for "The chapters of retirement"
   // (4.2) — a balanced set of the person's real priorities across chapters, in a
   // consistent voice — so a refresh never re-runs the curation. v3: sourcing widened
