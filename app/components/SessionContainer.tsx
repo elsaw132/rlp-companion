@@ -1229,12 +1229,13 @@ export default function SessionContainer({
       });
     };
 
-    // The facts already on record for this module, so the delta pass can target a
-    // correction precisely (the "drop the 11am coffee" case) and not re-propose
-    // something already captured.
+    // The person's FULL memory (every session so far), so the delta pass can
+    // RECONCILE against it: revise or drop a fact wherever it was first captured
+    // (the "carpentry survives across five sessions" bug), and never re-propose
+    // something already on record. Cross-module, not just this session.
     const knownFacts = user
       ? userData
-          .getActiveFacts({ provenanceModule: sessionId })
+          .getActiveFacts()
           .map((f) => ({ label: f.data.label, category: f.category }))
       : [];
 

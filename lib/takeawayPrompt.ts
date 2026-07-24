@@ -14,7 +14,7 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import { SONNET_MODEL } from "@/lib/models";
-import { filterGroundedRemovals, filterGroundedReasons } from "@/lib/contextFacts";
+import { filterGroundedRemovals, filterGroundedReasons, filterGroundedRevisions } from "@/lib/contextFacts";
 
 export type IncomingMessage = {
   role: "coach" | "user";
@@ -35,7 +35,7 @@ export type TakeawayRequest = {
   knownFacts?: KnownFact[];
 };
 
-export type Facts = { additions: unknown[]; removals: unknown[]; reasons: unknown[] };
+export type Facts = { additions: unknown[]; removals: unknown[]; reasons: unknown[]; revisions?: unknown[] };
 
 export type TakeawayResult = {
   takeaway: string;
@@ -75,11 +75,11 @@ Produce the summary in two grammatical persons. The content and tone must be ide
 - "secondPerson": written in the second person, addressing the person directly ("you"/"your").
 
 You ALSO extract structured fact changes that emerged ONLY in the conversation (not already in their saved selections), as a "facts" object:
-- "additions": new facts the person stated in conversation that aren't already on record. Each: {"category": one of [${FACT_CATEGORIES}], "label": the fact in their words (short), and optionally "domain" (for recurring_activity: Restore/Move/Think/Connect/Contribute), "description"}. Use one_off_dream for money-no-object/pipe dreams; aspiration for things they could realistically work toward; recurring_activity for regular activities — never mix these up. For keep_change_leave (the retired letter's stock-take of their current retirement), the "label" is the element of their life in their words and the "description" is exactly one of "keep", "change", or "leave" — whether they want to keep it as it is, reshape it, or let it go. Only include something clearly new and concrete. Empty array if nothing new.
+- "additions": new facts the person stated in conversation that aren't already on record. Each: {"category": one of [${FACT_CATEGORIES}], "label": the fact in their words (short), and optionally "domain" (for recurring_activity: Restore/Move/Think/Connect/Contribute), "description"}. Use one_off_dream for money-no-object/pipe dreams; aspiration for things they could realistically work toward; recurring_activity for regular activities — never mix these up. For keep_change_leave (the retired letter's stock-take of their current retirement), the "label" is the element of their life in their words and the "description" is exactly one of "keep", "change", or "leave" — whether they want to keep it as it is, reshape it, or let it go. If the person only floated something tentatively ("maybe", "possibly", "I might", "we'll see"), set "tentative": true on it, so it is recorded as a maybe and never treated as a settled plan or an anchor. Only include something clearly new and concrete. Empty array if nothing new.
 - "removals": ONLY when the person EXPLICITLY and UNAMBIGUOUSLY asked, in their OWN words, to drop, remove, undo, or replace something already on record (you're told what's on record). This is a HIGH bar. Every removal MUST include a "quote": the person's own verbatim words, copied exactly from a "Them:" line, that make the request. If you cannot copy such words, DO NOT emit a removal. Each: {"label": the on-record fact to drop (match its wording), "quote": the person's exact words asking to drop or change it, optionally "category", and "userConfirmedInChat": true only when that quote is a direct request from the person.
   The following do NOT count as removals — for these, emit nothing: the person simply giving a new, different, or fuller answer; you inferring they "seem to have" moved on; a change of subject; softening, hedging, or elaborating; anything you would preface with "it sounded like" or "they might have". When in any doubt, emit NO removal. A missed correction is fine — the person can edit it themselves; a wrong one is not.
-  Empty array unless the person explicitly asked, in words you can quote, to drop or change something.
-- "reasons": when the conversation surfaces a genuinely meaningful REASON, "why", or piece of context behind something — most often something already on record, sometimes something you're also adding — capture it so it carries into the plan (the short summary above does NOT carry forward, so a good reason would otherwise be lost). Each: {"label": the fact this reason is about — if it is about something ALREADY ON RECORD (listed above under "Already on record"), copy that fact's label EXACTLY, verbatim and character-for-character, the same way you would for a removal, so the reason attaches to that pick rather than floating free; only when the reasoning is genuinely about something NOT on record should "label" be a short new name for it (it is then kept as a standalone thread), "reason": the person's own "why", in their words and short, "quote": the person's verbatim words, copied exactly from a "Them:" line, that carry that reasoning}. A reason is ADDITIVE — it never drops or changes the pick. Only capture substantive, meaningful reasoning that adds something the label alone doesn't: not every aside, not a restatement of the label, not small talk. If the reasoning doesn't attach to any single on-record fact, still capture it with "label" set to a short name for what it's about — it will be kept as a standalone thread rather than lost. Every reason MUST include a "quote" you can copy verbatim from a "Them:" line; if you cannot, DO NOT emit it. Empty array if nothing meaningful emerged (most sessions, most of the time).
+  Empty array unless the person explicitly asked, in words you can quote, to drop something entirely.
+- "reasons": ONLY the "why" behind a fact whose identity is UNCHANGED. NEVER use a reason to record a rename, replacement, or broadening of an existing fact — those corrections are handled by a separate step; here, only capture the why behind a fact whose name stays the same. When the conversation surfaces a genuinely meaningful REASON, "why", or piece of context behind something — most often something already on record, sometimes something you're also adding — capture it so it carries into the plan (the short summary above does NOT carry forward, so a good reason would otherwise be lost). Each: {"label": the fact this reason is about — if it is about something ALREADY ON RECORD (listed above under "Already on record"), copy that fact's label EXACTLY, verbatim and character-for-character, the same way you would for a removal, so the reason attaches to that pick rather than floating free; only when the reasoning is genuinely about something NOT on record should "label" be a short new name for it (it is then kept as a standalone thread), "reason": the person's own "why", in their words and short, "quote": the person's verbatim words, copied exactly from a "Them:" line, that carry that reasoning}. A reason is ADDITIVE — it never drops or changes the pick. Only capture substantive, meaningful reasoning that adds something the label alone doesn't: not every aside, not a restatement of the label, not small talk. If the reasoning doesn't attach to any single on-record fact, still capture it with "label" set to a short name for what it's about — it will be kept as a standalone thread rather than lost. Every reason MUST include a "quote" you can copy verbatim from a "Them:" line; if you cannot, DO NOT emit it. Empty array if nothing meaningful emerged (most sessions, most of the time).
 
 Put the "facts" object FIRST, before the summary, so the facts are never lost if the reply runs long. Respond with ONLY a JSON object of exactly this shape, and nothing else:
 {"facts": {"additions": [], "removals": [], "reasons": []}, "thirdPerson": "...", "secondPerson": "..."}
@@ -99,7 +99,7 @@ function buildUserContent(body: TakeawayRequest): string {
 
   const known =
     body.knownFacts && body.knownFacts.length
-      ? `Already on record for this session (use these for "removals"):\n${body.knownFacts
+      ? `Your current memory of this person, built up across every session so far. Use these to decide "removals" and "revisions" — copy a label EXACTLY when you drop or change it:\n${body.knownFacts
           .map((f) => `- [${f.category}] ${f.label}`)
           .join("\n")}\n\n`
       : "";
@@ -290,7 +290,7 @@ export async function buildTakeaway(
   // transcript; anything the model inferred (no quote, or one it can't back up)
   // is dropped. The hard precision bias: never surface a correction the member
   // didn't explicitly ask for.
-  const settledFacts = facts ?? { additions: [], removals: [], reasons: [] };
+  const settledFacts = facts ?? { additions: [], removals: [], reasons: [], revisions: [] };
   const memberText = body.messages
     .filter((m) => m.role === "user")
     .map((m) => m.text)
@@ -305,6 +305,9 @@ export async function buildTakeaway(
       // Ground each reason in the member's own words before it leaves this path,
       // exactly as removals are grounded — a reason is never fabricated.
       reasons: filterGroundedReasons(settledFacts.reasons, memberText),
+      // Revisions carry the same grounding: a rename/broadening survives only if
+      // the person's own words asking for it appear in the transcript.
+      revisions: filterGroundedRevisions(settledFacts.revisions ?? [], memberText),
     },
   };
 }

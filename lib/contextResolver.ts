@@ -177,6 +177,10 @@ function renderFact(f: ResolvedFact): string {
   if (f.protectors && f.protectors.length) {
     s += ` — protected by: ${f.protectors.join(", ")}`;
   }
+  // "Tentative stays tentative": a fact the person only floated as a maybe is
+  // marked so, so neither Vita nor the seed generators ever treat it as a settled
+  // choice or an anchor (the rowing-with-Sarah case).
+  if (f.data.tentative === true) s += " — only a maybe they floated, not settled";
   return s;
 }
 

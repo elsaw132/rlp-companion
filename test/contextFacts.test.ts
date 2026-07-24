@@ -8,6 +8,7 @@ import {
   planConversationalApply,
   filterGroundedRemovals,
   filterGroundedReasons,
+  filterGroundedRevisions,
   normalizeDeltas,
   principlesAfterConversation,
   factIdentity,
@@ -541,5 +542,81 @@ describe("reason-capture — apply is additive", () => {
     } as ConversationalDeltas);
     expect(res.rejected).toBe(0);
     expect(store.active({ provenanceModule: "1.day" }).some((f) => f.data.label === "Time with grandkids")).toBe(true);
+  });
+});
+
+describe("planConversationalApply — revisions (reconcile, don't append)", () => {
+  // The same thing was captured in two different sessions (the real bug: a label
+  // that piled up across modules and never got retired when the person renamed it).
+  const existing: Pick<StoredFact, "id" | "category" | "domain" | "data">[] = [
+    { id: "c1", category: "recurring_activity", domain: null, data: { label: "carpentry" } },
+    { id: "c2", category: "recurring_activity", domain: null, data: { label: "carpentry" } },
+    { id: "x1", category: "aspiration", domain: null, data: { label: "learn Japanese" } },
+  ];
+
+  it("a single rename retires EVERY copy of the old fact (correct once, and it holds)", () => {
+    const deltas: ConversationalDeltas = {
+      additions: [],
+      removals: [],
+      reasons: [],
+      revisions: [
+        { oldLabel: "carpentry", label: "interior design", quote: "call it interior design now" },
+      ],
+    };
+    const { toSupersede, toAdd, toRejectIds } = planConversationalApply("4.1", deltas, existing);
+    // Both carpentry copies are retired — from ONE correction.
+    expect(toSupersede.map((s) => s.factId).sort()).toEqual(["c1", "c2"]);
+    // The unrelated fact is untouched; nothing is dropped or duplicated.
+    expect(toRejectIds).toEqual([]);
+    expect(toAdd).toEqual([]);
+    // Each retirement carries the same replacement: the new label, in place.
+    for (const s of toSupersede) {
+      expect(s.replacement.data.label).toBe("interior design");
+      expect(s.replacement.category).toBe("recurring_activity");
+      expect(s.replacement.provenanceModule).toBe("4.1");
+    }
+  });
+
+  it("carries tentativeness onto a revised fact and a tentative addition", () => {
+    const deltas: ConversationalDeltas = {
+      additions: [{ category: "aspiration", label: "join a rowing club", tentative: true }],
+      removals: [],
+      reasons: [],
+      revisions: [
+        { oldLabel: "carpentry", label: "carpentry via a class", tentative: true, quote: "maybe carpentry via a class, not sure yet" },
+      ],
+    };
+    const { toAdd, toSupersede } = planConversationalApply("2.1", deltas, existing);
+    expect(toAdd[0]?.data.tentative).toBe(true);
+    expect(toSupersede[0]?.replacement.data.tentative).toBe(true);
+  });
+});
+
+describe("revision grounding + parsing", () => {
+  it("filterGroundedRevisions keeps only revisions whose quote the person actually said", () => {
+    const memberText = "please just call it interior design from now on";
+    const kept = filterGroundedRevisions(
+      [{ oldLabel: "carpentry", label: "interior design", quote: "call it interior design" }],
+      memberText
+    );
+    expect(kept).toHaveLength(1);
+    const dropped = filterGroundedRevisions(
+      [{ oldLabel: "carpentry", label: "interior design", quote: "I definitely never said this" }],
+      memberText
+    );
+    expect(dropped).toHaveLength(0);
+  });
+
+  it("normalizeDeltas parses revisions and drops malformed ones", () => {
+    const n = normalizeDeltas({
+      revisions: [
+        { oldLabel: "a", label: "b" },
+        { oldLabel: "", label: "x" },
+        { label: "no old label" },
+      ],
+    });
+    expect(n.revisions).toHaveLength(1);
+    expect(n.revisions?.[0].oldLabel).toBe("a");
+    expect(n.revisions?.[0].label).toBe("b");
   });
 });
