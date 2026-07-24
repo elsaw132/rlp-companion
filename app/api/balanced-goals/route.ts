@@ -68,18 +68,23 @@ export async function POST(request: Request) {
     return Response.json({ seed: null });
   }
 
+  const model = body.userModel && body.userModel.trim() ? body.userModel.trim() : "";
+
+  // Goals must be grounded in the person's OWN answers (the user model). Onboarding
+  // alone (partner, horizon) is never enough — drafting from it yields generic
+  // "we don't know you yet" placeholder goals. If the model is empty (e.g. the fact
+  // snapshot hadn't loaded when the draft fired), return null so the client waits and
+  // retries rather than caching a generic set.
+  if (!model) {
+    return Response.json({ seed: null });
+  }
+
   const context = [
     body.onboarding && body.onboarding.trim() && `ABOUT THEM:\n${body.onboarding.trim()}`,
-    body.userModel && body.userModel.trim(),
+    model,
   ]
     .filter(Boolean)
     .join("\n\n");
-
-  // Nothing to work from — return the generic fallback rather than inventing a
-  // life from thin air.
-  if (!context.trim()) {
-    return Response.json({ seed: null });
-  }
 
   try {
     const response = await anthropic.messages.create({

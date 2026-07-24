@@ -272,6 +272,11 @@ export default function WeekShape({
   const fetchedRef = useRef(false);
   useEffect(() => {
     if (phase !== "loading" || fetchedRef.current) return;
+    // Never draft from an empty user model (a race where the facts hadn't loaded) —
+    // that yields a generic, factless week. A prefetch may already hold a real draft,
+    // so allow that; otherwise wait until userModelText fills in (this effect re-runs).
+    const prefetched = userData.getWeekShapeSeed(sessionId);
+    if (!prefetched && !userModelText.trim()) return;
     fetchedRef.current = true;
     let cancelled = false;
     (async () => {
@@ -303,7 +308,7 @@ export default function WeekShape({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, userModelText]);
 
   // Monotonic counter for ids of activities the person adds.
   const nextIdRef = useRef(0);

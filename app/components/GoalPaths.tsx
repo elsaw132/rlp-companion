@@ -165,6 +165,11 @@ export default function GoalPaths({
   const fetchedRef = useRef(false);
   useEffect(() => {
     if (phase !== "loading" || fetchedRef.current) return;
+    // Never draft from an empty user model (a race where the facts hadn't loaded) —
+    // that yields generic, factless paths. A prefetch may already hold a real draft,
+    // so allow that; otherwise wait until userModelText fills in (this effect re-runs).
+    const prefetched = userData.getGoalPathSeed(sessionId);
+    if (!prefetched && !userModelText.trim()) return;
     fetchedRef.current = true;
     let cancelled = false;
     (async () => {
@@ -193,7 +198,7 @@ export default function GoalPaths({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, userModelText]);
 
   // Monotonic counters for ids of stones/supports the person adds. Refs so they
   // survive re-renders and never collide with the drafted ids.

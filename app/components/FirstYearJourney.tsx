@@ -467,6 +467,11 @@ export default function FirstYearJourney({
   const fetchedRef = useRef(false);
   useEffect(() => {
     if (phase !== "loading" || fetchedRef.current) return;
+    // Never draft from an empty user model (a race where the facts hadn't loaded) —
+    // that yields a generic, factless year. A prefetch may already hold a real draft,
+    // so allow that; otherwise wait until userModelText fills in (this effect re-runs).
+    const prefetched = userData.getFirstYearSeed(sessionId);
+    if (!prefetched && !userModelText.trim()) return;
     fetchedRef.current = true;
     let cancelled = false;
     (async () => {
@@ -500,7 +505,7 @@ export default function FirstYearJourney({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, userModelText]);
 
   // Rewrite the story to match the timeline after a direct move (debounced),
   // unless the person has taken the wording into their own hands.

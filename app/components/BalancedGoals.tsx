@@ -8,6 +8,7 @@ import type {
 import type { BalancedSeed } from "@/lib/userModel";
 import {
   fetchBalancedGoalsDraft,
+  type BalancedGoalsSeed,
   type GoalSuggestion,
   type GoalVariant,
 } from "@/lib/balancedGoalsSeed";
@@ -66,6 +67,18 @@ function toVariant(v: GoalVariant): Variant {
   return { label: v.label, ...(v.cadence ? { cadence: capFirst(v.cadence) } : {}) };
 }
 
+// A seed drafted before the person's facts had loaded reads as generic
+// placeholders whose "why" apologises for not knowing them yet ("you haven't told
+// us anything about yourself yet"). Detect that so we can ignore it and redraft
+// once the facts are present, rather than leaving the person on a generic list.
+const FACTLESS_WHY =
+  /haven'?t told us|you haven'?t|once you (share|tell|add)|waiting for you to fill|tell us (more )?about|nothing about you|when you (share|tell)/i;
+function looksFactless(seed: BalancedGoalsSeed | null): boolean {
+  const suggestions = seed?.suggestions ?? [];
+  if (suggestions.length === 0) return false;
+  return suggestions.some((s) => FACTLESS_WHY.test(s.why ?? ""));
+}
+
 function mapSuggestions(suggestions: GoalSuggestion[]): Goal[] {
   return suggestions.map((s, i) => ({
     id: `g${i}`,
@@ -118,8 +131,12 @@ export default function BalancedGoals({
   const userData = useUserData();
 
   // Editing reopens straight onto the goals from the saved result; a fresh run uses
-  // any cached draft, or fetches one (the "loading" phase).
-  const cachedSeed = initial ? null : userData.getGoalSeed(sessionId);
+  // any cached draft, or fetches one (the "loading" phase). A cached draft that reads
+  // as factless placeholders (drafted before the facts had loaded) is ignored, so the
+  // person is redrafted from their real answers rather than left on a generic list.
+  const rawCachedSeed = initial ? null : userData.getGoalSeed(sessionId);
+  const cachedSeed =
+    rawCachedSeed && !looksFactless(rawCachedSeed) ? rawCachedSeed : null;
   const [phase, setPhase] = useState<"loading" | "curate" | "failed">(
     initial || cachedSeed ? "curate" : "loading"
   );
@@ -141,14 +158,21 @@ export default function BalancedGoals({
     return [];
   });
 
-  // Draft the goals once, the first time a fresh run has no cached draft.
+  // Draft the goals once, the first time a fresh run has no usable cached draft.
   const fetchedRef = useRef(false);
   useEffect(() => {
     if (phase !== "loading" || fetchedRef.current) return;
+    // Re-read the cache, ignoring a factless placeholder set the same way as at mount.
+    const raw = userData.getGoalSeed(sessionId);
+    const cached = raw && !looksFactless(raw) ? raw : null;
+    // Never draft goals from an empty user model — that yields the generic
+    // "we don't know you yet" placeholders that started this. Wait until the facts
+    // have resolved; this effect re-runs when userModelText fills in (e.g. after a
+    // reset re-hydrates), and then drafts for real.
+    if (!cached && !userModelText.trim()) return;
     fetchedRef.current = true;
     let cancelled = false;
     (async () => {
-      const cached = userData.getGoalSeed(sessionId);
       const draft =
         cached ??
         (await fetchBalancedGoalsDraft({
@@ -164,6 +188,7 @@ export default function BalancedGoals({
         setPhase("failed");
         return;
       }
+      // Save (overwriting any ignored factless seed) so the good draft sticks.
       if (!cached) void userData.saveGoalSeed(sessionId, draft);
       setGoals(mapSuggestions(draft.suggestions));
       setPhase("curate");
@@ -172,7 +197,7 @@ export default function BalancedGoals({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, userModelText]);
 
   // A monotonic counter for ids of goals the person adds — a ref so it survives
   // re-renders and never collides with the drafted "g0, g1…" ids.

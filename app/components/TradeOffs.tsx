@@ -221,6 +221,11 @@ export default function TradeOffs({
   const fetchedRef = useRef(false);
   useEffect(() => {
     if (phase !== "loading" || fetchedRef.current) return;
+    // Never draft from an empty user model (a race where the facts hadn't loaded) —
+    // that yields generic, factless scenarios. A prefetch may already hold a real
+    // draft, so allow that; otherwise wait until userModelText fills in (re-runs).
+    const prefetched = userData.getTradeOffSeed(sessionId);
+    if (!prefetched && !userModelText.trim()) return;
     fetchedRef.current = true;
     let cancelled = false;
     (async () => {
@@ -253,7 +258,7 @@ export default function TradeOffs({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, userModelText]);
 
   // Monotonic counter for ids of principles the person adds.
   const nextIdRef = useRef(0);
