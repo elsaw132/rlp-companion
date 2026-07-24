@@ -48,12 +48,17 @@ type SeasonsBoardProps = {
   // Cards drawn from the person's earlier answers, assembled in SessionContainer
   // from the user model. Empty if there's nothing to seed from.
   cards: SeasonCard[];
+  // True while the curated cards are still being assembled (no cached seed yet).
+  // The board then shows a brief loading state instead of the raw, un-curated
+  // fallback list — the person never sees the rough version.
+  seedPending?: boolean;
   onFinish: (result: SeasonsBoardResult) => void;
 } & EditableProps<SeasonsBoardResult>;
 
 export default function SeasonsBoard({
   interaction,
   cards,
+  seedPending = false,
   onFinish,
   mode = "create",
   initial,
@@ -158,6 +163,26 @@ export default function SeasonsBoard({
       seasonOrder,
       summaryLabel,
     };
+  }
+
+  // While the curated cards are still being assembled, show a calm loading state
+  // rather than the rough, un-curated fallback list. Create mode only — editing an
+  // existing board always has its own placements to show.
+  if (seedPending && !initial) {
+    return (
+      <section style={styles.wrap}>
+        <style>{seasonsCss}</style>
+        <div style={styles.loadingCard}>
+          <span style={styles.loadingMark} aria-hidden="true">
+            🍂
+          </span>
+          <p style={styles.loadingText}>
+            Bringing together what matters most to you across the whole
+            programme…
+          </p>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -342,6 +367,26 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  loadingCard: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "12px",
+    padding: "32px 24px",
+    background: "var(--warm-surface)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-md)",
+    textAlign: "center",
+  },
+  loadingMark: { fontSize: "28px" },
+  loadingText: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-h3)",
+    fontWeight: 500,
+    color: "var(--ink)",
+    margin: 0,
+    maxWidth: "32ch",
   },
   // Keep the helper line close above the cards (tighter than the wrap's 28px
   // gap) so it reads as a cue for the element, not a separate block.
