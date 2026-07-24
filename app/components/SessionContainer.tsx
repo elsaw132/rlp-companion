@@ -95,7 +95,8 @@ import {
   firstYearRhythmInputs,
   firstYearSeasonInputs,
 } from "@/lib/firstYearSeed";
-import { fetchBalancedGoalsDraft } from "@/lib/balancedGoalsSeed";
+import { fetchGoalDraft } from "@/lib/balancedGoalsSeed";
+import { goalThreadsFromFacts } from "@/lib/goalThreads";
 import {
   fetchGoalPathsDraft,
   spotlightGoalInputs,
@@ -155,7 +156,6 @@ import {
 } from "@/lib/contextResolver";
 import {
   springboardsFromFacts,
-  springboardAreasFromFacts,
   seasonCardsFromFacts,
   seasonCandidatesFromFacts,
   recurringSeedFromFacts,
@@ -783,27 +783,19 @@ export default function SessionContainer({
   useEffect(() => {
     if (interaction?.type !== "balanced-goals") return;
     if (goalsPrefetchedRef.current || userData.getGoalSeed(sessionId)) return;
+    // Draft from the deterministic thread pool; skip entirely if the facts haven't
+    // resolved yet (never draft from an empty pool). The effect re-runs when the
+    // snapshot fills in.
+    const threads = goalThreadsFromFacts(userData.getActiveFacts());
+    if (threads.length === 0) return;
     goalsPrefetchedRef.current = true;
-    // Springboards now come from the resolver's recurring_activity facts, grouped
-    // by their balanced-area domain — fact-sourced, so a removed activity is gone.
-    const facts = userData.getActiveFacts();
-    const areaSeed = springboardAreasFromFacts(
-      resolveSeedItems(sessionId, facts, "recurring_activity")
-    );
-    const allowed = new Set(interaction.areas.map((a) => a.id));
-    const springboards = areaSeed.filter((s) => allowed.has(s.area));
     void (async () => {
-      const draft = await fetchBalancedGoalsDraft({
-        userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
-        onboarding: userData.buildOnboardingContext(),
-        hasPartner: userData.hasPartner(),
-        retirementStage: userData.getRetirementStage(),
-        springboards,
-      });
+      const draft = await fetchGoalDraft(threads, userData.buildOnboardingContext());
       if (draft) void userData.saveGoalSeed(sessionId, draft);
+      else goalsPrefetchedRef.current = false; // let a later render retry
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interaction, sessionId]);
+  }, [interaction, sessionId, userData.loading]);
 
   // The goal-paths draft (4.4) is the same slow Claude call. Prefetch a path for
   // each spotlighted goal (read from 4.3's saved result) while the person reads
