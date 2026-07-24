@@ -11,17 +11,18 @@ import { useRouter } from "next/navigation";
 import FeedbackPanel from "@/app/components/FeedbackPanel";
 import VitaMark from "../VitaMark";
 
-// The comparison view: two plans side by side. Deterministic content (partner
-// labels, goals/values/strengths/hopes/fears/principles) is rendered straight
-// from the payload; the framing, the shared/complementary/different
-// observations, and the seed talk topics are Vita-generated. Goals, values and
-// strengths expand for detail (mirrors the RLP plan document). It reads
+// The comparison view: two plans side by side, organised into tabs so it reads
+// like the RLP plan rather than one long scroll. A persistent header (partner
+// labels + Vita's framing) sits above the tabs. Deterministic content is
+// rendered straight from the payload; the framing/observations/seed-topics are
+// Vita-generated. Goals, values and strengths expand for detail. It reads
 // identically whichever partner opens it. No completion state.
 
 type Obs = { text: string; sides?: { name: string; text: string }[]; clearest?: boolean };
 type Slot = "a" | "b";
 type PM = { name: string; cohort: string; planName: string; initial: string };
 type GoalDetail = {
+  area?: string;
   note?: string;
   cadence?: string;
   season?: string;
@@ -47,6 +48,8 @@ export type Payload = {
   talk: { seeds: string[]; user: { id: string; slot: Slot; body: string }[] };
 };
 
+type TabId = "meet" | "goals" | "matters" | "feelings" | "talk";
+
 const colourFor = (slot: Slot) =>
   slot === "a" ? "var(--partner-a)" : "var(--partner-b)";
 
@@ -60,6 +63,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [tab, setTab] = useState<TabId | null>(null);
 
   useEffect(() => {
     if (preview) return;
@@ -91,10 +95,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
     const body = draft.trim();
     if (!body || adding) return;
     if (preview) {
-      setUserTopics((prev) => [
-        ...prev,
-        { id: `local-${prev.length + 1}`, slot: "a", body },
-      ]);
+      setUserTopics((prev) => [...prev, { id: `local-${prev.length + 1}`, slot: "a", body }]);
       setDraft("");
       return;
     }
@@ -152,13 +153,17 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
   const { partners } = data;
   const hasTalk = data.talk.seeds.length > 0 || userTopics.length > 0;
 
-  const goalsHaveDetail =
-    data.goals.a.some((g) => g.detail) || data.goals.b.some((g) => g.detail);
-  const valuesHaveDetail =
-    data.values.a.some((v) => v.description) ||
-    data.values.b.some((v) => v.description);
-  const strengthsHaveDetail =
-    data.strengths.a.some((s) => s.note) || data.strengths.b.some((s) => s.note);
+  const tabs: { id: TabId; label: string }[] = [];
+  if (data.sharedGround.length || data.complementary.length || data.different.length)
+    tabs.push({ id: "meet", label: "Where you meet" });
+  if (data.goals.a.length || data.goals.b.length)
+    tabs.push({ id: "goals", label: "Goals" });
+  if (data.values.a.length || data.values.b.length || data.strengths.a.length || data.strengths.b.length || data.principles.length)
+    tabs.push({ id: "matters", label: "What matters" });
+  if (data.hopes.length || data.fears.length)
+    tabs.push({ id: "feelings", label: "Hopes & fears" });
+  tabs.push({ id: "talk", label: "Talk together" });
+  const active: TabId = tab ?? tabs[0]?.id ?? "talk";
 
   return (
     <main style={styles.page}>
@@ -184,7 +189,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
         ))}
       </div>
 
-      {/* Vita framing */}
+      {/* Vita framing — persistent above the tabs */}
       <div style={styles.vitaCard}>
         <span style={styles.vitaTag}>
           <VitaMark size={22} />
@@ -195,41 +200,56 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
         </p>
       </div>
 
-      {/* Shared ground */}
-      {data.sharedGround.length > 0 && (
-        <Section heading="Shared ground" subtitle="where your plans landed together" note="A good place to start — the things you both put near the top.">
-          {data.sharedGround.map((t, i) => (
-            <div key={i} style={{ ...styles.item, ...styles.itemShared }}>
-              <p style={styles.obs}>{t}</p>
-            </div>
-          ))}
-        </Section>
+      <div role="tablist" aria-label="Comparison sections" style={styles.tabBar}>
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={active === t.id}
+            onClick={() => setTab(t.id)}
+            style={{ ...styles.tab, ...(active === t.id ? styles.tabActive : null) }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* WHERE YOU MEET — the Vita synthesis */}
+      {active === "meet" && (
+        <div>
+          {data.sharedGround.length > 0 && (
+            <Section heading="Shared ground" subtitle="where your plans landed together" note="A good place to start — the things you both put near the top.">
+              {data.sharedGround.map((t, i) => (
+                <div key={i} style={{ ...styles.item, ...styles.itemShared }}>
+                  <p style={styles.obs}>{t}</p>
+                </div>
+              ))}
+            </Section>
+          )}
+          {data.complementary.length > 0 && (
+            <Section heading="Where you complement each other" note="Different choices that seem to fit together rather than pull apart.">
+              {data.complementary.map((o, i) => (
+                <Observation key={i} o={o} kind="comp" slotForName={slotForName} />
+              ))}
+            </Section>
+          )}
+          {data.different.length > 0 && (
+            <Section heading="Where your plans differ" note="Not problems — just places your two pictures don't line up. These are often the most useful things to talk about, and the conversation is usually less about the what than the why beneath it.">
+              {data.different.map((o, i) => (
+                <Observation key={i} o={o} kind="diff" slotForName={slotForName} />
+              ))}
+            </Section>
+          )}
+        </div>
       )}
 
-      {/* Complementary */}
-      {data.complementary.length > 0 && (
-        <Section heading="Where you complement each other" note="Different choices that seem to fit together rather than pull apart.">
-          {data.complementary.map((o, i) => (
-            <Observation key={i} o={o} kind="comp" slotForName={slotForName} />
-          ))}
-        </Section>
-      )}
-
-      {/* Different */}
-      {data.different.length > 0 && (
-        <Section heading="Where your plans differ" note="Not problems — just places your two pictures don't line up. These are often the most useful things to talk about, and the conversation is usually less about the what than the why beneath it.">
-          {data.different.map((o, i) => (
-            <Observation key={i} o={o} kind="diff" slotForName={slotForName} />
-          ))}
-        </Section>
-      )}
-
-      {/* Goals */}
-      {(data.goals.a.length > 0 || data.goals.b.length > 0) && (
+      {/* GOALS */}
+      {active === "goals" && (
         <Section
           heading="Goals — the full picture"
-          note="You've each taken time to work out the goals you want to pursue in retirement. The ones that stood out are above; here's the full picture — every goal each of you named, including those that are simply your own."
-          hint={goalsHaveDetail ? "Tap a goal to see more of what it means." : undefined}
+          note="Every goal each of you named, including those that are simply your own. The ones that stood out are marked."
+          hint="Tap a goal to see more of what it means."
         >
           <TwoColumns
             partners={partners}
@@ -252,158 +272,143 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
         </Section>
       )}
 
-      {/* Values */}
-      {(data.values.a.length > 0 || data.values.b.length > 0) && (
-        <Section
-          heading="What you each value most"
-          note="The values at the heart of each of your plans. Where you share one, it's marked."
-          hint={valuesHaveDetail ? "Tap a value to read what it means to each of you." : undefined}
-        >
-          <TwoColumns
-            partners={partners}
-            noun="values"
-            a={data.values.a}
-            b={data.values.b}
-            render={(e) => {
-              const v = e as ValueEntry;
-              return {
-                pills: (
-                  <>
-                    {v.nonNegotiable && <span style={styles.nnPill}>Won&rsquo;t compromise</span>}
-                    {v.both && <span style={styles.bothPill}>Both of you</span>}
-                  </>
-                ),
-                detail: v.description ? <p style={styles.exWhy}>{v.description}</p> : null,
-              };
-            }}
-          />
-        </Section>
-      )}
-
-      {/* Strengths */}
-      {(data.strengths.a.length > 0 || data.strengths.b.length > 0) && (
-        <Section
-          heading="What you each bring"
-          note="The strengths each of you leans on. Different strengths often cover for each other."
-          hint={strengthsHaveDetail ? "Tap a strength to see how it shows up." : undefined}
-        >
-          <TwoColumns
-            partners={partners}
-            noun="strengths"
-            a={data.strengths.a}
-            b={data.strengths.b}
-            render={(e) => {
-              const s = e as StrengthEntry;
-              return {
-                pills: s.both ? <span style={styles.bothPill}>Both of you</span> : null,
-                detail: s.note ? <p style={styles.exWhy}>{s.note}</p> : null,
-              };
-            }}
-          />
-        </Section>
-      )}
-
-      {/* Hopes */}
-      {data.hopes.length > 0 && (
-        <Section heading="What you're each hoping for" note="The hopes you each chose to share.">
-          <div style={styles.lines}>
-            {data.hopes.map((h, i) => (
-              <div key={i} style={styles.line}>
-                <Dot partners={partners} slot={h.slot} size={18} />
-                <span style={styles.lineText}>{h.text}</span>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Fears */}
-      {data.fears.length > 0 && (
-        <Section
-          heading="What you each fear"
-          note="The fears you each chose to share. Anything either of you kept private doesn't appear here."
-        >
-          <div style={styles.lines}>
-            {data.fears.map((f, i) => (
-              <div key={i} style={styles.line}>
-                <Dot partners={partners} slot={f.slot} size={18} />
-                <span style={styles.lineText}>{f.text}</span>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Principles */}
-      {data.principles.length > 0 && (
-        <Section
-          heading="How you each decide"
-          note="The principles you each lead with when things pull against each other."
-        >
-          <div style={styles.lines}>
-            {data.principles.map((p, i) => (
-              <div key={i} style={styles.line}>
-                <Dot partners={partners} slot={p.slot} size={18} />
-                <span style={styles.lineText}>{p.text}</span>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Worth talking about */}
-      <div style={styles.talk}>
-        <h2 style={styles.talkH3}>Worth talking about together</h2>
-        <p style={styles.talkIntro}>
-          These aren&rsquo;t problems to solve or decisions to reach. Most of it
-          won&rsquo;t line up neatly, and it doesn&rsquo;t need to — the point is to
-          hear each other. Start wherever you like, and add your own.
-        </p>
-
-        {hasTalk ? (
-          <>
-            {data.talk.seeds.map((t, i) => (
-              <div key={`s${i}`} style={styles.talkItem}>
-                <span style={styles.chk} aria-hidden="true" />
-                <span style={styles.talkText}>{t}</span>
-              </div>
-            ))}
-            {userTopics.map((t) => (
-              <div key={t.id} style={styles.talkItem}>
-                <span style={styles.chk} aria-hidden="true" />
-                <span style={styles.talkText}>{t.body}</span>
-              </div>
-            ))}
-          </>
-        ) : (
-          <p style={styles.talkEmpty}>
-            Nothing here stood out as needing its own conversation — it sounds like
-            the two of you are very well aligned. If that doesn&rsquo;t seem right,
-            it may be a glitch on our side:{" "}
-            <button type="button" style={styles.linkBtn} onClick={() => setReportOpen(true)}>
-              let us know
-            </button>
-            .
-          </p>
-        )}
-
-        <div style={styles.addRow}>
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addTopic();
-            }}
-            placeholder="Add something you'd like to talk about…"
-            aria-label="Add a topic to talk about"
-            style={styles.addInput}
-          />
-          <button type="button" style={styles.addBtn} onClick={addTopic} disabled={adding}>
-            Add
-          </button>
+      {/* WHAT MATTERS — values, strengths, principles */}
+      {active === "matters" && (
+        <div>
+          {(data.values.a.length > 0 || data.values.b.length > 0) && (
+            <Section
+              heading="What you each value most"
+              note="The values at the heart of each of your plans. Where you share one, it's marked."
+              hint="Tap a value to read what it means to each of you."
+            >
+              <TwoColumns
+                partners={partners}
+                noun="values"
+                accent
+                a={data.values.a}
+                b={data.values.b}
+                render={(e) => {
+                  const v = e as ValueEntry;
+                  return {
+                    pills: (
+                      <>
+                        {v.nonNegotiable && <span style={styles.nnPill}>Won&rsquo;t compromise</span>}
+                        {v.both && <span style={styles.bothPill}>Both of you</span>}
+                      </>
+                    ),
+                    detail: v.description ? <p style={styles.exWhy}>{v.description}</p> : null,
+                  };
+                }}
+              />
+            </Section>
+          )}
+          {(data.strengths.a.length > 0 || data.strengths.b.length > 0) && (
+            <Section
+              heading="What you each bring"
+              note="The strengths each of you leans on. Different strengths often cover for each other."
+              hint="Tap a strength to see how it shows up."
+            >
+              <TwoColumns
+                partners={partners}
+                noun="strengths"
+                accent
+                a={data.strengths.a}
+                b={data.strengths.b}
+                render={(e) => {
+                  const s = e as StrengthEntry;
+                  return {
+                    pills: s.both ? <span style={styles.bothPill}>Both of you</span> : null,
+                    detail: s.note ? <p style={styles.exWhy}>{s.note}</p> : null,
+                  };
+                }}
+              />
+            </Section>
+          )}
+          {data.principles.length > 0 && (
+            <Section heading="How you each decide" note="The principles you each lead with when things pull against each other.">
+              {data.principles.map((p, i) => (
+                <QuoteCard key={i} partners={partners} slot={p.slot} text={p.text} />
+              ))}
+            </Section>
+          )}
         </div>
-      </div>
+      )}
+
+      {/* HOPES & FEARS — a warmer, quote-led treatment */}
+      {active === "feelings" && (
+        <div>
+          {data.hopes.length > 0 && (
+            <Section heading="What you're each hoping for" note="The hopes you each chose to share.">
+              {data.hopes.map((h, i) => (
+                <QuoteCard key={i} partners={partners} slot={h.slot} text={h.text} />
+              ))}
+            </Section>
+          )}
+          {data.fears.length > 0 && (
+            <Section heading="What you each fear" note="The fears you each chose to share. Anything either of you kept private doesn't appear here.">
+              {data.fears.map((f, i) => (
+                <QuoteCard key={i} partners={partners} slot={f.slot} text={f.text} />
+              ))}
+            </Section>
+          )}
+        </div>
+      )}
+
+      {/* TALK TOGETHER */}
+      {active === "talk" && (
+        <div style={styles.talk}>
+          <h2 style={styles.talkH3}>Worth talking about together</h2>
+          <p style={styles.talkIntro}>
+            These aren&rsquo;t problems to solve or decisions to reach. Most of it
+            won&rsquo;t line up neatly, and it doesn&rsquo;t need to — the point is to
+            hear each other. Start wherever you like, and add your own.
+          </p>
+
+          {hasTalk ? (
+            <>
+              {data.talk.seeds.map((t, i) => (
+                <div key={`s${i}`} style={styles.talkItem}>
+                  <span style={styles.chk} aria-hidden="true" />
+                  <span style={styles.talkText}>{t}</span>
+                </div>
+              ))}
+              {userTopics.map((t) => (
+                <div key={t.id} style={styles.talkItem}>
+                  <span style={styles.chk} aria-hidden="true" />
+                  <span style={styles.talkText}>{t.body}</span>
+                </div>
+              ))}
+            </>
+          ) : (
+            <p style={styles.talkEmpty}>
+              Nothing here stood out as needing its own conversation — it sounds
+              like the two of you are very well aligned. If that doesn&rsquo;t seem
+              right, it may be a glitch on our side:{" "}
+              <button type="button" style={styles.linkBtn} onClick={() => setReportOpen(true)}>
+                let us know
+              </button>
+              .
+            </p>
+          )}
+
+          <div style={styles.addRow}>
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addTopic();
+              }}
+              placeholder="Add something you'd like to talk about…"
+              aria-label="Add a topic to talk about"
+              style={styles.addInput}
+            />
+            <button type="button" style={styles.addBtn} onClick={addTopic} disabled={adding}>
+              Add
+            </button>
+          </div>
+        </div>
+      )}
 
       <p style={styles.foot}>
         <b style={styles.footB}>Either of you can stop sharing at any time.</b> If
@@ -460,6 +465,28 @@ function Dot({
   );
 }
 
+// A warmer, serif quote card with a coloured left bar — used for hopes, fears
+// and principles so those read differently from the goal/value lists.
+function QuoteCard({
+  partners,
+  slot,
+  text,
+}: {
+  partners: Payload["partners"];
+  slot: Slot;
+  text: string;
+}) {
+  return (
+    <div style={{ ...styles.quote, borderLeftColor: colourFor(slot) }}>
+      <div style={styles.quoteWho}>
+        <Dot partners={partners} slot={slot} size={18} />
+        {partners[slot].name}
+      </div>
+      <p style={styles.quoteText}>{text}</p>
+    </div>
+  );
+}
+
 // A two-column dimension (goals / values / strengths), each item expandable.
 function TwoColumns({
   partners,
@@ -467,6 +494,7 @@ function TwoColumns({
   a,
   b,
   render,
+  accent = false,
 }: {
   partners: Payload["partners"];
   noun: string;
@@ -476,13 +504,20 @@ function TwoColumns({
     pills: ReactNode;
     detail: ReactNode | null;
   };
+  accent?: boolean;
 }) {
   return (
     <div style={styles.cols}>
       {(["a", "b"] as Slot[]).map((slot) => {
         const list = slot === "a" ? a : b;
         return (
-          <div key={slot} style={styles.col}>
+          <div
+            key={slot}
+            style={{
+              ...styles.col,
+              ...(accent ? { borderTop: `3px solid ${colourFor(slot)}` } : null),
+            }}
+          >
             <div style={styles.colHead}>
               <Dot partners={partners} slot={slot} size={20} />
               <b style={styles.colName}>
@@ -527,8 +562,7 @@ function Section({
   );
 }
 
-// A single expandable row (mirrors the RLP plan document's GoalCard). If there's
-// no detail, it renders as a plain, non-interactive row.
+// A single expandable row (mirrors the RLP plan document's GoalCard).
 function ExpandRow({
   label,
   pills,
@@ -566,6 +600,7 @@ function ExpandRow({
 function GoalDetailBody({ d }: { d: GoalDetail }) {
   return (
     <>
+      {d.area && <div style={styles.exArea}>{d.area}</div>}
       {d.note && <p style={styles.exWhy}>{d.note}</p>}
       {d.looksLike && (
         <p style={styles.exP}>
@@ -663,7 +698,7 @@ const styles: Record<string, CSSProperties> = {
     maxWidth: "60ch",
     margin: "0 0 22px",
   },
-  people: { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 34 },
+  people: { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 },
   person: {
     display: "flex",
     alignItems: "center",
@@ -693,7 +728,7 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid var(--warm-line)",
     borderRadius: "var(--r-lg)",
     padding: "24px 26px",
-    marginBottom: 34,
+    marginBottom: 22,
   },
   vitaTag: {
     display: "inline-flex",
@@ -711,7 +746,32 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
     color: "var(--ink)",
   },
-  bucket: { marginBottom: 32 },
+  // Tabs
+  tabBar: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    borderBottom: "1px solid var(--border)",
+    paddingBottom: 14,
+    marginBottom: 26,
+  },
+  tab: {
+    border: "1px solid var(--border-strong)",
+    background: "#fff",
+    color: "var(--text)",
+    borderRadius: "var(--r-pill)",
+    padding: "8px 16px",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "var(--font-sans)",
+  },
+  tabActive: {
+    background: "var(--brand-primary)",
+    color: "var(--brand-on-primary)",
+    borderColor: "var(--brand-primary)",
+  },
+  bucket: { marginBottom: 30 },
   bucketHead: {
     display: "flex",
     alignItems: "baseline",
@@ -836,17 +896,14 @@ const styles: Record<string, CSSProperties> = {
     color: "var(--text)",
   },
   exMeta: { display: "flex", alignItems: "center", gap: 8, flex: "none" },
-  exToggle: {
-    fontSize: 18,
-    color: "var(--text-faint)",
-    width: 14,
-    textAlign: "center",
-  },
-  exBody: {
-    padding: "0 12px 12px 12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
+  exToggle: { fontSize: 18, color: "var(--text-faint)", width: 14, textAlign: "center" },
+  exBody: { padding: "0 12px 12px 12px", display: "flex", flexDirection: "column", gap: 6 },
+  exArea: {
+    fontSize: "var(--fs-eyebrow)",
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
+    fontWeight: 700,
   },
   exWhy: {
     fontFamily: "var(--font-serif)",
@@ -891,20 +948,38 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     whiteSpace: "nowrap",
   },
-  lines: { display: "flex", flexDirection: "column", gap: 10 },
-  line: { display: "flex", gap: 11, alignItems: "flex-start" },
-  lineText: {
-    fontFamily: "var(--font-serif)",
-    fontSize: "var(--fs-body)",
-    lineHeight: 1.45,
+  // quote treatment (hopes / fears / principles)
+  quote: {
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderLeft: "3px solid var(--partner-a)",
+    borderRadius: "var(--r-md)",
+    padding: "14px 18px",
+    marginBottom: 10,
+    boxShadow: "var(--shadow-sm)",
+  },
+  quoteWho: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: "var(--fs-label)",
+    fontWeight: 600,
     color: "var(--text)",
+    marginBottom: 6,
+  },
+  quoteText: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-reading)",
+    lineHeight: 1.5,
+    color: "var(--ink)",
+    margin: 0,
   },
   talk: {
     background: "var(--warm-surface)",
     border: "1px solid var(--warm-line)",
     borderRadius: "var(--r-lg)",
     padding: "24px 26px",
-    margin: "20px 0 26px",
+    marginBottom: 26,
   },
   talkH3: {
     fontFamily: "var(--font-serif)",
@@ -991,6 +1066,7 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: "var(--lh-body)",
     borderTop: "1px solid var(--border)",
     paddingTop: 18,
+    marginTop: 8,
   },
   footB: { color: "var(--ink)", fontWeight: 600 },
   stopLink: {

@@ -82,25 +82,26 @@ const COMPARISON: Payload = {
   ],
   goals: {
     a: [
-      { label: "Time with the grandchildren", both: true },
-      { label: "Stay in this house", both: true },
+      { label: "Time with the grandchildren", both: true, detail: { area: "Family", note: "The reason for a lot of it — being there while they're small." } },
+      { label: "Stay in this house", both: true, detail: { area: "Our home", note: "This is home. I don't want to uproot to make retirement 'work'." } },
       {
         label: "Take painting seriously — not just a someday thing",
         both: false,
         detail: {
+          area: "Creativity",
           note: "It's been a someday thing for twenty years. I want to give it real time now.",
           looksLike: "A regular class, and a corner of the spare room set up as a studio.",
           cadence: "A couple of afternoons a week",
           season: "Early",
         },
       },
-      { label: "Get properly fit again — walking, swimming", both: false, detail: { cadence: "Most mornings", season: "Early" } },
+      { label: "Get properly fit again — walking, swimming", both: false, detail: { area: "Health", cadence: "Most mornings", season: "Early" } },
     ],
     b: [
-      { label: "Time with the grandchildren", both: true },
-      { label: "Stay in this house", both: true },
-      { label: "A big trip in the first year", both: false, detail: { note: "The thing I'm most looking forward to — somewhere far, while we're both well.", season: "Early" } },
-      { label: "Learn to cook properly and take over more of it", both: false },
+      { label: "Time with the grandchildren", both: true, detail: { area: "Family", note: "Now there's finally the time to actually be there." } },
+      { label: "Stay in this house", both: true, detail: { area: "Our home" } },
+      { label: "A big trip in the first year", both: false, detail: { area: "Travel & adventure", note: "The thing I'm most looking forward to — somewhere far, while we're both well.", season: "Early" } },
+      { label: "Learn to cook properly and take over more of it", both: false, detail: { area: "Our home", looksLike: "Actually planning the week's meals, not just reheating." } },
     ],
   },
   values: {
@@ -128,8 +129,11 @@ const COMPARISON: Payload = {
     { slot: "b", text: "More unhurried time together — not just busy time in the same house." },
   ],
   fears: [
-    { slot: "b", text: "That he'll lose his sense of purpose without work to structure his days." },
+    { slot: "a", text: "That you'll regret not leaving work sooner." },
+    { slot: "a", text: "That your health won't keep up with the plans you're making." },
     { slot: "a", text: "That the two of you want quite different things from these years, and drift." },
+    { slot: "b", text: "That he'll lose his sense of purpose without work to structure his days." },
+    { slot: "b", text: "That the money won't stretch as far as the plans do." },
   ],
   principles: [
     { slot: "a", text: "Family comes before ambition when the two pull against each other." },

@@ -36,6 +36,7 @@ export type PartnerMeta = {
 // Optional per-goal detail revealed in the expandable card. Only the fields the
 // member actually filled in are present.
 export type GoalDetail = {
+  area?: string;
   note?: string;
   cadence?: string;
   season?: string;
@@ -200,7 +201,10 @@ function buildShared(
   // Detail lookups, keyed by normalised label.
   const goalDetail = new Map<string, GoalDetail>();
   for (const g of balanced?.goals ?? []) {
+    // Area is always present, so every goal has at least that to reveal — the
+    // expand affordance is then consistent across all goals.
     const d: GoalDetail = {
+      ...(g.area?.trim() ? { area: g.area.trim() } : {}),
       ...(g.note ? { note: g.note } : {}),
       ...(g.cadence ? { cadence: g.cadence } : {}),
       ...(g.season ? { season: g.season } : {}),
@@ -248,7 +252,11 @@ function buildShared(
     name,
     cohort: cohortLabel(rs),
     planName: planNameFor(rs),
-    goals: goals.map((g) => g.label),
+    // Carry each goal's season into the generation input (not the deterministic
+    // view) so Vita can speak to timing without a dedicated seasons section.
+    goals: goals.map((g) =>
+      g.detail?.season ? `${g.label} (season: ${g.detail.season})` : g.label
+    ),
     values: values.map((v) => v.label),
     nonNegotiables: values.filter((v) => v.nonNegotiable).map((v) => v.label),
     strengths: strengths.map((s) => s.label),
