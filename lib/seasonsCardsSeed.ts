@@ -66,8 +66,11 @@ export function coerceCuratedCards(raw: unknown): SeasonsCardsSeed | null {
   for (const c of arr) {
     if (!c || typeof c !== "object") continue;
     const o = c as Record<string, unknown>;
-    const label = typeof o.label === "string" ? o.label.trim() : "";
-    if (!label) continue;
+    const raw = typeof o.label === "string" ? o.label.trim() : "";
+    if (!raw) continue;
+    // Sentence-case: a card sometimes echoes a lower-case source label, which
+    // reads as messy on the board. First letter only; the rest is left as-is.
+    const label = raw.charAt(0).toUpperCase() + raw.slice(1);
     const key = label.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

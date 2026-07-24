@@ -1,0 +1,502 @@
+# RLP Companion — Data-Processing Inventory
+
+**Scope:** the `rlp-companion` Next.js app (Phase 1 pilot prototype).
+**Date:** 2026-07-14. **Method:** static inspection of the codebase at `main`. No code was changed.
+
+**Important caveat on scope.** This describes what the *code* does. Contractual terms (DPAs, training
+and retention commitments, sub-processor lists) and dashboard-side settings for Clerk, Neon, Vercel,
+Anthropic, OpenAI and Resend are not in the repository and cannot be established from it. Everything
+of that kind is listed under *Unknowns* at the end rather than guessed at.
+
+---
+
+## 1. Personal data stored per user
+
+All application data lives in **Neon Postgres** (region `eu-west-2`, London). There are four tables,
+all created lazily in-process via `CREATE TABLE IF NOT EXISTS` — there are no migration files.
+
+| Table | Columns | Holds |
+|---|---|---|
+| `user_data` | `user_id`, `key`, `value jsonb`, `updated_at` — PK `(user_id, key)` | The main key/value store: transcripts, answers, plan, images |
+| `context_facts` | `id`, `user_id`, `category`, `domain`, `data jsonb`, `provenance_module`, `provenance_source`, `status`, `superseded_by`, `confidence`, `created_at`, `last_affirmed_at` | The structured, typed user model |
+| `feedback` | `id`, `user_id`, `message`, `reply_email`, `page`, `type`, `created_at` | Free-text tester feedback / support requests |
+| `module_feedback` | `id`, `user_id`, `module_id`, `useful`, `engaging`, `comment`, `created_at` | Per-module ratings + optional note |
+
+Defined in [lib/db.ts](lib/db.ts). `user_id` is always the Clerk user id, and is always taken from the
+authenticated session server-side, never from client input.
+
+### Category by category
+
+**Account identity — stored at Clerk, not in Neon.**
+Email address and name live in Clerk. The app reads them via `currentUser()` / `auth()` and stores only
+the opaque Clerk `user_id` as the foreign key in every table. The app does not write anything into Clerk
+metadata. One consequence worth noting: the app itself holds no name/email mapping, which is why the
+admin portal can only display truncated user ids.
+
+**Preferred name — `user_data` key `preferred-name`.**
+This is the name the user asks to be called. It is not merely stored: it is injected into *every* Vita
+conversation turn by `buildOnboardingContext()` ([lib/userData.tsx:719](lib/userData.tsx#L719)), which
+sends Anthropic the line *"Their preferred name — the only name you should ever call them — is …"*.
+It therefore leaves the system on every chat request, and sits in Anthropic's prompt cache for up to an
+hour (§2).
+
+**Age / date of birth — `user_data` key `onboarding`, field `dob`.**
+An optional ISO `YYYY-MM-DD` date of birth is captured at onboarding
+([lib/userData.tsx:84](lib/userData.tsx#L84)). It is optional and degrades gracefully — users who skip it,
+and everyone onboarded before it existed, have none. Its one purpose is computing real age at read time to
+gate the module 2.6 hearing-check recommendation at 50+
+([lib/modules.ts:1020](lib/modules.ts#L1020)). Where DOB is absent the code falls back to the coarser
+retirement-horizon band. This is the app's only true special-category-adjacent identifier and is worth
+flagging: a precise DOB is materially more identifying than the horizon band it backstops.
+
+Alongside `dob`, the same `onboarding` record holds `partner` (partnered or not), `horizon`
+(retirement-horizon band), `motivation`, `tone` (how the user wants Vita to speak), and `retirementStage`
+(`working` / `winding_down` / `recently_retired` / `established`, captured only when the
+`RETIREMENT_PATHS` flag is on).
+
+**Full conversation transcripts — `user_data` key `conversation:{moduleId}`.**
+The complete verbatim back-and-forth with Vita, one row per module, stored as JSON
+`{role, text}[]`. The "Your first year" editing chat is stored separately as
+`first-year-chat-v1:{id}`. These are the most sensitive records in the system — free-text, unstructured,
+and unbounded in what a user might disclose.
+
+**The structured user model — `context_facts` rows, plus `user_data` keys.**
+Values, strengths, roles, goals, dreams, recurring activities and confidence levels. This is stored in
+two places, which matters for erasure:
+- `context_facts` — the canonical typed profile, each row carrying `data jsonb` (label, plus verbatim
+  `reason`/`quote` text), provenance, `status` and a `confidence` of `still_forming` or `certain`.
+- `user_data` — the raw widget state and prose: `interaction:{id}`, `takeaway:{id}`, `stage3-values`,
+  `dreams:{id}`, `commitment:{id}`, the stage reveals (`stage1-reveal`, `stage2-reveal`, `stage3-reveal`),
+  and the various `seed:` / `goal-seed-v2:` / `week-shape-v2:` / `first-year-v1:` drafts.
+
+**Generated RLP document — `user_data` keys `plan-prose-v5`, `plan-self-intro-v2`.**
+The AI-generated plan opening and chapter titles, plus the user's own edits to those drafts.
+
+**Generated images — `user_data` key `plan-images-v4`.**
+Generated by OpenAI and stored **as base64 data URLs inside the Neon `jsonb` column**, not as external
+URLs and not in blob storage ([lib/userData.tsx:1031](lib/userData.tsx#L1031)). This is deliberate and
+documented in the route, but it means the images are inside the primary database and the plan-PDF path
+POSTs them back to the server again.
+
+**Uploaded photos — none. No upload path exists anywhere in the app.**
+I checked specifically: no file inputs, no multipart or `FormData` handling, no blob/S3/Cloudinary SDK,
+no camera API. All imagery is machine-generated. (The two `createObjectURL` calls are downloads, not
+uploads.) If an inventory elsewhere claims user photo uploads, that claim is wrong for this codebase.
+
+**Health-related inputs — present, and more extensive than the label "hearing check" suggests.**
+
+| Input | Module | Notes |
+|---|---|---|
+| Hearing-check recency, eye-test recency | 2.6 (Senses) | Age-gated recommendation at 50+ |
+| Sleep, eating, energy, recovery self-ratings | 2.5 | Slider self-reports |
+| "Health" readiness rating | 4.1 | Self-rated |
+| Fears | 3.5 | Free text; forwarded to Anthropic in `stage3-reveal` and `stage3-seed` |
+
+Each of these is written **twice** — once as widget state to `user_data` `interaction:{id}`, and again as
+a typed row in `context_facts`. Both locations must be accounted for in any erasure or subject-access
+response.
+
+**"Intrinsic capacity" is not captured.** The phrase appears exactly once, in a code comment at
+[lib/modules.ts:1668](lib/modules.ts#L1668), as the WHO framing behind some placeholder Stage 2 intro copy.
+There is no instrument and no stored field. The health data that *does* exist is the table above.
+
+**Behavioural / analytics events — Vercel.**
+`<Analytics />` and `<SpeedInsights />` are mounted unconditionally in the root layout
+([app/layout.tsx:52-53](app/layout.tsx#L52)), outside `<ClerkProvider>`, so they fire on every page
+including authenticated ones. There is no custom event tracking. Page views, referrer, device/OS/browser
+and IP-derived country go to Vercel; Speed Insights sends Core Web Vitals per route. Neither receives
+prompts or answers — **but the URL path is itself behavioural data**, and paths like `/session/[id]`
+reveal which module a member is working through and when.
+
+**Residual client-side data — legacy `localStorage`.**
+The app no longer writes to `localStorage` (there is no `setItem` anywhere). But the migration loop at
+[lib/userData.tsx:222](lib/userData.tsx#L222) reads legacy `rlp_*` keys, copies them to Postgres, and
+**never clears them**. Any tester from the pre-Postgres build still has their onboarding answers,
+conversations and takeaways sitting in their browser indefinitely, with no code path — including
+"Start over" — that removes them.
+
+> **Bounding caveat.** `POST /api/user-data` accepts arbitrary keys with no server-side allowlist
+> ([app/api/user-data/route.ts:44](app/api/user-data/route.ts#L44)). The key enumeration above describes
+> what the current client writes; it is not a server-enforced bound.
+
+---
+
+## 2. Sub-processors and regions
+
+| Provider | Data sent | Region | Retention | Training |
+|---|---|---|---|---|
+| **Clerk** | Email, name, auth session | Not set in code — **unknown** | Holds identity record | n/a |
+| **Neon** | Everything in §1 | **`eu-west-2`** (London) — from `DATABASE_URL` host | Indefinite (no TTL) | n/a |
+| **Vercel** | Function execution; analytics page views, geo, device | Functions **`lhr1`** (London); analytics processed globally | Dashboard-side — **unknown** | n/a |
+| **Anthropic** | Transcripts, preferred name, values, fears, goals | **Default global endpoint — not pinned** | Prompt cache ≤1h on `/api/chat` | **Contract-dependent — not in code** |
+| **OpenAI** | The member's free-text goal label | **Default global endpoint — not pinned** | Default ~30d abuse retention unless ZDR | **Contract-dependent — not in code** |
+| **Resend** | Feedback text, reply email, user id, page | Not configured | Held in a personal inbox | n/a |
+| **Google (YouTube)** | IP, user-agent, referrer — see below | Global | Google-side | n/a |
+
+### Anthropic (Claude API)
+
+Eighteen API routes call the SDK. The client is constructed per route with only
+`apiKey: process.env.ANTHROPIC_API_KEY` — **no `baseURL` override, no Bedrock, no Vertex, no region
+env var anywhere**. All Claude traffic therefore goes to the default global `api.anthropic.com`
+endpoint. This is the single most significant regional finding: **the rest of the stack is pinned to
+London, but the route carrying the richest personal data — full transcripts — is not regionally
+pinned at all.**
+
+What reaches Anthropic, by route:
+
+| Route | Model | Personal data in the prompt |
+|---|---|---|
+| `/api/chat` | `COACH_MODEL` | Full transcript + onboarding context + **preferred name** + prior reflections |
+| `/api/takeaway` | `SONNET_MODEL` | Transcript; also extracts context-fact deltas |
+| `/api/plan-intro` | `claude-sonnet-4-6` | **Name**, partner status, retirement stage, core values |
+| `/api/stage2-reveal` | `HAIKU_MODEL` | **Name**, life areas |
+| `/api/stage3-reveal` | `HAIKU_MODEL` | **Name**, strengths, values, **fears**, meaning passage |
+| `/api/stage3-seed` | `HAIKU_MODEL` | Stage answers, including named **fears** |
+| `/api/dreams` | `HAIKU_MODEL` | Transcript |
+| `/api/letter-review`, `/api/letter-suggestions` | `HAIKU_MODEL` | Letter body, recipient label, prior reflections |
+| `/api/stage-reveal`, `/api/stage3-values` | `HAIKU_MODEL` | Stage answers |
+| `/api/goal-paths`, `/api/trade-offs`, `/api/first-year`(+`/chat`), `/api/balanced-goals`, `/api/week-shape`, `/api/plan-self-intro` | `claude-sonnet-4-6` | Goals, week shape, onboarding context |
+
+**Prompt caching.** `/api/chat` sets `cache_control: {type: "ephemeral"}` with `ttl: "1h"` on the first
+block ([app/api/chat/route.ts:56](app/api/chat/route.ts#L56)) and the 5-minute default on the second.
+The first block contains the onboarding context **including the preferred name**, so name and context
+persist in Anthropic's cache for up to an hour. No other route uses caching.
+
+> Aside, not a privacy issue but relevant to trusting the table above: `lib/models.ts` documents itself
+> as the single control point for model routing, and isn't. `SONNET_MODEL` has exactly one importer;
+> nine other call sites hardcode `"claude-sonnet-4-6"`. The routing has ten sources of truth, not one.
+
+### OpenAI (images)
+
+Called by raw `fetch` — there is no `openai` package — at
+[app/api/plan-image/route.ts:27](app/api/plan-image/route.ts#L27) →
+`https://api.openai.com/v1/images/generations`. Model `gpt-image-1`, falling back automatically to
+`dall-e-3`.
+
+**Personal data does reach OpenAI**, though narrowly. The prompt is a fixed art-direction string plus a
+variable built at [lib/rlpPlan.ts:661](lib/rlpPlan.ts#L661): *"A simple, gently abstract scene that clearly
+evokes this: `${topGoal.label}`"* — and `label` is the member's own free-text goal. No name and no
+transcript are sent. The response comes back as base64 and is stored in Neon (§1). No region is configured.
+
+### Neon
+
+Region **`eu-west-2`** (London), confirmed from both the pooled and unpooled `DATABASE_URL` hostnames
+(`…eu-west-2.aws.neon.tech`). The app uses the pooled connection, which suits Vercel's serverless runtime.
+
+### Vercel
+
+`vercel.json` pins `{"regions": ["lhr1"]}` — **this governs serverless function execution region only**
+(London). It has no effect on where Anthropic or OpenAI process data. Analytics and Speed Insights are
+processed by Vercel globally regardless.
+
+### Clerk
+
+`.env.local` holds `pk_test_` / `sk_test_` keys — i.e. **the local dev environment points at a Clerk
+development instance**. Production environment variables live in Vercel project settings and are not in
+the repo, so the production instance type cannot be confirmed from code (deployment notes indicate
+production runs a Clerk production instance on the `app.chorus-life.com` custom domain, but that is not
+verifiable here). No region configuration is expressible in this codebase; Clerk's data region is an
+instance-level dashboard setting.
+
+Housekeeping note: `.clerk/.tmp/keyless.json` exists on disk with `publishableKey` / `secretKey` — a
+leftover Clerk keyless-mode credential file. It is gitignored, so it is not in version control, but it is
+an unclaimed dev instance credential sitting on a developer machine.
+
+### Resend
+
+[lib/email.ts:71](lib/email.ts#L71) POSTs to `api.resend.com/emails`, called only from
+[app/api/feedback/route.ts:41](app/api/feedback/route.ts#L41). It sends the member's free-text feedback,
+the page path, their **Clerk user id**, and their **reply email** if supplied. Recipient is
+`FEEDBACK_TO_EMAIL` or the default `elsa@chorus-life.com` — and `FEEDBACK_TO_EMAIL` is not set in
+`.env.local`, so the default is live. The `from` address defaults to `onboarding@resend.dev`, Resend's
+shared sender, meaning no verified domain. Per-module feedback deliberately does **not** email.
+
+### Google / YouTube — an unlisted processor
+
+[app/components/SessionContainer.tsx:1792](app/components/SessionContainer.tsx#L1792) renders an
+`<iframe>` built by `youtubeEmbedUrl()` pointing at `https://www.youtube.com/embed/{id}` — **not** the
+`youtube-nocookie.com` privacy-enhanced domain. When that module loads, the member's browser hands Google
+their IP, user-agent and referrer, and Google may set cookies. This is a third-party processor on an
+authenticated page that no consent flow covers. It is a one-line change to `youtube-nocookie.com`.
+
+Google Fonts, by contrast, is **not** a runtime processor: `next/font/google` self-hosts the font files at
+build time, so there is no per-visit request to Google.
+
+---
+
+## 3. Human access
+
+### What is built
+
+**An admin can view feedback submissions only. There is no UI, route, or query anywhere that exposes
+conversation transcripts or the structured user model to a team member.**
+
+This is the central finding of this section, and it holds up under scrutiny. `/admin/feedback` fetches
+exactly two things — `getAllFeedback()` and `getAllModuleFeedback()` — both reading only the `feedback`
+and `module_feedback` tables. Transcripts live in `user_data` and the user model in `context_facts`.
+The only cross-user reader for `user_data` is `getAllUserData()`, whose sole caller is
+`/api/user-data`, which derives the id from the session and never from client input.
+
+| Page | Shows |
+|---|---|
+| `/admin/feedback` | The only data-bearing admin page — ratings, free-text notes, reply emails |
+| `/admin/no-access` | Explainer for signed-in non-admins; no member data |
+
+**The gate is enforced server-side, twice.** `proxy.ts` (Next 16's renamed middleware) requires auth on
+everything except `/`, `/sign-in`, `/sign-up` and `/robots.txt`; then the page itself re-checks `userId`
+and calls `getAdminUser()`, redirecting to `/admin/no-access` if null. Both checks run in an async Server
+Component **before** any query, so data is never fetched for a non-admin. `lib/admin.ts` is `server-only`.
+
+**Who can access:** an `ADMIN_EMAILS` allowlist (comma-separated env var), falling back in code to
+`elsa@`, `sarah@` and `john@chorus-life.com`.
+
+**Identifiers shown:** truncated `user_id` (last 6 chars), with the full id in a tooltip and in CSV
+export. No emails or names — the app doesn't hold them. The one exception is `reply_email` on the
+general-feedback tab, which is self-supplied and only present when a tester asked for a reply.
+
+**Debug routes** (`/api/debug/context-profile`, `/api/debug/resolver-report`) are safe on all three axes:
+404 in production via `NODE_ENV` guards, 401 without a session, and scoped to the caller's own data
+(`resolver-report` reads only a hardcoded fictional member).
+
+### The access path that isn't gated
+
+**Anyone holding the `DATABASE_URL` can read every transcript and every fact directly, entirely outside
+the `ADMIN_EMAILS` allowlist.** The admin gate constrains the app's UI, not the database. `.env.local`
+exists at the repo root, so that credential is on at least one developer machine. Who holds it in
+Neon/Vercel is an organisational question the code cannot answer.
+
+Second uncontrolled channel: every general-feedback submission is emailed to a personal inbox
+(`elsa@chorus-life.com`) with the message, user id, page and reply email. User-initiated, but a human-access
+path that leaves the system.
+
+### Consent model — current state
+
+**There is no consent gate of any kind. Nothing in this category is built.** Searching the entire
+codebase for `consent|opt-in|privacy|terms|gdpr|agree|debrief|analytics`:
+
+| Item | Status |
+|---|---|
+| Analytics consent toggle / cookie banner | **Not built** — analytics is on by default for every user, unconditional, no opt-out |
+| Transcript-review opt-in | **Not built** — no checkbox, setting, DB column, or route |
+| Debrief | **Not built** — the concept is absent entirely |
+| Privacy policy / terms in-app | **Not built** — only an external link to `chorus-life.com/privacy.html` |
+| Onboarding consent | **Not built** — see below |
+
+The single checkbox in onboarding ([app/onboarding/page.tsx:357](app/onboarding/page.tsx#L357)) is an **AI
+disclaimer**, not data consent: *"I understand Vita is an AI coach, not a human, and doesn't give financial,
+legal or medical advice."* It gates the Get-started button. Note that `findings/mobile-audit.md` refers to
+it as "the consent checkbox" — that label is inaccurate; it consents to nothing.
+
+**The gap that needs attention.** `app/components/HowItWorks.tsx` makes three specific promises to users
+that no implementation backs:
+
+- *"No one on the Chorus Life team can read it, and it is never used to train Vita or any other AI."* (line 313)
+- *"When you finish, you'll be offered the option to share your responses with us to help improve Chorus.
+  Only if you say yes can our team see them."* (line 319)
+- *"Not unless you choose to let us… When you finish, you'll be offered the option to share them."* (FAQ, line 85)
+
+Grepping for any implementation of that end-of-journey opt-in (`shareResponses`, `share_responses`,
+`shareConsent`, the copy strings themselves) returns **only the copy**. No component, no route, no DB
+column, no `user_data` key. **The promised "you'll be offered the option" moment is never offered.** The
+codebase author appears aware — `HowItWorks.tsx` carries the comment *"data/consent sign-off pending"* at
+two places.
+
+Two of the three promises are, in fairness, currently true of the built app: no admin UI reads transcripts,
+and nothing in the code sends data for training. But the first is an access-control claim that holds only
+for the app surface, while the data sits in plaintext-readable Neon rows reachable by connection string;
+and the training claim depends on contractual terms not visible here (§2).
+
+**The headline: the built system is more privacy-protective than the consent model, because there is no
+consent model.** No human-access UI to transcripts exists — but the app tells users they will be asked
+before anyone reads their responses, and that ask is never made, while analytics runs on every user
+without a gate.
+
+---
+
+## 4. Cookies and tokens
+
+**The app sets zero cookies of its own.** Grepping `cookies()`, `document.cookie` and `Set-Cookie` across
+`app/`, `lib/` and `proxy.ts` returns no hits. All cookie behaviour belongs to Clerk.
+
+**Clerk** (`@clerk/nextjs` v7.4.2), mounted via `<ClerkProvider>` and `clerkMiddleware`. Cookie names are
+internal to the SDK, not in this source. For v7 the documented set is `__session` (the session JWT),
+`__client_uat` (a client-readable "updated at" signal) and `__clerk_db_jwt` (dev-instance handshake).
+These are strictly-necessary authentication cookies. **Flagging moderate uncertainty on the exact names
+and attributes for this patch version** — for a compliance artefact this should be confirmed against
+Clerk's own documentation rather than taken from here.
+
+**Vercel Analytics / Speed Insights** are mounted as the client components and are cookieless by design
+(Vercel markets Web Analytics as no-cookie). The only `cookie` reference in either package is in the
+server-side `track()` helper, which this app does not use. They still transmit page views and vitals with
+IP-derived geo, so Vercel is a processor even without a cookie.
+
+**localStorage:** still read, never written — see the residual-data note in §1. `ResetControls.tsx`'s
+comment claiming it wipes localStorage is stale; it calls the DB-backed reset. CLAUDE.md's "Data
+conventions (localStorage)" section likewise describes a layer that no longer writes.
+
+---
+
+## 5. Retention and deletion
+
+**There is no retention or TTL logic anywhere, and the deletion flow does not cascade.**
+
+### The deletion flow
+
+`deleteAllUserData(userId)` ([lib/db.ts:109](lib/db.ts#L109)) is exactly one statement:
+
+```sql
+DELETE FROM user_data WHERE user_id = ${userId}
+```
+
+Its only caller is `DELETE /api/user-data` with `{all: true}`. The UI entry points are a "Start over" link
+in `HomeDashboard.tsx` and `MobileAppBar.tsx`, behind a `window.confirm` reading *"This clears all your
+answers and conversations. Start over?"*
+
+| Data | Deleted by "Start over"? |
+|---|---|
+| `user_data` | **Yes** — the only thing it touches |
+| `context_facts` | **No** — the AI-extracted profile survives entirely |
+| `feedback` | **No** |
+| `module_feedback` | **No** |
+| Clerk account | **No** |
+| Anthropic / OpenAI / Resend | **No** |
+| Legacy `localStorage` | **No** |
+
+**The `context_facts` gap is the serious one.** That table holds the canonical inferred profile — values,
+dreams, recurring activities, each with verbatim reasons and quotes. "Start over" wipes the user's
+conversations and answers but leaves this profile fully `active`. Beyond the compliance point there is a
+functional consequence: because the reset also clears the backfill state in `user_data`, a user who resets
+and re-runs the programme has their fresh picks reconciled *against* stale facts from the previous run
+(`activeFacts` is scoped by `provenanceModule`, not by run). **The user-facing promise "This clears all
+your answers and conversations" is not accurate.**
+
+There is also no soft-delete or anonymisation: `rejectFact` / `supersedeFact` only flip a `status`
+column — the row, its label and its verbatim quote text remain in the table permanently.
+
+**No account-deletion flow exists.** `clerkClient` is never imported anywhere in `app/` or `lib/`. There
+is no way, within the app, to delete a Clerk user. Grep hits for `deleteUser` are coincidental substring
+matches on `deleteUserData`.
+
+### Retention
+
+**Zero.** `vercel.json` contains no `crons` key. There is no scheduled function, no purge job, no TTL
+column, no aging logic. Every `ttl`/`expire` hit in the codebase is the Anthropic *prompt-cache* TTL
+(`/api/chat`), which is unrelated to retention. **Nothing is ever deleted by the system; data is retained
+indefinitely by default.**
+
+All four tables carry timestamps, and **nothing acts on any of them**: `user_data.updated_at` is written
+on upsert and never read back (it isn't even selected by `getAllUserData`); `context_facts.created_at` /
+`last_affirmed_at` are surfaced to the client but no expiry reads them; `feedback.created_at` and
+`module_feedback.created_at` are used only for `ORDER BY` in the admin portal.
+
+Nothing in the codebase deletes anything at any sub-processor.
+
+---
+
+## 6. Automated decisions
+
+**No decision here has legal or significant effect — confirmed.** Nothing determines access to money,
+credit, insurance, employment or a service. There is no scoring, no percentile, no ranking of the user,
+and no eligibility gate. The adjacent surfaces are deliberately fenced: `/api/trade-offs` takes a
+finance-confidence signal as *input* but outputs discussion scenarios, never advice; `/api/plan-intro`
+"must draw only on what it's given… and invent nothing". `module_feedback` ratings are the user rating the
+product, not the reverse.
+
+The "AI interprets, user confirms" principle holds across most surfaces — **but it breaks in two specific
+places.**
+
+### Where it holds
+
+All the Stage 3/4 seeds — `balanced-goals`, `goal-paths`, `trade-offs`, `week-shape`, `first-year`,
+`stage3-seed` — follow one pattern: Claude drafts, the draft populates an editable widget, and the *user's*
+curated result is what gets saved. Facts derived from these carry provenance `widget_pick`, i.e. they
+descend from confirmed picks. `letter-suggestions` seeds a fragment the person rewrites; `letter-review`
+returns an acknowledgement, not a decision; `dreams` is reconciled with provenance `confirmed_takeaway`.
+
+### Gap 1 — `/api/takeaway` writes AI-inferred facts silently
+
+This is the significant one, and the code is explicit about it
+([app/components/SessionContainer.tsx:1063](app/components/SessionContainer.tsx#L1063)):
+
+> "additions land immediately; removals are applied only where the person confirmed the change in chat"
+
+The asymmetry is real. In `planConversationalApply` ([lib/contextFacts.ts:1018](lib/contextFacts.ts#L1018)):
+
+- **Additions** — every delta becomes a `DraftFact` and is written immediately. The only filter is a
+  dedupe against already-active facts. No confirmation gate, no grounding check, no quote requirement.
+- **Removals** — gated twice. They require `userConfirmedInChat === true`, *and* `filterGroundedRemovals`
+  demands a verbatim member quote actually present in the transcript. Otherwise they become a
+  `PendingRemoval` with a real confirmation UI (*"One quick check — did you want to change this?"* /
+  *"Drop this?"* → "Yes, drop it" / "No, keep it").
+
+So removals get two safeguards and a confirmation prompt; **additions get none**. The stated rationale is
+that a false removal "erodes trust in the very feature meant to build it", while a missed removal is fine
+because "the member can always re-edit via the widget" — **but conversationally-added facts have no widget
+to re-edit.** They are created with `provenanceSource: "conversational_statement"`, and
+`reconcileModuleFacts` deliberately scopes to one provenance source so widget reconciles "never disturb
+conversational facts". No user-facing surface lists, edits, or deletes them: every `getActiveFacts`
+consumer feeds prompts rather than displaying a reviewable list, and the only inspection route is 404'd in
+production.
+
+Net effect: **Claude infers facts about the user from free conversation, writes them without asking, the
+user cannot see or remove them, they persist through "Start over" (§5), and they feed every later prompt
+and ultimately the plan.** Facts default to `still_forming` confidence, which is a real mitigation, but it
+does not gate the write.
+
+### Gap 2 — the archetype is an unconfirmed AI classification
+
+`/api/stage-reveal` returns an `archetypeId`, `secondaryId` and `whyYou`. `ImagineReveal.tsx` sets it and
+**auto-persists it** with no accept step, then renders it as a verdict — a named type ("The Unhurried
+Builder", "The Adventurer") with a crown motif. **There is no confirm, reject, or change control**; the
+only CTA is "Continue to Stage {n}". The user cannot say "that's not me."
+
+The mitigations are real and clearly deliberate — `lib/archetypes.ts` insists it is "a confident read…
+never a ranking", `company` is framed as "belonging, not ranking. No percentiles", and Stage 2 has no
+archetype at all. So it is classification without scoring. It remains a profile label that is AI-assigned,
+persisted, displayed as fact, and unconfirmable.
+
+### Worth logging
+
+The plan prose (`/api/plan-intro`) is AI-written and rendered without an accept step. The underlying facts
+were user-curated, so this is synthesis-without-confirmation rather than inference-without-confirmation —
+a lesser concern, but it belongs in the record.
+
+---
+
+## Unknowns / needs confirming
+
+**Contractual and dashboard-side — not answerable from code:**
+
+1. **Anthropic training and retention terms.** Whether the API account's content is excluded from training,
+   and what the retention period is. Not visible in the repo. (Standard commercial API terms do not train on
+   inputs, but the account's actual configuration needs confirming.)
+2. **OpenAI training and retention terms.** In particular whether the account has a zero-data-retention
+   agreement. By default OpenAI retains image-generation inputs for ~30 days for abuse monitoring.
+3. **Where Anthropic and OpenAI physically process the data.** No region is pinned in code, so it is
+   whatever the global endpoint routes to. Only the contract answers this.
+4. **Clerk's data region** — an instance-level dashboard setting, not expressible in this codebase.
+5. **Vercel Analytics retention and IP handling** — dashboard-side.
+6. **DPAs / sub-processor agreements** with all six providers.
+
+**Environment and deployment:**
+
+7. **Production environment variables.** `.env.local` is the dev set. Production values live in Vercel
+   project settings and are not in the repo. Specifically unconfirmed: whether production Clerk is
+   `pk_live_`, whether the production `DATABASE_URL` is also `eu-west-2`, and whether `FEEDBACK_TO_EMAIL`
+   or `ADMIN_EMAILS` are overridden in production.
+8. **Who holds the `DATABASE_URL` in Neon/Vercel**, and whether direct DB access is audited. This is the
+   real bound on human access to transcripts (§3), and the code cannot answer it.
+9. **Whether the published privacy policy** at `chorus-life.com/privacy.html` names these sub-processors —
+   it is not in this repo.
+
+**Product decisions needing a human answer:**
+
+10. **The `context_facts` deletion gap** (§5) — is leaving the inferred profile behind after "Start over"
+    intended? The user-facing copy says otherwise.
+11. **The unimplemented share-consent promise** (§3) — the app promises an end-of-journey opt-in that does
+    not exist. Either the mechanism or the copy needs to change before the pilot relies on it.
+12. **Silent conversational fact additions** (§6) — intended, or an oversight in an otherwise careful
+    confirm-first design?
+13. **Legacy `localStorage`** on pre-Postgres testers' browsers (§1) — never cleared; no code path removes it.
+14. **Exact Clerk cookie names/attributes** for v7.4.2 (§4) — confirm against Clerk's docs before relying
+    on the list here.
