@@ -7,13 +7,13 @@ import type {
 } from "@/lib/modules";
 import type { BalancedSeed } from "@/lib/userModel";
 import {
-  FALLBACK_BALANCED_GOALS,
   fetchBalancedGoalsDraft,
   type GoalSuggestion,
   type GoalVariant,
 } from "@/lib/balancedGoalsSeed";
 import { useUserData } from "@/lib/userData";
 import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
+import { DraftFailed } from "./DraftFailed";
 
 // A goal is carried at up to three sizes; the person steps between them without
 // losing any. Each is a complete phrasing with its own rough timing (cadence).
@@ -120,7 +120,7 @@ export default function BalancedGoals({
   // Editing reopens straight onto the goals from the saved result; a fresh run uses
   // any cached draft, or fetches one (the "loading" phase).
   const cachedSeed = initial ? null : userData.getGoalSeed(sessionId);
-  const [phase, setPhase] = useState<"loading" | "curate">(
+  const [phase, setPhase] = useState<"loading" | "curate" | "failed">(
     initial || cachedSeed ? "curate" : "loading"
   );
 
@@ -159,8 +159,13 @@ export default function BalancedGoals({
           springboards: [],
         }));
       if (cancelled) return;
-      if (draft && !cached) void userData.saveGoalSeed(sessionId, draft);
-      setGoals(mapSuggestions((draft ?? FALLBACK_BALANCED_GOALS).suggestions));
+      if (!draft) {
+        // Generation genuinely failed — show an honest retry, never fabricated goals.
+        setPhase("failed");
+        return;
+      }
+      if (!cached) void userData.saveGoalSeed(sessionId, draft);
+      setGoals(mapSuggestions(draft.suggestions));
       setPhase("curate");
     })();
     return () => {
@@ -255,6 +260,21 @@ export default function BalancedGoals({
           </span>
           <p style={styles.draftText}>{draftingLabel}</p>
         </div>
+      </section>
+    );
+  }
+
+  if (phase === "failed") {
+    return (
+      <section style={styles.wrap}>
+        <style>{balCss}</style>
+        <DraftFailed
+          message="We couldn't draft your goals just now. Your answers are all saved. Try again in a moment."
+          onRetry={() => {
+            fetchedRef.current = false;
+            setPhase("loading");
+          }}
+        />
       </section>
     );
   }

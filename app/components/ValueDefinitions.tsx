@@ -167,9 +167,22 @@ export default function ValueDefinitions({
       <div style={styles.helperGroup}>
         <HelperLine>Tap to keep each one as it is, or swap it.</HelperLine>
         <div style={styles.cardList}>
-        {values.map((v, i) => (
-          <div key={`${v.value}-${i}`} style={styles.card}>
-            <p style={styles.valueName}>{v.value}</p>
+        {values.map((v, i) => {
+          // A value is "captured" once it has a threat and at least one
+          // protector — the same bar as finishing. Showing it per-card gives the
+          // visible confirmation testers found missing ("it doesn't register the
+          // choice for each value as you go down the list").
+          const done =
+            v.threat.trim().length > 0 && protectorsOf(v).length > 0;
+          return (
+          <div
+            key={`${v.value}-${i}`}
+            style={{ ...styles.card, ...(done ? styles.cardDone : {}) }}
+          >
+            <div style={styles.cardHead}>
+              <p style={styles.valueName}>{v.value}</p>
+              {done && <span style={styles.doneBadge}>✓ Captured</span>}
+            </div>
             {v.description && (
               <p style={styles.description}>{sentence(v.description)}</p>
             )}
@@ -277,7 +290,8 @@ export default function ValueDefinitions({
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
         </div>
       </div>
 
@@ -368,6 +382,29 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "var(--r-md)",
     padding: "18px 20px",
     boxShadow: "var(--shadow-sm)",
+  },
+  cardHead: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
+  cardDone: {
+    borderColor: "var(--brand-primary)",
+  },
+  doneBadge: {
+    flexShrink: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 700,
+    color: "var(--brand-primary)",
+    background: "var(--brand-primary-tint)",
+    border: "1px solid var(--brand-primary)",
+    borderRadius: "999px",
+    padding: "2px 10px",
+    whiteSpace: "nowrap",
   },
   valueName: {
     fontFamily: "var(--font-serif)",

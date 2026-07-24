@@ -392,8 +392,10 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
       ev("value_priority"),
       // Trade-offs are so often a goal weighed against the people in their life.
       ev("relationship"),
-      e("goal", { crossRef: "4.3" }),
-      e("readiness", { crossRef: "4.1" }),
+      // The trade-offs conversation weighs goals against values — Vita's chat
+      // needs the goals and the transition too, not only the seed. seed → both.
+      ev("goal", { crossRef: "4.3" }),
+      ev("readiness", { crossRef: "4.1" }),
     ],
   },
   "4.6": {
@@ -408,19 +410,25 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
       // Retired only (Phase 5): the "keep" elements from the letter are the
       // anchors the week is built around. Absent for everyone else.
       ev("keep_change_leave"),
-      e("readiness", { tag: "work-transition", crossRef: "4.1" }),
-      e("goal", { crossRef: "4.3" }),
+      // Vita's chat must see the goals and the work-transition, not just the seed —
+      // otherwise it denies having answers the person gave in 4.1/4.3 (confirmed
+      // from a tester's 4.6 transcript: "it hadn't been made available to me"). seed → both.
+      ev("readiness", { tag: "work-transition", crossRef: "4.1" }),
+      ev("goal", { crossRef: "4.3" }),
     ],
   },
   "4.7": {
     moduleId: "4.7",
     inputs: [
       ev("goal", { crossRef: "4.3" }),
-      e("week_plan", { crossRef: "4.6" }),
-      e("chapter", { crossRef: "4.2" }),
+      // First year draws everything together — Vita's chat needs the full earlier
+      // picture, not only the seed, or the person is made to re-enter what they
+      // already built (confirmed from a tester's 4.7 feedback). seed → both.
+      ev("week_plan", { crossRef: "4.6" }),
+      ev("chapter", { crossRef: "4.2" }),
       ev("readiness", { crossRef: "4.1" }),
-      e("goal_path", { crossRef: "4.4" }),
-      e("principle", { crossRef: "4.5" }),
+      ev("goal_path", { crossRef: "4.4" }),
+      ev("principle", { crossRef: "4.5" }),
     ],
   },
 };

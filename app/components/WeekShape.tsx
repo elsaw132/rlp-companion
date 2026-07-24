@@ -9,7 +9,6 @@ import type {
   WeekShapeResult,
 } from "@/lib/modules";
 import {
-  fallbackWeekShape,
   fetchWeekShapeDraft,
   transitionShape,
   weekShapeGoalInputs,
@@ -17,6 +16,7 @@ import {
   type WeekShapeSeed,
 } from "@/lib/weekShapeSeed";
 import { useUserData } from "@/lib/userData";
+import { DraftFailed } from "./DraftFailed";
 import { resolveSeedItems } from "@/lib/contextResolver";
 import { recurringSeedFromFacts } from "@/lib/resolverInputs";
 import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
@@ -250,7 +250,7 @@ export default function WeekShape({
   // fresh run uses any cached draft, or fetches one (the "loading" phase).
   const cachedSeed = initial ? null : userData.getWeekShapeSeed(sessionId);
 
-  const [phase, setPhase] = useState<"loading" | "curate">(
+  const [phase, setPhase] = useState<"loading" | "curate" | "failed">(
     initial || cachedSeed ? "curate" : "loading"
   );
 
@@ -289,18 +289,12 @@ export default function WeekShape({
           recurring: draftInputs.recurring,
         }));
       if (cancelled) return;
-      const seed =
-        draft ??
-        fallbackWeekShape({
-          userModel: userModelText,
-          onboarding: onboardingContext,
-          hasPartner,
-          retirementStage: userData.getRetirementStage(),
-          goals: draftInputs.goals,
-          transition: draftInputs.transition,
-          recurring: draftInputs.recurring,
-        });
-      if (draft && !cached) void userData.saveWeekShapeSeed(sessionId, draft);
+      if (!draft) {
+        setPhase("failed");
+        return;
+      }
+      const seed = draft;
+      if (!cached) void userData.saveWeekShapeSeed(sessionId, draft);
       setStructure(earlierStructure ?? seed.structure);
       setActivities(makeFreshActivities(seed));
       setPhase("curate");
@@ -355,6 +349,21 @@ export default function WeekShape({
         })),
       summaryLabel,
     };
+  }
+
+  if (phase === "failed") {
+    return (
+      <section style={styles.wrap}>
+        <style>{weekCss}</style>
+        <DraftFailed
+          message="We couldn't draft the shape of your week just now. Your answers are all saved. Try again in a moment."
+          onRetry={() => {
+            fetchedRef.current = false;
+            setPhase("loading");
+          }}
+        />
+      </section>
+    );
   }
 
   if (phase === "loading") {

@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as DraftRequest;
   } catch {
-    return Response.json({ seed: FALLBACK_BALANCED_GOALS });
+    return Response.json({ seed: null });
   }
 
   const context = [
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   // Nothing to work from — return the generic fallback rather than inventing a
   // life from thin air.
   if (!context.trim()) {
-    return Response.json({ seed: FALLBACK_BALANCED_GOALS });
+    return Response.json({ seed: null });
   }
 
   try {
