@@ -128,7 +128,7 @@ export function buildSystemBlocks(
     "\n\n" +
     closingInstruction +
     "\n\n" +
-    'THE MARKER IS A LITERAL TOKEN. When you close, write the marker exactly as these eight characters — two open brackets, MODULE_COMPLETE, two close brackets: [[MODULE_COMPLETE]]. Never reword it, translate it, wrap it in tildes, asterisks or other punctuation, and never write any variant such as ~~COMPLETION_MARKER~~ or "completion marker". It is invisible plumbing the person never sees, so it must match exactly or it will leak into your message.' +
+    'THE MARKER IS A LITERAL TOKEN. When you close, write the marker exactly as these eight characters — two open brackets, MODULE_COMPLETE, two close brackets: [[MODULE_COMPLETE]]. Never reword it, translate it, wrap it in tildes, asterisks or other punctuation, and never write any variant such as ~~COMPLETION_MARKER~~ or "completion marker", nor a paraphrase of its purpose such as [ADVANCE] or [SESSION COMPLETED]. It is invisible plumbing the person never sees, so it must match exactly or it will leak into your message.' +
     "\n\n" +
     "You have already opened this conversation by saying, word for word:\n" +
     `"${body.coachOpening}"`;
