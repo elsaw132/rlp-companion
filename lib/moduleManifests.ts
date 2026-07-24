@@ -380,7 +380,9 @@ export const MODULE_MANIFESTS: Record<string, ModuleManifest> = {
       ev("strength"),
       // The "why" behind each goal shapes which milestones actually matter.
       ev("value"),
-      e("relationship"),
+      // The people in their life come up in the paths conversation ("do that with
+      // my daughter") — Vita's chat needs them, not only the seed. seed → both.
+      ev("relationship"),
       v("readiness", { crossRef: "4.1" }),
       e("recurring_activity"),
     ],
