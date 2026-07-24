@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import {
   coerceFirstYear,
-  fallbackFirstYear,
   type FirstYearDraftInput,
 } from "@/lib/firstYearSeed";
 
@@ -65,21 +64,10 @@ Respond with ONLY the JSON object described above — no markdown, no preamble, 
 
 export async function POST(request: Request) {
   let body: FirstYearDraftInput;
-  const empty: FirstYearDraftInput = {
-    userModel: "",
-    onboarding: "",
-    hasPartner: false,
-    retirementStage: null,
-    goals: [],
-    rhythm: [],
-    seasonPriorities: [],
-    seasonOrder: [],
-    transition: null,
-  };
   try {
     body = (await request.json()) as FirstYearDraftInput;
   } catch {
-    return Response.json({ seed: fallbackFirstYear(empty) });
+    return Response.json({ seed: null });
   }
 
   const input: FirstYearDraftInput = {

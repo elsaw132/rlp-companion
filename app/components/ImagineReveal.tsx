@@ -15,11 +15,11 @@ import { RETIREMENT_PATHS } from "@/lib/flags";
 import { useUserData } from "@/lib/userData";
 import { getArchetype } from "@/lib/archetypes";
 import {
-  FALLBACK_SYNTHESIS,
   isFallbackSynthesis,
   type RevealSynthesis,
 } from "@/lib/stageReveal";
 import StageReveal from "./StageReveal";
+import { DraftFailed } from "./DraftFailed";
 import { stageColorFor } from "@/lib/stageColors";
 import ArchetypeBlock from "./ArchetypeBlock";
 
@@ -32,6 +32,7 @@ export default function ImagineReveal() {
   const retired = RETIREMENT_PATHS && isRetired(rs);
 
   const [synthesis, setSynthesis] = useState<RevealSynthesis | null>(null);
+  const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [displayName, setDisplayName] = useState<string | null>(null);
 
@@ -74,6 +75,7 @@ export default function ImagineReveal() {
   }
 
   async function generate() {
+    setFailed(false);
     try {
       const res = await fetch("/api/stage-reveal", {
         method: "POST",
@@ -82,15 +84,34 @@ export default function ImagineReveal() {
       });
       if (!res.ok) throw new Error("bad response");
       const data = (await res.json()) as RevealSynthesis;
+      // A fallback reveal is fabricated first-person "quotes" the person never
+      // said. Never show it — treat it exactly like a failure: an honest retry.
+      if (isFallbackSynthesis(data)) {
+        setFailed(true);
+        return;
+      }
       setSynthesis(data);
-      // Persist only a real, personalised result — never a fallback, so a run
-      // with no takeaways or a transient API failure retries next time rather
-      // than freezing the reveal on the generic version.
-      if (!isFallbackSynthesis(data)) void userData.saveStage1Reveal(data);
+      void userData.saveStage1Reveal(data);
     } catch {
-      // Never leave the screen empty — render the safe generic reveal.
-      setSynthesis(FALLBACK_SYNTHESIS);
+      setFailed(true);
     }
+  }
+
+  // A genuine failure shows an honest retry — never fabricated "quotes" the
+  // person never said.
+  if (failed) {
+    return (
+      <main className="rlp-reveal-loading">
+        <style>{loadingCss}</style>
+        <DraftFailed
+          message="We couldn't pull your Stage 1 together just now. Nothing is lost."
+          onRetry={() => {
+            setFailed(false);
+            void generate();
+          }}
+        />
+      </main>
+    );
   }
 
   // Hold the screen until the synthesis is ready, so the reveal composes itself

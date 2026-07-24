@@ -16,7 +16,6 @@ import type {
   WeekShapeResult,
 } from "@/lib/modules";
 import {
-  fallbackFirstYear,
   fetchFirstYearDraft,
   fetchFirstYearChat,
   firstYearGoalInputs,
@@ -29,6 +28,7 @@ import {
   type FirstYearKind,
 } from "@/lib/firstYearSeed";
 import { useUserData } from "@/lib/userData";
+import { DraftFailed } from "./DraftFailed";
 import { HelperLine } from "./InteractionShell";
 
 // One item on the timeline. `season` is one of the four phase ids or ALL_YEAR;
@@ -419,7 +419,7 @@ export default function FirstYearJourney({
   const cachedSeed = userData.getFirstYearSeed(sessionId);
   const cachedChat = userData.getFirstYearChat(sessionId);
 
-  const [phase, setPhase] = useState<"loading" | "ready">(
+  const [phase, setPhase] = useState<"loading" | "ready" | "failed">(
     cachedSeed ? "ready" : "loading"
   );
   const [items, setItems] = useState<ItemRow[]>(
@@ -485,8 +485,12 @@ export default function FirstYearJourney({
       };
       const draft = cached ?? (await fetchFirstYearDraft(input));
       if (cancelled) return;
-      const seed = draft ?? fallbackFirstYear(input);
-      if (draft && !cached) void userData.saveFirstYearSeed(sessionId, draft);
+      if (!draft) {
+        setPhase("failed");
+        return;
+      }
+      const seed = draft;
+      if (!cached) void userData.saveFirstYearSeed(sessionId, draft);
       setItems(toRows(seed.items));
       setNarrative(seed.narrative);
       setHydrated(true);
@@ -594,6 +598,21 @@ export default function FirstYearJourney({
       summaryLabel,
     };
     onComplete(result, closingAck, messages);
+  }
+
+  if (phase === "failed") {
+    return (
+      <section style={styles.wrap}>
+        <style>{journeyCss}</style>
+        <DraftFailed
+          message="We couldn't draft your first year just now. Your answers are all saved. Try again in a moment."
+          onRetry={() => {
+            fetchedRef.current = false;
+            setPhase("loading");
+          }}
+        />
+      </section>
+    );
   }
 
   if (phase === "loading") {

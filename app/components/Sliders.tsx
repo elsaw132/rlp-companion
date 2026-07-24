@@ -26,9 +26,13 @@ function lowerFirst(s: string): string {
 // "Ideal week: toward lots of routine; strongly toward mostly with others;
 //  balanced between full and busy and slow and restful. Seasons change it: a little."
 export function slidersSummaryText(result: SlidersResult): string {
-  const phrases = result.spectrums.map((s) =>
-    positionPhrase(s.left, s.right, s.position)
-  );
+  // Only report sliders the person actually MOVED. An untouched slider sits at
+  // the midpoint by default — reporting it as "balanced between X and Y" would
+  // assert a preference they never set (`touched === false`). Older saved results
+  // have no `touched` flag, so undefined counts as set (unchanged behaviour).
+  const phrases = result.spectrums
+    .filter((s) => s.touched !== false)
+    .map((s) => positionPhrase(s.left, s.right, s.position));
   const label = result.summaryLabel ?? "Ideal week";
   const week = phrases.length ? `${label}: ${phrases.join("; ")}.` : "";
   const seasons = result.seasonal?.answer
@@ -70,6 +74,12 @@ export default function Sliders({
   const [season, setSeason] = useState<string | null>(
     initial?.seasonal?.answer ?? null
   );
+  // Track which sliders the person has actually moved. A re-edit (initial present)
+  // starts fully "touched" — those positions were genuinely set before. A fresh
+  // run starts untouched, so an untouched midpoint is never read as a preference.
+  const [touched, setTouched] = useState<boolean[]>(() =>
+    spectrums.map(() => initial != null)
+  );
 
   // Build the result from the current settings — seasonal and summaryLabel are
   // only present when the interaction configured them.
@@ -79,6 +89,7 @@ export default function Sliders({
       left: s.left,
       right: s.right,
       position: positions[i],
+      touched: touched[i],
     })),
     ...(seasonal ? { seasonal: { prompt: seasonal.prompt, answer: season } } : {}),
     ...(summaryLabel ? { summaryLabel } : {}),
@@ -94,6 +105,7 @@ export default function Sliders({
 
   function setPosition(index: number, value: number) {
     setPositions((prev) => prev.map((p, i) => (i === index ? value : p)));
+    setTouched((prev) => (prev[index] ? prev : prev.map((t, i) => (i === index ? true : t))));
   }
 
   return (

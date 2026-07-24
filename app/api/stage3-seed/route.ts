@@ -193,12 +193,18 @@ export async function POST(request: Request) {
   // where we have it, else the older carryValues list. For priority-choices we
   // still pin the ranking pool to their core values. Every other surface keeps
   // its generic fallback.
-  const fallbackSeed: Stage3Seed =
+  // For mirror-cards and value-triage the generic FALLBACK_SEEDS assert fabricated
+  // "evidence" about the person ("the way you keep wanting to learn new things") —
+  // never show that. Return null instead; the surface then renders its own honest
+  // menu (the VIA strengths / values palette), with nothing invented about them.
+  const fallbackSeed: Stage3Seed | null =
     seedType === "value-definitions"
       ? valueDefinitionsFallback(core.length ? core : body.carryValues ?? [])
       : seedType === "priority-choices"
         ? constrainSeedToCore(FALLBACK_SEEDS[seedType], core)
-        : FALLBACK_SEEDS[seedType];
+        : seedType === "mirror-cards" || seedType === "value-triage"
+          ? null
+          : FALLBACK_SEEDS[seedType];
 
   // Nothing to work from — return the fallback rather than asking the model to
   // invent a life. Flagged so the client knows this isn't a real AI seed.
