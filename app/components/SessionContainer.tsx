@@ -95,7 +95,8 @@ import {
   firstYearRhythmInputs,
   firstYearSeasonInputs,
 } from "@/lib/firstYearSeed";
-import { fetchBalancedGoalsDraft } from "@/lib/balancedGoalsSeed";
+import { fetchGoalDraft } from "@/lib/balancedGoalsSeed";
+import { goalThreadsFromFacts } from "@/lib/goalThreads";
 import {
   fetchGoalPathsDraft,
   spotlightGoalInputs,
@@ -155,7 +156,6 @@ import {
 } from "@/lib/contextResolver";
 import {
   springboardsFromFacts,
-  springboardAreasFromFacts,
   seasonCardsFromFacts,
   seasonCandidatesFromFacts,
   recurringSeedFromFacts,
@@ -164,21 +164,44 @@ import {
 // Vita appends a close signal to her final message so we know the module is
 // finished. It's stripped before display and before storage, so it never shows
 // and never re-enters the conversation history. The canonical token is
-// [[MODULE_COMPLETE]], but the model occasionally invents a wrapped variant
-// (e.g. ~~COMPLETION_MARKER~~, [[COMPLETION_MARKER]], **MODULE_COMPLETE**). Catch
-// those too so a stray marker can never leak into a bubble — and so the close is
-// still recognised when it does. Returns whether a close was signalled and the
-// text with every marker artifact removed.
+// [[MODULE_COMPLETE]], but the model sometimes substitutes its own wording — a
+// reworded variant (~~COMPLETION_MARKER~~, **MODULE_COMPLETE**) or, more often, a
+// paraphrase of the *intent* like [ADVANCE] or [SESSION COMPLETED]. We catch three
+// shapes so no invented marker can ever leak into a bubble, and so the close is
+// still recognised whichever wording the model reaches for:
+//   (a) the distinctive MODULE_COMPLETE / COMPLETION_MARKER tokens, with or without
+//       light wrapping — these never occur in ordinary prose, so match them anywhere;
+//   (b) bracketed close-paraphrases (ADVANCE, SESSION COMPLETED, NEXT SESSION…),
+//       matched ONLY when wrapped in brackets, so a plain word like "advance" in a
+//       sentence is never stripped;
+//   (c) a backstop: any leftover ALL-CAPS token wrapped in brackets sitting alone on
+//       the final line — an invented marker in a form we haven't catalogued.
+// Returns whether a close was signalled and the text with every marker removed.
 const COMPLETION_MARKER_RE =
-  /[~*_[\]<>#-]{0,2}\s*(?:MODULE[_\s-]?COMPLETE|COMPLETION[_\s-]?MARKER)\s*[~*_[\]<>#-]{0,2}/gi;
+  /[~*_[\]<>#()-]{0,2}\s*(?:MODULE[_\s-]?COMPLETE|COMPLETION[_\s-]?MARKER)\s*[~*_[\]<>#()-]{0,2}/gi;
+const COMPLETION_PARAPHRASE_RE =
+  /[[(<]{1,2}\s*(?:ADVANCE|PROCEED|CONTINUE|FINISH(?:ED)?|(?:MODULE|SESSION)[_\s-]?(?:COMPLETED?|DONE|FINISHED)|(?:NEXT|END(?:[_\s-]?OF)?)[_\s-]?SESSION)\s*[\])>]{1,2}/gi;
+const TRAILING_CAPS_TOKEN_RE =
+  /(?:^|\n)\s*[[(<]{1,2}\s*[A-Z][A-Z0-9 _-]{1,28}[A-Z0-9]\s*[\])>]{1,2}\s*$/;
 function stripCompletionMarker(reply: string): {
   isClosing: boolean;
   text: string;
 } {
-  COMPLETION_MARKER_RE.lastIndex = 0;
-  const isClosing = COMPLETION_MARKER_RE.test(reply);
-  const text = reply.replace(COMPLETION_MARKER_RE, "").trim();
-  return { isClosing, text };
+  let text = reply;
+  let isClosing = false;
+  for (const re of [COMPLETION_MARKER_RE, COMPLETION_PARAPHRASE_RE]) {
+    const next = text.replace(re, "");
+    if (next !== text) {
+      isClosing = true;
+      text = next;
+    }
+  }
+  const trailing = text.match(TRAILING_CAPS_TOKEN_RE);
+  if (trailing) {
+    isClosing = true;
+    text = text.slice(0, trailing.index);
+  }
+  return { isClosing, text: text.trim() };
 }
 
 // Vita's opening can occasionally run long (especially if it echoes a carried-
@@ -783,27 +806,19 @@ export default function SessionContainer({
   useEffect(() => {
     if (interaction?.type !== "balanced-goals") return;
     if (goalsPrefetchedRef.current || userData.getGoalSeed(sessionId)) return;
+    // Draft from the deterministic thread pool; skip entirely if the facts haven't
+    // resolved yet (never draft from an empty pool). The effect re-runs when the
+    // snapshot fills in.
+    const threads = goalThreadsFromFacts(userData.getActiveFacts());
+    if (threads.length === 0) return;
     goalsPrefetchedRef.current = true;
-    // Springboards now come from the resolver's recurring_activity facts, grouped
-    // by their balanced-area domain — fact-sourced, so a removed activity is gone.
-    const facts = userData.getActiveFacts();
-    const areaSeed = springboardAreasFromFacts(
-      resolveSeedItems(sessionId, facts, "recurring_activity")
-    );
-    const allowed = new Set(interaction.areas.map((a) => a.id));
-    const springboards = areaSeed.filter((s) => allowed.has(s.area));
     void (async () => {
-      const draft = await fetchBalancedGoalsDraft({
-        userModel: resolveSeedText(sessionId, userData.getActiveFacts()),
-        onboarding: userData.buildOnboardingContext(),
-        hasPartner: userData.hasPartner(),
-        retirementStage: userData.getRetirementStage(),
-        springboards,
-      });
+      const draft = await fetchGoalDraft(threads, userData.buildOnboardingContext());
       if (draft) void userData.saveGoalSeed(sessionId, draft);
+      else goalsPrefetchedRef.current = false; // let a later render retry
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interaction, sessionId]);
+  }, [interaction, sessionId, userData.loading]);
 
   // The goal-paths draft (4.4) is the same slow Claude call. Prefetch a path for
   // each spotlighted goal (read from 4.3's saved result) while the person reads
@@ -885,6 +900,22 @@ export default function SessionContainer({
     if (interaction?.type !== "week-shape") return;
     if (weekShapePrefetchedRef.current || userData.getWeekShapeSeed(sessionId))
       return;
+    // Wait for the fact snapshot before drafting. Prefetching from a not-yet-loaded
+    // snapshot yields a factless, generic week that then gets cached and shown as if
+    // it were real. This effect re-runs when userData.loading flips — the same guard
+    // the goals and seasons prefetches carry.
+    if (userData.loading) return;
+    const goals = weekShapeGoalInputs(
+      (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
+    );
+    // The real, recurring activities come from structured recurring_activity facts —
+    // not a scrape of prior transcripts.
+    const recurring = recurringSeedFromFacts(
+      resolveSeedItems(sessionId, userData.getActiveFacts(), "recurring_activity")
+    );
+    // Nothing real to build a week from yet — don't draft, and don't cache a generic
+    // seed. The surface drafts on its own once there's something to use.
+    if (recurring.length === 0 && goals.length === 0) return;
     weekShapePrefetchedRef.current = true;
     void (async () => {
       const draft = await fetchWeekShapeDraft({
@@ -892,22 +923,16 @@ export default function SessionContainer({
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
         retirementStage: userData.getRetirementStage(),
-        goals: weekShapeGoalInputs(
-          (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
-        ),
+        goals,
         transition: transitionShape(
           (userData.getBuild("4.1") as ReadinessSnapshotResult | null) ?? null
         ),
-        // The real, recurring activities now come from structured
-        // recurring_activity facts — not a scrape of prior transcripts.
-        recurring: recurringSeedFromFacts(
-          resolveSeedItems(sessionId, userData.getActiveFacts(), "recurring_activity")
-        ),
+        recurring,
       });
       if (draft) void userData.saveWeekShapeSeed(sessionId, draft);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interaction, sessionId]);
+  }, [interaction, sessionId, userData.loading]);
 
   // The seasons board (4.2) draws its cards from the person's real priorities across
   // the whole programme. The narrow, aspiration-first seasonCardsFromFacts used to

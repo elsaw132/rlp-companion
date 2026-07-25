@@ -687,6 +687,9 @@ export type BalancedGoalsResult = {
     // The area of the person's life this goal is about, in their own words — a free
     // label ("Travel & adventure", "Our home"), not one of a fixed set.
     area: string;
+    // The thing the person said this goal was drawn from ("rowing", "wanting to be a
+    // Winchester guide") — the "You mentioned …" provenance. Absent on older results.
+    source?: string;
     // Retained for back-compat with earlier saved results and downstream readers that
     // branch on it; every goal drafted now is a concrete thing to DO.
     track: "do" | "be";
