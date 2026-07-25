@@ -7,8 +7,9 @@
 // instead a light note on what already helps it and the one or two things that
 // would help it take root. One structured Claude call (/api/goal-paths) reads
 // the picture built up across the earlier stages and returns one path per goal,
-// in the same order. Anything that goes wrong falls back to a goal-specific
-// generic path so the surface always renders.
+// in the same order. If the model can't produce a real path for any goal — or
+// anything else goes wrong — the draft fails honestly and the surface offers a
+// retry, never a wholly generic set of paths passed off as the person's own.
 
 import type { BalancedGoalsResult, GoalPathsResult } from "@/lib/modules";
 import type { RetirementStage } from "@/lib/userData";
@@ -91,11 +92,11 @@ export async function fetchGoalPathsDraft(
   );
 }
 
-// ---- Fallback (generic, never empty) ----
-// Only used when the model call fails entirely. Builds a modest, goal-specific
-// path for each spotlighted goal so it reads as a reasonable starting point the
-// person edits, never a dead end. do-goals get a generic four-rung ladder;
-// be-goals get a light support note.
+// ---- Per-goal fallback ----
+// Used only to fill in a single goal the model skipped when the draft otherwise
+// succeeded (coerceGoalPaths returns null when the model produced nothing for any
+// goal). Builds a modest, goal-specific path so no goal is left blank. do-goals get
+// a generic four-rung ladder; be-goals get a light support note.
 export function fallbackGoalPaths(goals: GoalPathInput[]): GoalPathsSeed {
   const source = goals.length
     ? goals
@@ -183,15 +184,17 @@ function coerceStrengths(raw: unknown, allowed: string[], cap = 3): string[] {
 // Validate and clean whatever the model returned into the seed shape. Driven by
 // the INPUT goals so there's exactly one path per spotlighted goal, in order,
 // with the track taken authoritatively from 4.3 — the model only supplies the
-// path content. Any goal the model skipped or returned unusably falls back to a
-// goal-specific generic path, so the surface always has one path per goal.
+// path content. Returns null when the model produced no usable content for ANY
+// goal (an empty/failed draft) so the caller fails honestly rather than showing a
+// wholly generic set of paths. When the draft did land, a rare individual goal the
+// model skipped keeps its goal-specific fallback path so every goal has one.
 export function coerceGoalPaths(
   raw: unknown,
   goals: GoalPathInput[],
   strengthsList: string[] = []
-): GoalPathsSeed {
+): GoalPathsSeed | null {
+  if (!goals.length) return null;
   const fallback = fallbackGoalPaths(goals);
-  if (!goals.length) return fallback;
 
   const arr =
     raw && typeof raw === "object"
@@ -209,6 +212,9 @@ export function coerceGoalPaths(
     if (key && !byGoal.has(key)) byGoal.set(key, o);
   }
 
+  // Count the goals the model actually produced real content for; if none did, the
+  // whole draft failed and we return null rather than a set of generic fallbacks.
+  let realCount = 0;
   const paths: GoalPath[] = goals.map((g, i) => {
     const match = byGoal.get(g.goal.toLowerCase());
     const fb = fallback.paths[i];
@@ -221,6 +227,7 @@ export function coerceGoalPaths(
       if (!alreadyHelps.length && !wouldHelp.length) {
         return { ...fb, ...(strengths.length ? { strengths } : {}) };
       }
+      realCount++;
       return {
         goal: g.goal,
         track: "be",
@@ -241,6 +248,7 @@ export function coerceGoalPaths(
     if (!milestones.length) {
       return { ...fb, ...(strengths.length ? { strengths } : {}) };
     }
+    realCount++;
     return {
       goal: g.goal,
       track: "do",
@@ -249,6 +257,7 @@ export function coerceGoalPaths(
     };
   });
 
+  if (realCount === 0) return null;
   return { paths };
 }
 

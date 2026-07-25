@@ -828,6 +828,9 @@ export default function SessionContainer({
   useEffect(() => {
     if (interaction?.type !== "goal-paths") return;
     if (pathsPrefetchedRef.current || userData.getGoalPathSeed(sessionId)) return;
+    // Wait for the fact snapshot before reading the 4.3 build — a race here would
+    // draft from empty goals. The effect re-runs when userData.loading flips.
+    if (userData.loading) return;
     const goals = spotlightGoalInputs(
       (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
     );
@@ -849,7 +852,7 @@ export default function SessionContainer({
       if (draft) void userData.saveGoalPathSeed(sessionId, draft);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interaction, sessionId]);
+  }, [interaction, sessionId, userData.loading]);
 
   // The trade-offs draft (4.5) is the same slow Claude call. Prefetch the
   // scenarios and candidate principles — grounded in the spotlighted goals
@@ -861,6 +864,9 @@ export default function SessionContainer({
     if (interaction?.type !== "trade-offs") return;
     if (tradeOffsPrefetchedRef.current || userData.getTradeOffSeed(sessionId))
       return;
+    // Wait for the fact snapshot before reading the 4.3 build and value facts — a
+    // race here would draft from empty inputs. Re-runs when userData.loading flips.
+    if (userData.loading) return;
     const goals = tradeOffGoalInputs(
       (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
     );
@@ -889,7 +895,7 @@ export default function SessionContainer({
       if (draft) void userData.saveTradeOffSeed(sessionId, draft);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interaction, sessionId]);
+  }, [interaction, sessionId, userData.loading]);
 
   // The week-shape draft (4.6) is the same slow Claude call. Prefetch the week —
   // grounded in the spotlighted goals (4.3) and the work-transition shape (4.1)
@@ -985,6 +991,14 @@ export default function SessionContainer({
     if (interaction?.type !== "first-year") return;
     if (firstYearPrefetchedRef.current || userData.getFirstYearSeed(sessionId))
       return;
+    // Wait for the fact snapshot, and skip when there are no goals to build a year
+    // from — a race here would draft (and cache) a templated year from empty input.
+    // The effect re-runs when userData.loading flips.
+    if (userData.loading) return;
+    const goals = firstYearGoalInputs(
+      (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
+    );
+    if (!goals.length) return;
     firstYearPrefetchedRef.current = true;
     void (async () => {
       const seasonInputs = firstYearSeasonInputs(
@@ -995,9 +1009,7 @@ export default function SessionContainer({
         onboarding: userData.buildOnboardingContext(),
         hasPartner: userData.hasPartner(),
         retirementStage: userData.getRetirementStage(),
-        goals: firstYearGoalInputs(
-          (userData.getBuild("4.3") as BalancedGoalsResult | null) ?? null
-        ),
+        goals,
         rhythm: firstYearRhythmInputs(
           (userData.getBuild("4.6") as WeekShapeResult | null) ?? null
         ),
@@ -1010,7 +1022,7 @@ export default function SessionContainer({
       if (draft) void userData.saveFirstYearSeed(sessionId, draft);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interaction, sessionId]);
+  }, [interaction, sessionId, userData.loading]);
 
   // Pre-warm the Retirement Life Plan the moment 4.7 (the last Stage 4 module) is
   // done. The plan's prose and scene images are otherwise generated only when

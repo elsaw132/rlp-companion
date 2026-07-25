@@ -240,59 +240,6 @@ export async function fetchFirstYearChat(
   }
 }
 
-// ---- Fallback (grounded where it can be, never empty) ----
-// Only used when the model call fails entirely. Assembles a reasonable first year
-// from whatever inputs exist, so the surface reads as a sensible starting point.
-export function fallbackFirstYear(input: FirstYearDraftInput): FirstYearSeed {
-  const items: FirstYearItemSeed[] = [];
-  const seasons = SEASON_IDS;
-
-  // Spread the goals across the year, spotlighted ones earlier; mark the first as
-  // top of the list and flag anything that reads as a trip.
-  const goals = input.goals ?? [];
-  goals.slice(0, 8).forEach((g, i) => {
-    const isTrip = /\b(trip|travel|visit|holiday|see |go to|journey|cruise)\b/i.test(
-      g.goal
-    );
-    items.push({
-      label: g.goal,
-      kind: isTrip ? "trip" : g.track === "be" ? "project" : "goal",
-      season: seasons[Math.min(i, seasons.length - 1)],
-      ...(i === 0 ? { top: true } : {}),
-      ...(g.note ? { note: g.note } : {}),
-    });
-  });
-
-  // A couple of rhythm threads that run through the whole year.
-  (input.rhythm ?? []).slice(0, 3).forEach((r) => {
-    items.push({ label: r.label, kind: "rhythm", season: ALL_YEAR });
-  });
-
-  // The work footprint, if they're phasing out gradually.
-  if (input.transition?.lean === "gradual") {
-    items.push({
-      label: input.transition.shape
-        ? `Ongoing work — ${input.transition.shape}`
-        : "Ongoing work, winding down",
-      kind: "work",
-      season: ALL_YEAR,
-      fixed: true,
-    });
-  }
-
-  return { items, narrative: fallbackNarrative(input) };
-}
-
-// A plain, grounded narrative for when the model call fails entirely.
-function fallbackNarrative(input: FirstYearDraftInput): string {
-  const first = input.goals?.[0]?.goal;
-  const work =
-    input.transition?.lean === "gradual"
-      ? " Work is still part of the picture, winding down across the year, so the months around it have room to breathe."
-      : " With a clean break from work, the year is yours to shape from the start.";
-  return `Your first year opens gently, finding the rhythm of days that are your own again.${first ? ` ${first} is there near the front, one of the things you most want to begin.` : ""} As the months go on, more of what matters takes its place, with the steady threads of your week running underneath it all.${work} By the close of the year, the shape of this new chapter has settled into something that feels like yours.`;
-}
-
 // ---- Coercion ----
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
@@ -359,24 +306,19 @@ export function coerceItemList(raw: unknown): FirstYearItemSeed[] {
 }
 
 // Validate and clean whatever the model returned into the seed shape. Items
-// sharing a label are de-duplicated so nothing appears twice.
-export function coerceFirstYear(
-  raw: unknown,
-  input: FirstYearDraftInput
-): FirstYearSeed {
-  const fb = fallbackFirstYear(input);
+// sharing a label are de-duplicated so nothing appears twice. Returns null when the
+// model produced no usable items — an empty/failed draft — so the caller fails
+// honestly rather than substituting a templated year built from a stale snapshot.
+export function coerceFirstYear(raw: unknown): FirstYearSeed | null {
   const obj =
     raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
 
   const items = coerceItemList(obj.items);
+  if (items.length === 0) return null;
+
+  // Never fabricate the first-year prose. If the model gave no narrative, leave it
+  // blank for the person to write, rather than inventing one for them.
   const narrative = str(obj.narrative);
 
-  return {
-    // Keep the model's real items; the fallback set is still built from the
-    // person's own goals/rhythm, so it's a grounded floor if the model gave none.
-    items: items.length ? items : fb.items,
-    // Never fabricate the first-year prose. If the model gave no narrative, leave
-    // it blank for the person to write, rather than inventing one for them.
-    narrative,
-  };
+  return { items, narrative };
 }

@@ -173,7 +173,9 @@ export async function POST(request: Request) {
     const end = text.lastIndexOf("}");
     const slice = start !== -1 && end !== -1 ? text.slice(start, end + 1) : text;
 
-    return Response.json({ seed: coerceFirstYear(JSON.parse(slice), input) });
+    // null when the model produced no usable items — the client then shows the
+    // honest "couldn't draft" state instead of a templated year.
+    return Response.json({ seed: coerceFirstYear(JSON.parse(slice)) });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       console.error(
