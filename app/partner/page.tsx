@@ -9,6 +9,7 @@ import ShareStep from "@/app/components/partner/ShareStep";
 import WaitingState from "@/app/components/partner/WaitingState";
 import ComparisonView from "@/app/components/partner/ComparisonView";
 import ConfirmPartnerName from "@/app/components/partner/ConfirmPartnerName";
+import { currentUserCouplesAllowed } from "@/lib/couplesAccess";
 
 // The single entry point for "Plan with your partner" (module 5.1). It resolves
 // the pairing and each side's completion (cheap DB reads only — no LLM in the
@@ -40,6 +41,9 @@ export default async function PartnerPage({
 }) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
+
+  // Pilot gate: the module is dormant for anyone not on the couples allowlist.
+  if (!(await currentUserCouplesAllowed())) redirect("/home");
 
   const pairing = await getActivePairingFor(userId);
   if (!pairing) redirect("/home");

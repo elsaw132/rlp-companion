@@ -12,9 +12,6 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/privacy",
   "/robots.txt",
-  // Dummy-data visual preview of the couples module — no auth, no DB, no real
-  // user data. Safe to remove before merge.
-  "/preview/partner(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

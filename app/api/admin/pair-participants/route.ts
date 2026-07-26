@@ -1,6 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { getAdminUser } from "@/lib/admin";
 import { createPairing, withdrawPairing, getPairingById } from "@/lib/db";
+import { isCouplesEmailAllowed } from "@/lib/couplesAccess";
 
 // Admin-only pairing action for the "Plan with your partner" pilot. There is no
 // self-serve invite flow (that's Epic 2.7): an admin links two known couples
@@ -68,6 +69,17 @@ export async function POST(request: Request) {
       return Response.json(
         { ok: false, error: "Those are the same email — enter two people." },
         { status: 400 }
+      );
+    }
+    // Pilot gate: both must be on the couples allowlist.
+    const offList = [emailA, emailB].filter((e) => !isCouplesEmailAllowed(e));
+    if (offList.length) {
+      return Response.json(
+        {
+          ok: false,
+          error: `Not in the couples pilot: ${offList.join(", ")}. Add them to COUPLES_PILOT_EMAILS first.`,
+        },
+        { status: 403 }
       );
     }
 
