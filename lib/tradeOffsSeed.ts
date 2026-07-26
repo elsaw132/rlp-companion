@@ -150,81 +150,6 @@ export async function fetchTradeOffsDraft(
   );
 }
 
-// ---- Fallback (grounded where it can be, never empty) ----
-// Only used when the model call fails entirely. Builds two or three reasonable
-// scenarios from whatever inputs exist, so the surface reads as a sensible
-// starting point the person shapes, never a dead end.
-function isShakyLevel(level?: string): boolean {
-  return level === "Low" || level === "Building";
-}
-
-export function fallbackTradeOffs(input: TradeOffsDraftInput): TradeOffsSeed {
-  const goals = input.goals ?? [];
-  const scenarios: TradeOffScenario[] = [];
-
-  if (goals.length >= 2) {
-    scenarios.push({
-      title: "Two things you care about, one window of time",
-      situation: `A season comes when "${goals[0].goal}" and "${goals[1].goal}" both want your time and energy, and you can't give yourself fully to both at once.`,
-      optionA: `Lean into ${goals[0].goal}`,
-      optionB: `Lean into ${goals[1].goal}`,
-    });
-  } else if (goals.length === 1) {
-    scenarios.push({
-      title: "When the goal asks more than you planned",
-      situation: `"${goals[0].goal}" turns out to need more of you than you expected — more time, or more money. Something else would have to give to do it justice.`,
-      optionA: "Go all in on it",
-      optionB: "Keep it smaller, protect the rest",
-    });
-  }
-
-  const finance = input.finance;
-  const financeShaky =
-    !!finance &&
-    (isShakyLevel(finance.financesLevel) ||
-      (!!finance.dateKnown &&
-        finance.dateKnown !== "Yes, I have a clear sense"));
-  if (financeShaky) {
-    scenarios.push({
-      title: "If the money doesn't stretch to everything",
-      situation:
-        "The plans you're most looking forward to add up to more than feels comfortable. If you couldn't have it all, you'd have to choose how to respond.",
-      optionA: "Do fewer things, well",
-      optionB: "Look at freeing up more",
-    });
-  }
-
-  const filler: TradeOffScenario[] = [
-    {
-      title: "Freedom or commitment",
-      situation:
-        "Something meaningful comes up that would tie down part of your week for a long stretch. Saying yes means less open time; saying no means missing it.",
-      optionA: "Protect the open time",
-      optionB: "Take the commitment on",
-    },
-    {
-      title: "Your time or someone else's",
-      situation:
-        "A pull on your time from someone you care about lands right when you'd set that time aside for something of your own.",
-      optionA: "Hold your own plans",
-      optionB: "Give the time to them",
-    },
-  ];
-  let i = 0;
-  while (scenarios.length < 2 && i < filler.length) {
-    scenarios.push(filler[i++]);
-  }
-
-  return {
-    scenarios: scenarios.slice(0, 3),
-    values: (input.values ?? []).map((v) => v.value).filter(Boolean),
-    principles: [
-      "When something has to give, I protect the people I love before anything else.",
-      "I'd rather do a few things properly than spread myself thin.",
-    ],
-  };
-}
-
 // ---- Coercion ----
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
@@ -258,14 +183,14 @@ function coerceStrings(raw: unknown, cap: number): string[] {
 }
 
 // Validate and clean whatever the model returned into the seed shape. The model
-// supplies the scenarios and the candidate principles; the core values always
-// come straight from Stage 3 (never invented), so they're taken from the input.
-// Anything missing falls back to the grounded generic seed.
+// supplies the scenarios and the candidate principles; the core values always come
+// straight from Stage 3 (never invented), so they're taken from the input. Returns
+// null when the model produced no usable scenario — an empty/failed draft — so the
+// caller fails honestly rather than showing a generic set of trade-offs as theirs.
 export function coerceTradeOffs(
   raw: unknown,
   input: TradeOffsDraftInput
-): TradeOffsSeed {
-  const fb = fallbackTradeOffs(input);
+): TradeOffsSeed | null {
   const obj =
     raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
 
@@ -277,11 +202,14 @@ export function coerceTradeOffs(
       if (scenarios.length >= 3) break;
     }
   }
+  if (scenarios.length === 0) return null;
+
   const principles = coerceStrings(obj.principles, 4);
 
   return {
-    scenarios: scenarios.length ? scenarios : fb.scenarios,
-    values: fb.values,
+    scenarios,
+    // The core values come straight from Stage 3 (real, verbatim), never invented.
+    values: (input.values ?? []).map((v) => v.value).filter(Boolean),
     // Never fabricate the person's principles ("When something has to give, I
     // protect the people I love…"). If the model gave none, leave them blank for
     // the person to write rather than inventing them.
