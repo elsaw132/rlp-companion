@@ -155,30 +155,26 @@ export function deriveShareableItems(
     seen.add("plan:leaving-work");
   }
 
-  // --- Your values (the core few) ----------------------------------------
-  if (valuesTriage) {
-    for (const label of valuesTriage.core) {
-      if (!label?.trim()) continue;
-      items.push({
-        ref: slugRef("value", label, seen),
-        group: "values",
-        label,
-        defaultOn: true,
-      });
-    }
+  // --- Your values (shared as a whole set, not individually) -------------
+  const coreValues = (valuesTriage?.core ?? []).filter((l) => l?.trim());
+  if (coreValues.length) {
+    items.push({
+      ref: "value:all",
+      group: "values",
+      label: coreValues.join(" · "),
+      defaultOn: true,
+    });
   }
 
-  // --- Your strengths (the signature few) --------------------------------
-  if (strengths) {
-    for (const label of strengths.starred) {
-      if (!label?.trim()) continue;
-      items.push({
-        ref: slugRef("strength", label, seen),
-        group: "strengths",
-        label,
-        defaultOn: true,
-      });
-    }
+  // --- Your strengths (shared as a whole set) ----------------------------
+  const signatureStrengths = (strengths?.starred ?? []).filter((l) => l?.trim());
+  if (signatureStrengths.length) {
+    items.push({
+      ref: "strength:all",
+      group: "strengths",
+      label: signatureStrengths.join(" · "),
+      defaultOn: true,
+    });
   }
 
   // --- Your hopes --------------------------------------------------------
@@ -208,17 +204,19 @@ export function deriveShareableItems(
     }
   }
 
-  // --- Your principles (how you'll decide when things compete) -----------
-  if (tradeOffs) {
-    for (const p of tradeOffs.principles) {
-      if (!p?.trim()) continue;
-      items.push({
-        ref: slugRef("principle", p, seen),
-        group: "principles",
-        label: p,
-        defaultOn: true,
-      });
-    }
+  // --- Your decision principles (shared as a set) ------------------------
+  // One toggle: the module can store the same principle in two phrasings, so a
+  // per-principle list would read as duplicates. Shared principles feed Vita's
+  // synthesis rather than a raw list (see coupleComparison), where any such
+  // duplication collapses.
+  const principles = (tradeOffs?.principles ?? []).filter((p) => p?.trim());
+  if (principles.length) {
+    items.push({
+      ref: "principle:all",
+      group: "principles",
+      label: "Your decision principles",
+      defaultOn: true,
+    });
   }
 
   return items;

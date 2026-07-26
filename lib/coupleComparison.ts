@@ -14,6 +14,7 @@ import type {
   DayBuilderResult,
   ReadinessSnapshotResult,
   FirstYearResult,
+  ValueTriageResult,
   ValueDefinitionsResult,
   MirrorCardsResult,
   TradeOffsResult,
@@ -61,7 +62,6 @@ export type ComparisonAssembly = {
     strengths: { a: StrengthEntry[]; b: StrengthEntry[] };
     hopes: { slot: "a" | "b"; text: string }[];
     fears: { slot: "a" | "b"; text: string }[];
-    principles: { slot: "a" | "b"; text: string }[];
   };
 };
 
@@ -194,6 +194,7 @@ function buildShared(
   const readiness = result<ReadinessSnapshotResult>(data, "4.1", "readiness-snapshot");
   const balanced = result<BalancedGoalsResult>(data, "4.3", "balanced-goals");
   const firstYear = result<FirstYearResult>(data, "4.7", "first-year");
+  const valuesTriage = result<ValueTriageResult>(data, "3.2", "value-triage");
   const valueDefs = result<ValueDefinitionsResult>(data, "3.4", "value-definitions");
   const mirror = result<MirrorCardsResult>(data, "3.1", "mirror-cards");
   const tradeOffs = result<TradeOffsResult>(data, "4.5", "trade-offs");
@@ -229,19 +230,25 @@ function buildShared(
   const goals = items
     .filter((i) => i.ref.startsWith("goal:") && set.has(i.ref))
     .map((i) => ({ label: i.label, detail: goalDetail.get(norm(i.label)) }));
-  const values = items
-    .filter((i) => i.group === "values" && set.has(i.ref))
-    .map((i) => ({
-      label: i.label,
-      description: valueDesc.get(norm(i.label)),
-      nonNegotiable: nonNegotiable.has(norm(i.label)) || undefined,
-    }));
-  const strengths = items
-    .filter((i) => i.group === "strengths" && set.has(i.ref))
-    .map((i) => ({ label: i.label, note: strengthNote.get(norm(i.label)) }));
-  const principles = items
-    .filter((i) => i.group === "principles" && set.has(i.ref))
-    .map((i) => i.label);
+  // Values/strengths/principles are shared as whole sets (one toggle each), so
+  // they're gated by a single group ref and read straight from the raw results.
+  const values = set.has("value:all")
+    ? (valuesTriage?.core ?? [])
+        .filter((l) => l?.trim())
+        .map((label) => ({
+          label,
+          description: valueDesc.get(norm(label)),
+          nonNegotiable: nonNegotiable.has(norm(label)) || undefined,
+        }))
+    : [];
+  const strengths = set.has("strength:all")
+    ? (mirror?.starred ?? [])
+        .filter((l) => l?.trim())
+        .map((label) => ({ label, note: strengthNote.get(norm(label)) }))
+    : [];
+  const principles = set.has("principle:all")
+    ? (tradeOffs?.principles ?? []).filter((p) => p?.trim())
+    : [];
   const hopeItem = items.find((i) => i.ref === "hope:main" && set.has(i.ref));
   const fears = items
     .filter((i) => i.group === "fears" && set.has(i.ref))
@@ -335,11 +342,6 @@ export function buildComparisonAssembly(input: {
     ...a.base.fears.map((text) => ({ slot: "a" as const, text })),
     ...b.base.fears.map((text) => ({ slot: "b" as const, text })),
   ];
-  const principles: { slot: "a" | "b"; text: string }[] = [
-    ...a.principles.map((text) => ({ slot: "a" as const, text })),
-    ...b.principles.map((text) => ({ slot: "b" as const, text })),
-  ];
-
   return {
     partners: {
       a: { slot: "a", name: a.base.name, cohort: a.base.cohort, planName: a.base.planName },
@@ -352,7 +354,6 @@ export function buildComparisonAssembly(input: {
       strengths: { a: strengthsA, b: strengthsB },
       hopes,
       fears,
-      principles,
     },
   };
 }

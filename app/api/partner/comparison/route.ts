@@ -156,7 +156,6 @@ export async function GET(request: Request) {
     strengths: assembly.deterministic.strengths,
     hopes: assembly.deterministic.hopes,
     fears: assembly.deterministic.fears,
-    principles: assembly.deterministic.principles,
     talk: {
       seeds: comparison.talkTopics,
       user: talk.map((t) => ({

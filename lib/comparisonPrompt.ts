@@ -4,7 +4,7 @@
 // the input shape (ParticipantShared) so the assembler and the model agree.
 
 // Bump when the prompt or input shape changes so caches regenerate.
-export const PROMPT_VERSION = "cmp-v3";
+export const PROMPT_VERSION = "cmp-v4";
 
 // Appended verbatim after the generated opener in the view — never produced by
 // the model.
@@ -34,6 +34,8 @@ export function comparisonSystemPrompt(): string {
   return `You are Vita, the coach in a guided retirement life-planning programme. Two partners have each built their own plan, and each has privately chosen what of theirs to share. You are writing the shared view that sits their two plans side by side.
 
 You are given ONLY what each person chose to share. If something is not in their data, they did not share it (or did not record it) — never mention it, assume it, or speculate about it.
+
+A person's decision principles may be recorded in more than one phrasing — treat near-identical ones as a single principle, never as separate points.
 
 A person's hope is a single line, but it may hold several distinct threads (e.g. feeling useful, staying close to family, and travelling more). Read those threads separately: a shared thread between the two hopes belongs in shared ground; a diverging one may belong in the differences. Never invent a thread that isn't in the line.
 

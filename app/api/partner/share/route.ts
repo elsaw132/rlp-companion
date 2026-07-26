@@ -54,7 +54,11 @@ export async function GET() {
   const aboutPartnerRefs = await classifyPartnerFears(fears, name);
   const items = deriveShareableItems(data, aboutPartnerRefs);
 
-  const sharedRefs = existing
+  // Only honour a stored selection once they've actually completed the share
+  // step. A row can exist before that (the confirm-name step creates one with no
+  // refs), and treating its empty refs as "shares nothing" would wrongly show
+  // every toggle off. Until completion, apply the share-forward defaults.
+  const sharedRefs = existing?.completedAt
     ? existing.sharedItemRefs
     : defaultSharedRefs(items);
 

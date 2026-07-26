@@ -44,7 +44,6 @@ export type Payload = {
   strengths: { a: StrengthEntry[]; b: StrengthEntry[] };
   hopes: { slot: Slot; text: string }[];
   fears: { slot: Slot; text: string }[];
-  principles: { slot: Slot; text: string }[];
   talk: { seeds: string[]; user: { id: string; slot: Slot; body: string }[] };
 };
 
@@ -158,7 +157,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
     tabs.push({ id: "meet", label: "Where you meet" });
   if (data.goals.a.length || data.goals.b.length)
     tabs.push({ id: "goals", label: "Goals" });
-  if (data.values.a.length || data.values.b.length || data.strengths.a.length || data.strengths.b.length || data.principles.length)
+  if (data.values.a.length || data.values.b.length || data.strengths.a.length || data.strengths.b.length)
     tabs.push({ id: "matters", label: "What matters" });
   if (data.hopes.length || data.fears.length)
     tabs.push({ id: "feelings", label: "Hopes & fears" });
@@ -322,13 +321,6 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
                   };
                 }}
               />
-            </Section>
-          )}
-          {data.principles.length > 0 && (
-            <Section heading="How you each decide" note="The principles you each lead with when things pull against each other.">
-              {data.principles.map((p, i) => (
-                <QuoteCard key={i} partners={partners} slot={p.slot} text={p.text} />
-              ))}
             </Section>
           )}
         </div>
