@@ -18,6 +18,9 @@ export type ShareData = {
   aboutPartnerRefs: string[];
   completed: boolean;
   partnerFirstName: string;
+  // The person's decision principles (deduped), shown behind a reveal under the
+  // single principles toggle so they can see what they're sharing.
+  principles?: string[];
 };
 
 const GROUP_META: Record<
@@ -71,6 +74,7 @@ export default function ShareStep({ preview }: { preview?: ShareData } = {}) {
   const [error, setError] = useState(false);
   const [on, setOn] = useState<Set<string>>(new Set(preview?.sharedRefs ?? []));
   const [submitting, setSubmitting] = useState(false);
+  const [showPrinciples, setShowPrinciples] = useState(false);
 
   useEffect(() => {
     // Preview mode (dummy data injected): skip the network entirely.
@@ -196,33 +200,56 @@ export default function ShareStep({ preview }: { preview?: ShareData } = {}) {
             </p>
             {rows.map((it) => {
               const isOn = on.has(it.ref);
+              const revealable =
+                it.ref === "principle:all" && (data.principles?.length ?? 0) > 0;
               return (
-                <div key={it.ref} style={styles.row}>
-                  <span style={styles.rowText}>
-                    {it.label}
-                    {it.aboutPartner && (
-                      <span style={styles.flag}>This one&rsquo;s about {name}</span>
-                    )}
-                  </span>
-                  <span style={styles.state}>{isOn ? "On" : "Off"}</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isOn}
-                    aria-label={`Share: ${it.label}`}
-                    onClick={() => toggle(it.ref)}
-                    style={{
-                      ...styles.switch,
-                      ...(isOn ? styles.switchOn : null),
-                    }}
-                  >
-                    <span
+                <div key={it.ref}>
+                  <div style={styles.row}>
+                    <span style={styles.rowText}>
+                      {it.label}
+                      {it.aboutPartner && (
+                        <span style={styles.flag}>This one&rsquo;s about {name}</span>
+                      )}
+                      {revealable && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPrinciples((v) => !v)}
+                          aria-expanded={showPrinciples}
+                          style={styles.revealBtn}
+                        >
+                          {showPrinciples ? "Hide" : "Show these"}
+                        </button>
+                      )}
+                    </span>
+                    <span style={styles.state}>{isOn ? "On" : "Off"}</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isOn}
+                      aria-label={`Share: ${it.label}`}
+                      onClick={() => toggle(it.ref)}
                       style={{
-                        ...styles.knob,
-                        ...(isOn ? styles.knobOn : null),
+                        ...styles.switch,
+                        ...(isOn ? styles.switchOn : null),
                       }}
-                    />
-                  </button>
+                    >
+                      <span
+                        style={{
+                          ...styles.knob,
+                          ...(isOn ? styles.knobOn : null),
+                        }}
+                      />
+                    </button>
+                  </div>
+                  {revealable && showPrinciples && (
+                    <ul style={styles.revealList}>
+                      {data.principles!.map((p, i) => (
+                        <li key={i} style={styles.revealItem}>
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               );
             })}
@@ -399,6 +426,35 @@ const styles: Record<string, CSSProperties> = {
     color: "var(--text-muted)",
     minWidth: 32,
     textAlign: "right",
+  },
+  revealBtn: {
+    border: "none",
+    background: "none",
+    padding: 0,
+    marginLeft: 10,
+    color: "var(--color-vita)",
+    textDecoration: "underline",
+    cursor: "pointer",
+    font: "inherit",
+    fontSize: "var(--fs-sm)",
+    whiteSpace: "nowrap",
+  },
+  revealList: {
+    listStyle: "disc",
+    margin: "2px 0 12px",
+    padding: "12px 16px 12px 34px",
+    background: "var(--bg-alt)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-sm)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  revealItem: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-sm)",
+    lineHeight: 1.45,
+    color: "var(--text)",
   },
   switch: {
     flex: "none",

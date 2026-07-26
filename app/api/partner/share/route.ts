@@ -12,6 +12,8 @@ import {
   fearItems,
 } from "@/lib/coupleShare";
 import { classifyPartnerFears } from "@/lib/partnerFears";
+import { dedupePrinciples } from "@/lib/principleDedup";
+import type { TradeOffsResult } from "@/lib/modules";
 
 // The share step's data endpoint. GET returns this participant's shareable items
 // (with partner-directed fears classified and defaulted off) plus their current
@@ -51,7 +53,20 @@ export async function GET() {
 
   const data = await getAllUserData(userId);
   const fears = fearItems(deriveShareableItems(data, []));
-  const aboutPartnerRefs = await classifyPartnerFears(fears, name);
+
+  // The person's decision principles, for the "click to reveal" list under the
+  // single principles toggle. Deduped for display only (the module can store the
+  // same principle in two phrasings); the whole set is still what's shared.
+  const to = data["interaction:4.5"];
+  const rawPrinciples =
+    to && typeof to === "object" && (to as { type?: unknown }).type === "trade-offs"
+      ? ((to as TradeOffsResult).principles ?? []).filter((p) => p?.trim())
+      : [];
+
+  const [aboutPartnerRefs, principles] = await Promise.all([
+    classifyPartnerFears(fears, name),
+    rawPrinciples.length ? dedupePrinciples(rawPrinciples) : Promise.resolve<string[]>([]),
+  ]);
   const items = deriveShareableItems(data, aboutPartnerRefs);
 
   // Only honour a stored selection once they've actually completed the share
@@ -68,6 +83,7 @@ export async function GET() {
     aboutPartnerRefs,
     completed: Boolean(existing?.completedAt),
     partnerFirstName: name,
+    principles,
   });
 }
 
