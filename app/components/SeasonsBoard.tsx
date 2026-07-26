@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   SeasonsBoardInteraction,
   SeasonsBoardResult,
@@ -48,12 +48,17 @@ type SeasonsBoardProps = {
   // Cards drawn from the person's earlier answers, assembled in SessionContainer
   // from the user model. Empty if there's nothing to seed from.
   cards: SeasonCard[];
+  // True while the curated cards are still being assembled (no cached seed yet).
+  // The board then shows a brief loading state instead of the raw, un-curated
+  // fallback list — the person never sees the rough version.
+  seedPending?: boolean;
   onFinish: (result: SeasonsBoardResult) => void;
 } & EditableProps<SeasonsBoardResult>;
 
 export default function SeasonsBoard({
   interaction,
   cards,
+  seedPending = false,
   onFinish,
   mode = "create",
   initial,
@@ -83,6 +88,27 @@ export default function SeasonsBoard({
     }));
   });
   const [draft, setDraft] = useState("");
+
+  // The board first renders from the raw fact list, then the curated cards arrive a
+  // few seconds later (the Claude tidy) and replace it. Because `items` was seeded
+  // once at mount, that upgrade used to be ignored and the person stayed on the
+  // rough list. Re-seed from the new cards when they land — but only while the board
+  // is still untouched (creating, nothing placed, nothing added of their own), so we
+  // never discard work in progress.
+  const seededSignature = cards.map((c) => c.label).join("|");
+  useEffect(() => {
+    if (initial) return; // editing an existing board — never re-seed
+    setItems((prev) => {
+      const untouched = prev.every((it) => it.seasons.length === 0 && !it.own);
+      if (!untouched) return prev;
+      return cards.map((c) => ({
+        label: c.label,
+        category: c.category,
+        seasons: [],
+      }));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seededSignature]);
 
   // Toggle a season for a card. The enduring lane and the three seasons are
   // mutually exclusive: a card runs across all of them, or sits in specific
@@ -137,6 +163,26 @@ export default function SeasonsBoard({
       seasonOrder,
       summaryLabel,
     };
+  }
+
+  // While the curated cards are still being assembled, show a calm loading state
+  // rather than the rough, un-curated fallback list. Create mode only — editing an
+  // existing board always has its own placements to show.
+  if (seedPending && !initial) {
+    return (
+      <section style={styles.wrap}>
+        <style>{seasonsCss}</style>
+        <div style={styles.loadingCard}>
+          <span style={styles.loadingMark} aria-hidden="true">
+            🍂
+          </span>
+          <p style={styles.loadingText}>
+            Bringing together what matters most to you across the whole
+            programme…
+          </p>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -321,6 +367,26 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: "var(--lh-body)",
     color: "var(--text-muted)",
     margin: 0,
+  },
+  loadingCard: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "12px",
+    padding: "32px 24px",
+    background: "var(--warm-surface)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--r-md)",
+    textAlign: "center",
+  },
+  loadingMark: { fontSize: "28px" },
+  loadingText: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-h3)",
+    fontWeight: 500,
+    color: "var(--ink)",
+    margin: 0,
+    maxWidth: "32ch",
   },
   // Keep the helper line close above the cards (tighter than the wrap's 28px
   // gap) so it reads as a cue for the element, not a separate block.

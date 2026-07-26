@@ -8,7 +8,6 @@ import type {
   TradeOffsResult,
 } from "@/lib/modules";
 import {
-  fallbackTradeOffs,
   fetchTradeOffsDraft,
   financeSignal,
   tradeOffGoalInputs,
@@ -17,6 +16,7 @@ import {
   type TradeOffsSeed,
 } from "@/lib/tradeOffsSeed";
 import { useUserData } from "@/lib/userData";
+import { DraftFailed } from "./DraftFailed";
 import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 type Bucket = "non-negotiable" | "flexible" | "unsorted";
@@ -195,7 +195,7 @@ export default function TradeOffs({
   // fresh run uses any cached draft, or fetches one (the "loading" phase).
   const cachedSeed = initial ? null : userData.getTradeOffSeed(sessionId);
 
-  const [phase, setPhase] = useState<"loading" | "curate">(
+  const [phase, setPhase] = useState<"loading" | "curate" | "failed">(
     initial || cachedSeed ? "curate" : "loading"
   );
 
@@ -221,6 +221,11 @@ export default function TradeOffs({
   const fetchedRef = useRef(false);
   useEffect(() => {
     if (phase !== "loading" || fetchedRef.current) return;
+    // Never draft from an empty user model (a race where the facts hadn't loaded) —
+    // that yields generic, factless scenarios. A prefetch may already hold a real
+    // draft, so allow that; otherwise wait until userModelText fills in (re-runs).
+    const prefetched = userData.getTradeOffSeed(sessionId);
+    if (!prefetched && !userModelText.trim()) return;
     fetchedRef.current = true;
     let cancelled = false;
     (async () => {
@@ -238,18 +243,12 @@ export default function TradeOffs({
           values: draftInputs.values,
         }));
       if (cancelled) return;
-      const seed =
-        draft ??
-        fallbackTradeOffs({
-          userModel: userModelText,
-          onboarding: onboardingContext,
-          hasPartner,
-          retirementStage: userData.getRetirementStage(),
-          goals: draftInputs.goals,
-          finance: draftInputs.finance,
-          values: draftInputs.values,
-        });
-      if (draft && !cached) void userData.saveTradeOffSeed(sessionId, draft);
+      if (!draft) {
+        setPhase("failed");
+        return;
+      }
+      const seed = draft;
+      if (!cached) void userData.saveTradeOffSeed(sessionId, draft);
       setScenarios(makeFreshScenarios(seed));
       setValues(makeFreshValues(seed));
       setPrinciples(makeFreshPrinciples(seed));
@@ -259,7 +258,7 @@ export default function TradeOffs({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, userModelText]);
 
   // Monotonic counter for ids of principles the person adds.
   const nextIdRef = useRef(0);
@@ -309,6 +308,21 @@ export default function TradeOffs({
       principles: principles.map((p) => p.text.trim()).filter(Boolean),
       summaryLabel,
     };
+  }
+
+  if (phase === "failed") {
+    return (
+      <section style={styles.wrap}>
+        <style>{tradeCss}</style>
+        <DraftFailed
+          message="We couldn't draft your trade-offs just now. Your answers are all saved. Try again in a moment."
+          onRetry={() => {
+            fetchedRef.current = false;
+            setPhase("loading");
+          }}
+        />
+      </section>
+    );
   }
 
   if (phase === "loading") {

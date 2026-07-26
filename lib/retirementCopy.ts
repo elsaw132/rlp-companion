@@ -235,10 +235,10 @@ export const RULES: Rule[] = [
   // copy for every cohort, so there's nothing cohort-specific left to rewrite.
   // Its description and coachOpening below still are.
   {
-    find: "Here's the balance you've set for your ideal week. Which of these did you feel most strongly about?",
+    find: "Let's talk through the shape of your ideal week. Where does the balance feel most important to you?",
     variants: v(
-      "Here's the balance you've set for your ideal week. Which of these did you feel most strongly about?",
-      "Here's the balance of your week as it is now. Which of these did you feel most strongly about — and is there anything you'd like to shift?"
+      "Let's talk through the shape of your ideal week. Where does the balance feel most important to you?",
+      "Let's talk through the shape of your week as it is now. Where does the balance feel most important to you?"
     ),
   },
 

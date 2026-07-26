@@ -282,6 +282,9 @@ export function coerceTradeOffs(
   return {
     scenarios: scenarios.length ? scenarios : fb.scenarios,
     values: fb.values,
-    principles: principles.length ? principles : fb.principles,
+    // Never fabricate the person's principles ("When something has to give, I
+    // protect the people I love…"). If the model gave none, leave them blank for
+    // the person to write rather than inventing them.
+    principles,
   };
 }

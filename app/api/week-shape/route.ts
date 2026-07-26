@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import {
   coerceWeekShape,
-  fallbackWeekShape,
   type WeekShapeDraftInput,
 } from "@/lib/weekShapeSeed";
 
@@ -61,17 +60,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as WeekShapeDraftInput;
   } catch {
-    return Response.json({
-      seed: fallbackWeekShape({
-        userModel: "",
-        onboarding: "",
-        hasPartner: false,
-        retirementStage: null,
-        goals: [],
-        transition: null,
-        recurring: [],
-      }),
-    });
+    return Response.json({ seed: null });
   }
 
   const input: WeekShapeDraftInput = {

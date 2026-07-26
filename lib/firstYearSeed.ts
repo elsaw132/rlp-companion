@@ -372,7 +372,11 @@ export function coerceFirstYear(
   const narrative = str(obj.narrative);
 
   return {
+    // Keep the model's real items; the fallback set is still built from the
+    // person's own goals/rhythm, so it's a grounded floor if the model gave none.
     items: items.length ? items : fb.items,
-    narrative: narrative || fb.narrative,
+    // Never fabricate the first-year prose. If the model gave no narrative, leave
+    // it blank for the person to write, rather than inventing one for them.
+    narrative,
   };
 }

@@ -918,21 +918,37 @@ export default function SessionContainer({
   // consistently-phrased set, cached for the surface. Curation selects and phrases only
   // from what the person actually said (never invents); if it hasn't landed, the board
   // falls back to the raw seasonCardsFromFacts set, so it always renders.
+  // While the curation runs, the board shows a calm loading state instead of the
+  // raw fallback list. `seasonsCurationSettled` flips true the moment there's
+  // nothing left to wait for — a seed is cached, the call finished (success OR
+  // failure), or there was nothing to curate — so the loader never spins forever.
   const seasonsCardsPrefetchedRef = useRef(false);
+  const [seasonsCurationSettled, setSeasonsCurationSettled] = useState(false);
   useEffect(() => {
     if (interaction?.type !== "seasons-board") return;
-    if (seasonsCardsPrefetchedRef.current || userData.getSeasonsCardsSeed(sessionId))
+    if (userData.loading) return; // wait for the snapshot before deciding
+    if (userData.getSeasonsCardsSeed(sessionId)) {
+      setSeasonsCurationSettled(true); // already curated — show it straight away
       return;
+    }
+    if (seasonsCardsPrefetchedRef.current) return;
     const input = seasonCandidatesFromFacts(userData.getActiveFacts());
-    // Nothing to curate — skip the call entirely.
-    if (input.candidates.length === 0) return;
+    // Nothing to curate — let the board render its (empty) fallback.
+    if (input.candidates.length === 0) {
+      setSeasonsCurationSettled(true);
+      return;
+    }
     seasonsCardsPrefetchedRef.current = true;
     void (async () => {
       const seed = await fetchSeasonsCards(input);
       if (seed) void userData.saveSeasonsCardsSeed(sessionId, seed);
+      // Whether it landed or failed, stop the loader: a seed shows the curated
+      // board; a failure lets the raw fallback render rather than spin forever.
+      else seasonsCardsPrefetchedRef.current = false;
+      setSeasonsCurationSettled(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interaction, sessionId]);
+  }, [interaction, sessionId, userData.loading]);
 
   // The first-year draft (4.7) is the same slow Claude call. Prefetch the
   // assembled year — grounded in the goals (4.3), the weekly rhythm (4.6), the
@@ -1229,12 +1245,13 @@ export default function SessionContainer({
       });
     };
 
-    // The facts already on record for this module, so the delta pass can target a
-    // correction precisely (the "drop the 11am coffee" case) and not re-propose
-    // something already captured.
+    // The person's FULL memory (every session so far), so the delta pass can
+    // RECONCILE against it: revise or drop a fact wherever it was first captured
+    // (the "carpentry survives across five sessions" bug), and never re-propose
+    // something already on record. Cross-module, not just this session.
     const knownFacts = user
       ? userData
-          .getActiveFacts({ provenanceModule: sessionId })
+          .getActiveFacts()
           .map((f) => ({ label: f.data.label, category: f.category }))
       : [];
 
@@ -1853,10 +1870,10 @@ export default function SessionContainer({
   // (manifest-scoped, status=active) rather than the lossy user-model re-derivation:
   // 4.2's seasons board takes a flat set of cards; 4.3's springboards come from the
   // recurring_activity facts grouped by balanced area.
-  // The board reads Vita's tidied (de-duplicated) cards once they've landed in the
-  // cache, and falls back to the raw fact-sourced cards until then — so it always
-  // renders, just with the near-duplicates still showing if the tidy hasn't
-  // finished. The tidy only groups same-intent cards; it never drops a distinct one.
+  // The board reads Vita's tidied (curated) cards once they've landed in the cache.
+  // Until the tidy settles the board shows a loading state (see seasonsSeedPending)
+  // rather than the rough fallback, so the person never sees the un-curated list.
+  // The raw fact-sourced set is only used if the tidy genuinely fails.
   const seededCards =
     interaction?.type === "seasons-board"
       ? (userData.getSeasonsCardsSeed(sessionId)?.cards ??
@@ -1864,6 +1881,13 @@ export default function SessionContainer({
           resolveSeedItems(sessionId, userData.getActiveFacts())
         ))
       : [];
+  // True while the curated cards are still being assembled: the board shows a calm
+  // loading state instead of the rough fallback. Editing an existing board is never
+  // pending — it has its own saved placements.
+  const seasonsSeedPending =
+    interaction?.type === "seasons-board" &&
+    !userData.getSeasonsCardsSeed(sessionId) &&
+    !seasonsCurationSettled;
   const balancedSeed: BalancedSeed | null =
     interaction?.type === "balanced-goals"
       ? springboardsFromFacts(
@@ -2053,6 +2077,7 @@ export default function SessionContainer({
           interaction={interaction}
           seed={seed}
           seededCards={seededCards}
+          seasonsSeedPending={seasonsSeedPending}
           balancedSeed={balancedSeed}
           onFinish={handleBuildFinish}
           hasPartner={userData.hasPartner()}
@@ -2442,6 +2467,7 @@ function InteractionStep({
   interaction,
   seed = null,
   seededCards = [],
+  seasonsSeedPending = false,
   balancedSeed = null,
   onFinish,
   mode = "create",
@@ -2458,6 +2484,9 @@ function InteractionStep({
   seed?: Stage3Seed | null;
   // Pre-populated cards for the Stage 4 seasons board (4.2); empty otherwise.
   seededCards?: SeasonCard[];
+  // True while the seasons board's curated cards are still being assembled — the
+  // board shows a loading state instead of the raw fallback.
+  seasonsSeedPending?: boolean;
   // Pre-populated springboards for the balanced-goals exercise (4.3); null
   // for every other type.
   balancedSeed?: BalancedSeed | null;
@@ -2612,6 +2641,7 @@ function InteractionStep({
         <SeasonsBoard
           interaction={interaction}
           cards={seededCards}
+          seedPending={seasonsSeedPending}
           onFinish={onFinish}
           mode={mode}
           initial={initial?.type === "seasons-board" ? initial : undefined}

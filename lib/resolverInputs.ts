@@ -136,7 +136,11 @@ export function seasonCardsFromFacts(items: ResolvedFact[]): SeasonCard[] {
 // the thing itself so cards stay short and near-duplicates collapse.
 function conciseCardLabel(text: string): string {
   const head = text.split(/\s+(?:--|—|–)\s+|:\s+/)[0].trim();
-  return head || text.trim();
+  const label = head || text.trim();
+  // Sentence-case the first letter: some source facts are stored lower case
+  // (conversation-extracted activities and aspirations), which read as messy on
+  // the board. Leaves the rest of the label untouched.
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : label;
 }
 
 // ---- 4.2 season-board CANDIDATES (the curation input) --------------------------

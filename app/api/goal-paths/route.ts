@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import {
   coerceGoalPaths,
-  fallbackGoalPaths,
   type GoalPathInput,
 } from "@/lib/goalPathsSeed";
 
@@ -66,7 +65,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as DraftRequest;
   } catch {
-    return Response.json({ seed: fallbackGoalPaths([]) });
+    return Response.json({ seed: null });
   }
 
   const goals = Array.isArray(body.goals) ? body.goals : [];
@@ -77,7 +76,7 @@ export async function POST(request: Request) {
   // No goals to draw a path for — return the generic fallback rather than
   // inventing goals from thin air.
   if (!goals.length) {
-    return Response.json({ seed: fallbackGoalPaths([]) });
+    return Response.json({ seed: null });
   }
 
   const goalBlock = goals

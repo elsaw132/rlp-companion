@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import {
   coerceTradeOffs,
-  fallbackTradeOffs,
   type TradeOffsDraftInput,
 } from "@/lib/tradeOffsSeed";
 
@@ -57,17 +56,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as TradeOffsDraftInput;
   } catch {
-    return Response.json({
-      seed: fallbackTradeOffs({
-        userModel: "",
-        onboarding: "",
-        hasPartner: false,
-        retirementStage: null,
-        goals: [],
-        finance: null,
-        values: [],
-      }),
-    });
+    return Response.json({ seed: null });
   }
 
   const input: TradeOffsDraftInput = {

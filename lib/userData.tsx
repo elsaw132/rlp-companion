@@ -470,6 +470,7 @@ type ContextValue = {
   setKey: (key: string, value: unknown | ((prev: unknown) => unknown)) => Promise<void>;
   removeKey: (key: string) => Promise<void>;
   removeAll: () => Promise<void>;
+  reload: () => Promise<void>;
 };
 
 const UserDataContext = createContext<ContextValue | null>(null);
@@ -651,9 +652,21 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [commit]);
 
+  // Re-fetch the profile from the server and replace the snapshot. Used after a
+  // per-module reset so getActiveFacts reflects the rejected facts without a full
+  // page reload.
+  const reload = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user-data");
+      if (res.ok) commit((await res.json()) as Record<string, unknown>);
+    } catch {
+      /* keep the current snapshot */
+    }
+  }, [commit]);
+
   return (
     <UserDataContext.Provider
-      value={{ loading, snapshot, setKey, removeKey, removeAll }}
+      value={{ loading, snapshot, setKey, removeKey, removeAll, reload }}
     >
       {children}
     </UserDataContext.Provider>
@@ -670,7 +683,7 @@ export function useUserData() {
   if (!ctx) {
     throw new Error("useUserData must be used within a UserDataProvider");
   }
-  const { loading, snapshot, setKey, removeKey, removeAll } = ctx;
+  const { loading, snapshot, setKey, removeKey, removeAll, reload } = ctx;
 
   const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
@@ -1345,6 +1358,19 @@ export function useUserData() {
   const resetAll = () => removeAll();
 
   const resetModule = async (id: string) => {
+    // Drop the facts this module contributed to the profile too — not only its
+    // cached answers. Without this, a restart re-drafts from a pool that still
+    // holds the old module's facts (which is why the seasons board kept showing
+    // last run's cards). Best-effort: the cache clears below still run either way.
+    try {
+      await fetch("/api/context-facts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resetModule", moduleId: id }),
+      });
+    } catch {
+      /* best-effort */
+    }
     await removeKey(KEYS.conversation(id));
     await removeKey(KEYS.interaction(id));
     await clearSeed(id);
@@ -1363,6 +1389,10 @@ export function useUserData() {
     await clearTakeaway(id);
     await clearDreams(id);
     await clearModuleComplete(id);
+    // Refresh the in-memory profile from the server so getActiveFacts — and the
+    // seasons board's candidate pool it feeds — reflects the rejected facts rather
+    // than the stale snapshot loaded at page mount.
+    await reload();
   };
 
   return {

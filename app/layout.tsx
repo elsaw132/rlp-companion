@@ -1,5 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
@@ -28,6 +28,22 @@ export const metadata: Metadata = {
   // The app domain stays out of search during the pilot (invite-only; the public
   // front door is chorus-life.com). Inherited by every page unless overridden.
   robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // The Vita chat box is a footer docked to the bottom of the screen. When the
+  // on-screen keyboard opens, tell the browser to SHRINK THE PAGE (resize the
+  // layout) so the docked box lands above the keyboard on its own. Without this,
+  // Android uses its default ("resizes-visual"): the page stays full-height, the
+  // box ends up behind the keyboard, and the JavaScript that slides it up (in
+  // SessionContainer's Composer) fights Android's keyboard handling — moving the
+  // focused box's fixed parent makes Chrome drop the keyboard the instant it
+  // opens, so it flashes open and shut and the user can never type. iOS ignores
+  // this directive (its keyboard overlays the page), so the Composer's
+  // visual-viewport lift keeps handling iPhone exactly as before.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

@@ -74,7 +74,7 @@ describe("seasonCandidatesFromFacts", () => {
       mk("keep_change_leave", "my work identity", { description: "change" }),
     ];
     const labels = seasonCandidatesFromFacts(facts).candidates.map((c) => c.label);
-    expect(labels).toContain("the trips with Harry");
+    expect(labels).toContain("The trips with Harry");
     expect(labels).not.toContain("the long commute");
     expect(labels).not.toContain("my work identity");
   });

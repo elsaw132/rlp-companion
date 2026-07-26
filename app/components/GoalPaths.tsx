@@ -7,13 +7,13 @@ import type {
   GoalPathsResult,
 } from "@/lib/modules";
 import {
-  fallbackGoalPaths,
   fetchGoalPathsDraft,
   seedFromResult,
   spotlightGoalInputs,
   type GoalPath,
 } from "@/lib/goalPathsSeed";
 import { useUserData } from "@/lib/userData";
+import { DraftFailed } from "./DraftFailed";
 import { FinishControls, HelperLine, type EditableProps } from "./InteractionShell";
 
 type Track = "do" | "be";
@@ -151,7 +151,7 @@ export default function GoalPaths({
   // fresh run uses any cached draft, or fetches one (the "loading" phase).
   const cachedSeed = initial ? null : userData.getGoalPathSeed(sessionId);
 
-  const [phase, setPhase] = useState<"loading" | "curate">(
+  const [phase, setPhase] = useState<"loading" | "curate" | "failed">(
     initial || cachedSeed ? "curate" : "loading"
   );
 
@@ -165,6 +165,11 @@ export default function GoalPaths({
   const fetchedRef = useRef(false);
   useEffect(() => {
     if (phase !== "loading" || fetchedRef.current) return;
+    // Never draft from an empty user model (a race where the facts hadn't loaded) —
+    // that yields generic, factless paths. A prefetch may already hold a real draft,
+    // so allow that; otherwise wait until userModelText fills in (this effect re-runs).
+    const prefetched = userData.getGoalPathSeed(sessionId);
+    if (!prefetched && !userModelText.trim()) return;
     fetchedRef.current = true;
     let cancelled = false;
     (async () => {
@@ -181,15 +186,19 @@ export default function GoalPaths({
           strengths,
         }));
       if (cancelled) return;
-      if (draft && !cached) void userData.saveGoalPathSeed(sessionId, draft);
-      setPaths(pathsFromSeed((draft ?? fallbackGoalPaths(goalInputs)).paths));
+      if (!draft) {
+        setPhase("failed");
+        return;
+      }
+      if (!cached) void userData.saveGoalPathSeed(sessionId, draft);
+      setPaths(pathsFromSeed(draft.paths));
       setPhase("curate");
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, userModelText]);
 
   // Monotonic counters for ids of stones/supports the person adds. Refs so they
   // survive re-renders and never collide with the drafted ids.
@@ -328,6 +337,21 @@ export default function GoalPaths({
       }),
       summaryLabel,
     };
+  }
+
+  if (phase === "failed") {
+    return (
+      <section style={styles.wrap}>
+        <style>{pathCss}</style>
+        <DraftFailed
+          message="We couldn't sketch the paths for your goals just now. Your answers are all saved. Try again in a moment."
+          onRetry={() => {
+            fetchedRef.current = false;
+            setPhase("loading");
+          }}
+        />
+      </section>
+    );
   }
 
   if (phase === "loading") {
