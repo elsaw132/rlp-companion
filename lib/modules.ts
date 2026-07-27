@@ -3446,8 +3446,9 @@ A short, warm sign-off — one or two sentences. Note that this first-year pictu
     // Act works differently from the rest: no set order, nothing required. The
     // last paragraph is rewritten per cohort in retirementCopy.ts — how useful
     // these sessions are right now depends on how far into retirement someone
-    // is. Not shown while Act has no sessions: the dashboard renders
-    // PILOT_CALLOUT in its place until then (see moduleVisibleFor / comingSoon).
+    // is. While Act has no built sessions, the dashboard shows an in-stage
+    // message in its place (couples get the one partner session; everyone else
+    // sees that the pilot completes after Stage 4 — see HomeDashboard).
     intro: {
       heading: "Now let's put it to work",
       body: [
@@ -3684,25 +3685,6 @@ Mirror back, in their words: how they want the rest of the wind-down to go, the 
 // retirement" opening written for someone with it all still ahead. The stage
 // label stays "STAGE 1 · IMAGINE"; only the body changes. Applied in the home
 // dashboard behind the flag; everyone else keeps the default intro.
-// What stands in for Act's intro while Act has no sessions to open — the pilot
-// has reached the end of what's built. Shown through the same StageIntro
-// surface, so it reads as Vita speaking rather than as an error, and its button
-// returns to the plan (the thing they've just finished making) rather than
-// carrying on into a stage that isn't there.
-//
-// The dashboard chooses between this and Act's real intro on whether Act has any
-// visible sessions — not on a flag — so the day Act's sessions land, this
-// disappears on its own and the real intro takes over. Its "seen" state is
-// tracked separately from the stage intros for the same reason: someone who saw
-// this must still meet the real Act intro when it ships.
-export const PILOT_CALLOUT: StageIntro = {
-  heading: "You're all done for now",
-  body: [
-    "Stage 5, Act, isn't ready yet — we're still building it. We'll be in touch the moment its sessions are open to pilot participants. For now, you've reached the end of what's here. Thank you for taking part; it makes a real difference to what we're building. We'll speak soon.",
-  ],
-  buttonLabel: "Back to my plan",
-};
-
 export const WINDING_STAGE1_INTRO_BODY: string[] = [
   "You've already started the shift out of work — one foot in, one stepping into what's next. That gives you a real head start: you're not imagining retirement from a standing start, you're picturing the rest of a change that's already underway.",
   "There's no right answer here, and nothing to get perfect. These first few sessions help you build a vivid picture of the retirement your wind-down is leading toward — something you'll come back to, deepen, and reshape as you go.",
