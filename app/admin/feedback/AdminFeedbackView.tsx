@@ -116,23 +116,27 @@ type SummaryRow = {
   medianActiveMs: number | null;
 };
 
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+// UK-time formatting (Europe/London — BST in summer, GMT in winter, switched
+// automatically). An EXPLICIT timeZone keeps this deterministic: server and
+// client both format the same instant for the same fixed zone, so there's no
+// hydration mismatch (unlike relying on the machine's local zone). formatToParts
+// assembles the exact "5 Aug 2026, 18:36" shape from London-time parts.
+const UK_PARTS = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/London",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 
-// Deterministic UTC formatting, so the server-rendered markup and the client
-// hydration match exactly (a locale/timezone formatter would differ between them
-// and trip a hydration warning).
 function fmtDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const day = d.getUTCDate();
-  const mon = MONTHS[d.getUTCMonth()];
-  const year = d.getUTCFullYear();
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${day} ${mon} ${year}, ${hh}:${mm}`;
+  const p: Record<string, string> = {};
+  for (const part of UK_PARTS.formatToParts(d)) p[part.type] = part.value;
+  return `${p.day} ${p.month} ${p.year}, ${p.hour}:${p.minute}`;
 }
 
 // A short, stable handle for a tester from their Clerk user id — enough to tell
