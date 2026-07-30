@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuleFeedbackCard from "./ModuleFeedbackCard";
 import { useModuleTimer } from "@/lib/useModuleTimer";
@@ -2918,6 +2918,9 @@ function Composer({
   const [input, setInput] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
+  // True while the box has focus (the user is typing). We lift the bar more
+  // eagerly when focused — see the measure() threshold below.
+  const focusedRef = useRef(false);
 
   // The box is ALWAYS docked to the bottom of the screen (a fixed footer). This
   // value is how many pixels the on-screen keyboard is covering (0 when it's
@@ -2936,26 +2939,37 @@ function Composer({
   // behind it without this spacer).
   const [barHeight, setBarHeight] = useState(88);
 
-  useEffect(() => {
+  // Measure how much of the screen's bottom is covered, and lift the bar by that
+  // much. Track BOTH resize (keyboard opening/closing) and scroll: on iOS the
+  // visual viewport shifts under your finger as you scroll with the keyboard up,
+  // so recomputing on scroll keeps the bar glued above the keyboard instead of
+  // drifting — that drift was the jitter testers saw.
+  const measure = useCallback(() => {
     const vv = window.visualViewport;
     if (!vv) return; // No visual-viewport support: bar just sits at bottom: 0.
-    const update = () => {
-      const overlap = window.innerHeight - vv.height - vv.offsetTop;
-      // Ignore tiny changes (URL-bar show/hide); only a real keyboard clears
-      // this threshold. Track BOTH resize (keyboard opening/closing) and scroll:
-      // on iOS the visual viewport shifts under your finger as you scroll with
-      // the keyboard up, so recomputing on scroll keeps the bar glued above the
-      // keyboard instead of drifting — that drift was the jitter testers saw.
-      setKbInset(overlap > 120 ? overlap : 0);
-    };
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
-    };
+    const overlap = window.innerHeight - vv.height - vv.offsetTop;
+    // While the box is focused (the user is typing) lift it above ANYTHING
+    // covering the bottom, down to a slim ~40px. That slim case is an iPad with
+    // a hardware keyboard attached: there's no full on-screen keyboard, just a
+    // short predictive/dictation bar (~55px). The old flat 120px cutoff — there
+    // to ignore Safari's address bar sliding in and out — treated that bar as
+    // noise and left the box sitting underneath it. When the box is NOT focused,
+    // keep the 120px cutoff so address-bar wobble doesn't nudge anything.
+    const threshold = focusedRef.current ? 40 : 120;
+    setKbInset(overlap > threshold ? overlap : 0);
   }, []);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    measure();
+    vv.addEventListener("resize", measure);
+    vv.addEventListener("scroll", measure);
+    return () => {
+      vv.removeEventListener("resize", measure);
+      vv.removeEventListener("scroll", measure);
+    };
+  }, [measure]);
 
   // Keep the reserved spacer matched to the bar's real height (it grows as the
   // message wraps to more lines), so the last message always clears it.
@@ -3009,6 +3023,16 @@ function Composer({
         placeholder="Type your message…"
         rows={1}
         value={input}
+        onFocus={() => {
+          // Re-measure now: on iPad the predictive/dictation bar appears the
+          // instant the box is focused, and we want the lift to include it.
+          focusedRef.current = true;
+          measure();
+        }}
+        onBlur={() => {
+          focusedRef.current = false;
+          measure();
+        }}
         onChange={(e) => {
           setInput(e.target.value);
           // Only reaches the parent when a notice is actually up, so normal
