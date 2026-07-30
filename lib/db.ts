@@ -723,6 +723,358 @@ export async function getAllBaselineSurveys(): Promise<BaselineSurveyRow[]> {
   }));
 }
 
+// --- Post-completion survey -----------------------------------------------
+// The one-time pilot survey shown when a member finishes the programme — their
+// Retirement Life Plan is complete. This is the "after" to baseline_survey's
+// "before". Its own table, for the same reasons as baseline_survey: cross-user
+// research data read by the admin portal, one row per member (user_id is the PK),
+// upserted so a resubmission overwrites in place rather than duplicating.
+//
+// Two columns deliberately share the baseline's names and types — feelings
+// (jsonb) and planning_confidence (int) — because the pilot compares them
+// directly across the two tables. Keep them identical. Every other column is the
+// survey's own. Every column is nullable: every question can be skipped, and a
+// partial submission still records whatever was answered.
+let postCompletionSurveyTableReady: Promise<void> | null = null;
+
+function ensurePostCompletionSurveyTable(): Promise<void> {
+  if (!postCompletionSurveyTableReady) {
+    postCompletionSurveyTableReady = sql()`
+      CREATE TABLE IF NOT EXISTS post_completion_survey (
+        user_id text PRIMARY KEY,
+        overall_value int,
+        feelings jsonb,
+        feelings_other text,
+        planning_confidence int,
+        before_thought text,
+        after_thought text,
+        expectations_met text,
+        vita_understood int,
+        vita_good_questions int,
+        vita_authentic int,
+        vita_challenged int,
+        vita_discovered int,
+        comfort_sharing int,
+        comfort_improve text,
+        session_stayed text,
+        session_stayed_why text,
+        team_message text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `
+      .then(() => undefined)
+      .catch((err) => {
+        postCompletionSurveyTableReady = null;
+        throw err;
+      });
+  }
+  return postCompletionSurveyTableReady;
+}
+
+// The full post-completion payload. user_id always comes from the authenticated
+// Clerk session at the call site, never from client input. feelings is the
+// up-to-three multi-select (stored as a JSON array); the *_value / vita_* /
+// comfort fields are 1–5 ints or null; session_stayed is the module id of the
+// one session that stayed with them; the rest are free text or null.
+export type PostCompletionSurveyInput = {
+  userId: string;
+  overallValue: number | null;
+  feelings: string[];
+  feelingsOther: string | null;
+  planningConfidence: number | null;
+  beforeThought: string | null;
+  afterThought: string | null;
+  expectationsMet: string | null;
+  vitaUnderstood: number | null;
+  vitaGoodQuestions: number | null;
+  vitaAuthentic: number | null;
+  vitaChallenged: number | null;
+  vitaDiscovered: number | null;
+  comfortSharing: number | null;
+  comfortImprove: string | null;
+  sessionStayed: string | null;
+  sessionStayedWhy: string | null;
+  teamMessage: string | null;
+};
+
+// Record (or overwrite) one member's post-completion survey. The PK conflict
+// target makes this idempotent: resubmitting updates the single row in place.
+export async function upsertPostCompletionSurvey(
+  input: PostCompletionSurveyInput
+): Promise<void> {
+  await ensurePostCompletionSurveyTable();
+  await sql()`
+    INSERT INTO post_completion_survey (
+      user_id, overall_value, feelings, feelings_other, planning_confidence,
+      before_thought, after_thought, expectations_met,
+      vita_understood, vita_good_questions, vita_authentic, vita_challenged,
+      vita_discovered, comfort_sharing, comfort_improve,
+      session_stayed, session_stayed_why, team_message, updated_at
+    )
+    VALUES (
+      ${input.userId}, ${input.overallValue},
+      ${JSON.stringify(input.feelings)}::jsonb, ${input.feelingsOther},
+      ${input.planningConfidence}, ${input.beforeThought}, ${input.afterThought},
+      ${input.expectationsMet}, ${input.vitaUnderstood}, ${input.vitaGoodQuestions},
+      ${input.vitaAuthentic}, ${input.vitaChallenged}, ${input.vitaDiscovered},
+      ${input.comfortSharing}, ${input.comfortImprove}, ${input.sessionStayed},
+      ${input.sessionStayedWhy}, ${input.teamMessage}, now()
+    )
+    ON CONFLICT (user_id) DO UPDATE SET
+      overall_value = EXCLUDED.overall_value,
+      feelings = EXCLUDED.feelings,
+      feelings_other = EXCLUDED.feelings_other,
+      planning_confidence = EXCLUDED.planning_confidence,
+      before_thought = EXCLUDED.before_thought,
+      after_thought = EXCLUDED.after_thought,
+      expectations_met = EXCLUDED.expectations_met,
+      vita_understood = EXCLUDED.vita_understood,
+      vita_good_questions = EXCLUDED.vita_good_questions,
+      vita_authentic = EXCLUDED.vita_authentic,
+      vita_challenged = EXCLUDED.vita_challenged,
+      vita_discovered = EXCLUDED.vita_discovered,
+      comfort_sharing = EXCLUDED.comfort_sharing,
+      comfort_improve = EXCLUDED.comfort_improve,
+      session_stayed = EXCLUDED.session_stayed,
+      session_stayed_why = EXCLUDED.session_stayed_why,
+      team_message = EXCLUDED.team_message,
+      updated_at = now()
+  `;
+}
+
+// One post-completion row, as read by the admin portal. Read-only there.
+export type PostCompletionSurveyRow = {
+  userId: string;
+  overallValue: number | null;
+  feelings: string[];
+  feelingsOther: string | null;
+  planningConfidence: number | null;
+  beforeThought: string | null;
+  afterThought: string | null;
+  expectationsMet: string | null;
+  vitaUnderstood: number | null;
+  vitaGoodQuestions: number | null;
+  vitaAuthentic: number | null;
+  vitaChallenged: number | null;
+  vitaDiscovered: number | null;
+  comfortSharing: number | null;
+  comfortImprove: string | null;
+  sessionStayed: string | null;
+  sessionStayedWhy: string | null;
+  teamMessage: string | null;
+  createdAt: string;
+};
+
+// Every post-completion submission, newest first — for the admin portal. Reads
+// across all users, so it is only ever called behind the admin gate. Whether a
+// row exists for a user is also the "has this member already done the survey?"
+// signal the dashboard card uses to flip to its completed state.
+export async function getAllPostCompletionSurveys(): Promise<
+  PostCompletionSurveyRow[]
+> {
+  await ensurePostCompletionSurveyTable();
+  const rows = (await sql()`
+    SELECT user_id, overall_value, feelings, feelings_other, planning_confidence,
+           before_thought, after_thought, expectations_met,
+           vita_understood, vita_good_questions, vita_authentic, vita_challenged,
+           vita_discovered, comfort_sharing, comfort_improve,
+           session_stayed, session_stayed_why, team_message, created_at
+    FROM post_completion_survey
+    ORDER BY created_at DESC
+  `) as {
+    user_id: string;
+    overall_value: number | null;
+    feelings: unknown;
+    feelings_other: string | null;
+    planning_confidence: number | null;
+    before_thought: string | null;
+    after_thought: string | null;
+    expectations_met: string | null;
+    vita_understood: number | null;
+    vita_good_questions: number | null;
+    vita_authentic: number | null;
+    vita_challenged: number | null;
+    vita_discovered: number | null;
+    comfort_sharing: number | null;
+    comfort_improve: string | null;
+    session_stayed: string | null;
+    session_stayed_why: string | null;
+    team_message: string | null;
+    created_at: string | Date;
+  }[];
+  return rows.map((r) => ({
+    userId: r.user_id,
+    overallValue: r.overall_value,
+    feelings: Array.isArray(r.feelings) ? (r.feelings as string[]) : [],
+    feelingsOther: r.feelings_other,
+    planningConfidence: r.planning_confidence,
+    beforeThought: r.before_thought,
+    afterThought: r.after_thought,
+    expectationsMet: r.expectations_met,
+    vitaUnderstood: r.vita_understood,
+    vitaGoodQuestions: r.vita_good_questions,
+    vitaAuthentic: r.vita_authentic,
+    vitaChallenged: r.vita_challenged,
+    vitaDiscovered: r.vita_discovered,
+    comfortSharing: r.comfort_sharing,
+    comfortImprove: r.comfort_improve,
+    sessionStayed: r.session_stayed,
+    sessionStayedWhy: r.session_stayed_why,
+    teamMessage: r.team_message,
+    createdAt: toIso(r.created_at) ?? new Date().toISOString(),
+  }));
+}
+
+// Has this member already submitted the post-completion survey? One indexed PK
+// lookup — used server-side to gate the dashboard card and to avoid re-sending
+// the survey email.
+export async function hasPostCompletionSurvey(userId: string): Promise<boolean> {
+  await ensurePostCompletionSurveyTable();
+  const rows = (await sql()`
+    SELECT 1 FROM post_completion_survey WHERE user_id = ${userId} LIMIT 1
+  `) as unknown[];
+  return rows.length > 0;
+}
+
+// GDPR erasure — drop this member's survey row. Wired into lib/erasure.ts.
+export async function deleteAllPostCompletionSurvey(
+  userId: string
+): Promise<void> {
+  await ensurePostCompletionSurveyTable();
+  await sql()`DELETE FROM post_completion_survey WHERE user_id = ${userId}`;
+}
+
+// --- Post-completion survey email (once-per-user guard) -------------------
+// A tiny marker table so the survey-invite email fires at most once per member,
+// ever. Claiming a row is atomic (INSERT ... ON CONFLICT DO NOTHING RETURNING),
+// so concurrent completion flushes can't double-send. Deliberately NOT cleared
+// by "start over" (unlike user_data and module_progress), so restarting the
+// programme never triggers a second email; only full GDPR erasure removes it.
+let postCompletionEmailTableReady: Promise<void> | null = null;
+
+function ensurePostCompletionEmailTable(): Promise<void> {
+  if (!postCompletionEmailTableReady) {
+    postCompletionEmailTableReady = (async () => {
+      await sql()`
+        CREATE TABLE IF NOT EXISTS post_completion_email (
+          user_id text PRIMARY KEY,
+          claimed_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+      // The scheduled Resend message id, so the delayed send can be cancelled if
+      // the member completes the survey in-app before it fires. Added in place
+      // for any table that predates it.
+      await sql()`ALTER TABLE post_completion_email ADD COLUMN IF NOT EXISTS resend_id text`;
+    })()
+      .then(() => undefined)
+      .catch((err) => {
+        postCompletionEmailTableReady = null;
+        throw err;
+      });
+  }
+  return postCompletionEmailTableReady;
+}
+
+// Claim the one-and-only survey email for this member. Returns true exactly once
+// — the first call — and false forever after, so the caller schedules the email
+// only when it gets true. Atomic, so it is safe against concurrent callers.
+export async function claimPostCompletionEmail(
+  userId: string
+): Promise<boolean> {
+  await ensurePostCompletionEmailTable();
+  const rows = (await sql()`
+    INSERT INTO post_completion_email (user_id)
+    VALUES (${userId})
+    ON CONFLICT (user_id) DO NOTHING
+    RETURNING user_id
+  `) as unknown[];
+  return rows.length > 0;
+}
+
+// Store the scheduled Resend message id against the claim, so the delayed send
+// can be cancelled later if the member completes the survey first.
+export async function setPostCompletionEmailResendId(
+  userId: string,
+  resendId: string
+): Promise<void> {
+  await ensurePostCompletionEmailTable();
+  await sql()`
+    UPDATE post_completion_email SET resend_id = ${resendId} WHERE user_id = ${userId}
+  `;
+}
+
+// The scheduled Resend message id for this member, or null if none is stored.
+export async function getPostCompletionEmailResendId(
+  userId: string
+): Promise<string | null> {
+  await ensurePostCompletionEmailTable();
+  const rows = (await sql()`
+    SELECT resend_id FROM post_completion_email WHERE user_id = ${userId}
+  `) as { resend_id: string | null }[];
+  return rows.length > 0 ? rows[0].resend_id : null;
+}
+
+// Clear the stored id once the scheduled send has been cancelled, so we don't try
+// to cancel it again on a later resubmission.
+export async function clearPostCompletionEmailResendId(
+  userId: string
+): Promise<void> {
+  await ensurePostCompletionEmailTable();
+  await sql()`
+    UPDATE post_completion_email SET resend_id = NULL WHERE user_id = ${userId}
+  `;
+}
+
+// One row per member whose survey invite has been sent (claimed), for the admin
+// completions view. Reads across all users, so it is only ever called behind the
+// admin gate.
+export type PostCompletionEmailRow = { userId: string; claimedAt: string };
+
+export async function getAllPostCompletionEmails(): Promise<
+  PostCompletionEmailRow[]
+> {
+  await ensurePostCompletionEmailTable();
+  const rows = (await sql()`
+    SELECT user_id, claimed_at FROM post_completion_email
+  `) as { user_id: string; claimed_at: string | Date }[];
+  return rows.map((r) => ({
+    userId: r.user_id,
+    claimedAt: toIso(r.claimed_at) ?? new Date().toISOString(),
+  }));
+}
+
+// GDPR erasure — drop this member's email marker. Wired into lib/erasure.ts.
+export async function deleteAllPostCompletionEmail(
+  userId: string
+): Promise<void> {
+  await ensurePostCompletionEmailTable();
+  await sql()`DELETE FROM post_completion_email WHERE user_id = ${userId}`;
+}
+
+// Every member's completed-session list, for the admin completions funnel. The
+// `completed` array in user_data is the authoritative record of what a member has
+// finished (module_progress is analytics and can miss older completions), so
+// "has finished their plan" is read from here. updated_at is the closest stamp we
+// have for when the list last changed. Reads across all users — admin gate only.
+export type CompletedListRow = {
+  userId: string;
+  completed: string[];
+  updatedAt: string;
+};
+
+export async function getAllCompletedLists(): Promise<CompletedListRow[]> {
+  await ensureTable();
+  const rows = (await sql()`
+    SELECT user_id, value, updated_at FROM user_data WHERE key = 'completed'
+  `) as { user_id: string; value: unknown; updated_at: string | Date }[];
+  return rows.map((r) => ({
+    userId: r.user_id,
+    completed: Array.isArray(r.value) ? (r.value as string[]) : [],
+    updatedAt: toIso(r.updated_at) ?? new Date().toISOString(),
+  }));
+}
+
 // --- Module progress (pilot analytics) ------------------------------------
 // How long each session actually took, and whether it was finished. One row per
 // (user, session), upserted as they work.

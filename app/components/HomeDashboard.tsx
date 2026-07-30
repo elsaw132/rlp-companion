@@ -493,6 +493,29 @@ export default function HomeDashboard() {
             <div className="lab">Your {viewedStageData.name} progress</div>
             <div className="sub">Grows as you complete the sessions in this stage.</div>
           </div>
+
+          {/* Post-completion feedback — the desktop home for the survey ask,
+              persistent in the sidebar once the plan is complete (any stage in
+              view). The sidebar is hidden ≤880px, so a main-column fallback
+              carries it on mobile/tablet. */}
+          {isStageDone(STAGES[3]) &&
+            (userData.getPostSurveyDone() ? (
+              <div className="side-feedback-done" role="status">
+                <span aria-hidden="true">✓</span>
+                <span>Feedback sent — thank you.</span>
+              </div>
+            ) : (
+              <Link className="side-feedback" href="/completion-survey">
+                <span className="sf-title">Tell us how it went</span>
+                <span className="sf-sub">
+                  A few last questions on the programme — your answers help us
+                  make it better.
+                </span>
+                <span className="sf-cta" aria-hidden="true">
+                  Give feedback ›
+                </span>
+              </Link>
+            ))}
         </aside>
 
         {/* MAIN */}
@@ -558,6 +581,42 @@ export default function HomeDashboard() {
                 );
               })}
             </div>
+
+            {/* Post-completion feedback — mobile/tablet fallback for the sidebar
+                ask, which is hidden ≤880px. Placed here (not in the Plan-stage
+                block) so it shows whatever stage is in view, since on a phone the
+                default landing is the Act stage. Hidden on desktop. */}
+            {isStageDone(STAGES[3]) &&
+              (userData.getPostSurveyDone() ? (
+                <div className="feedback-done feedback-mobile" role="status">
+                  <span className="fd-check" aria-hidden="true">
+                    ✓
+                  </span>
+                  <span>
+                    Thanks for your feedback — it helps shape Chorus Life for the
+                    people who come next.
+                  </span>
+                </div>
+              ) : (
+                <Link
+                  className="picture-card is-calm is-feedback feedback-mobile"
+                  href="/completion-survey"
+                >
+                  <span className="pc-icon" aria-hidden="true">
+                    ✎
+                  </span>
+                  <span className="pc-body">
+                    <span className="pc-title">Tell us how it went</span>
+                    <span className="pc-sub">
+                      A few last questions on the programme — your answers help us
+                      make it better.
+                    </span>
+                  </span>
+                  <span className="pc-chev" aria-hidden="true">
+                    ›
+                  </span>
+                </Link>
+              ))}
 
             {/* COACH NEXT-STEP HERO — only when looking at the current stage.
                 Viewing an earlier, finished stage shows a calmer header instead. */}
@@ -743,6 +802,11 @@ export default function HomeDashboard() {
                 </span>
               </Link>
             )}
+
+            {/* The post-completion feedback ask lives in the sidebar on desktop
+                and, for mobile/tablet, in a stage-independent card just below the
+                stage arc (see above) — so it isn't tied to viewing the Plan
+                stage. Nothing renders here. */}
 
             {/* STAGE SESSIONS */}
             <div className="sec-row">
@@ -935,13 +999,34 @@ const homeCss = `
 .rlp-home .picture-card.is-calm .pc-title{font-family:var(--font-sans);font-size:15px;font-weight:600;color:var(--brand-primary)}
 /* RLP card only — the flagship. A bold, high-contrast dark-green card with a
    Chorus-lime accent so it stands out as the most important thing on the page. */
-.rlp-home .picture-card.is-rlp{background:var(--color-brand-primary);border-color:var(--color-brand-primary);box-shadow:var(--shadow-lg);padding:22px 24px}
+.rlp-home .picture-card.is-rlp{background:var(--color-brand-primary);border-color:var(--color-brand-primary);box-shadow:var(--shadow-lg);padding:22px 24px;margin-bottom:14px}
 .rlp-home .picture-card.is-rlp:hover{border-color:var(--color-brand-primary);box-shadow:var(--shadow-lg);transform:translateY(-1px)}
 .rlp-home .picture-card.is-rlp .pc-icon{width:46px;height:46px;background:var(--chorus-lime);color:var(--color-brand-primary)}
 .rlp-home .picture-card.is-rlp .pc-bloom{width:24px;height:auto;display:block}
 .rlp-home .picture-card.is-rlp .pc-title{font-family:var(--font-serif);font-size:21px;font-weight:600;color:#fff}
 .rlp-home .picture-card.is-rlp .pc-sub{color:rgba(255,255,255,.74)}
 .rlp-home .picture-card.is-rlp .pc-chev{color:rgba(255,255,255,.62)}
+/* The feedback ask, paired directly under the plan card: a light card with a
+   green hairline so it reads as the clear next action without competing with the
+   plan card above it. */
+.rlp-home .picture-card.is-feedback{box-shadow:var(--shadow-sm);border-color:color-mix(in srgb,var(--brand-primary) 32%,transparent)}
+.rlp-home .picture-card.is-feedback .pc-icon{background:var(--brand-primary-tint);color:var(--brand-primary)}
+/* Once submitted, the ask collapses to a quiet one-line acknowledgement rather
+   than a third full card — keeps the finished dashboard calm. */
+.rlp-home .feedback-done{display:flex;align-items:center;gap:10px;margin:0 0 32px;padding:2px 2px;font-size:14px;color:var(--text-muted);line-height:1.45}
+.rlp-home .feedback-done .fd-check{width:22px;height:22px;border-radius:50%;background:var(--brand-primary-tint);color:var(--brand-primary);display:grid;place-items:center;font-size:12px;font-weight:700;flex-shrink:0}
+/* The feedback ask lives in the sidebar on desktop; this main-column copy is the
+   fallback that appears only once the sidebar is hidden (≤880px). */
+.rlp-home .feedback-mobile{display:none}
+@media (max-width:880px){.rlp-home .feedback-mobile{display:flex}}
+/* Sidebar feedback card — a compact, self-contained ask under the progress ring,
+   with a green hairline so it stands apart from the nav without shouting. */
+.rlp-home .side-feedback{display:block;margin-top:22px;padding:15px 16px;background:var(--bg);border:1.5px solid color-mix(in srgb,var(--brand-primary) 30%,transparent);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);transition:box-shadow .15s ease,transform .15s ease}
+.rlp-home .side-feedback:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.rlp-home .side-feedback .sf-title{display:block;font-family:var(--font-sans);font-size:15px;font-weight:600;color:var(--brand-primary);line-height:1.25;margin-bottom:5px}
+.rlp-home .side-feedback .sf-sub{display:block;font-size:12.5px;color:var(--text-muted);line-height:1.45;margin-bottom:10px}
+.rlp-home .side-feedback .sf-cta{display:block;font-size:13px;font-weight:600;color:var(--brand-primary)}
+.rlp-home .side-feedback-done{margin-top:22px;padding:2px 4px;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text-muted);line-height:1.45}
 
 .rlp-home .steps{display:flex;align-items:flex-start;gap:0;margin:8px 0 42px}
 .rlp-home .step{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;flex:1;position:relative;background:none;border:none;font-family:inherit;padding:0}

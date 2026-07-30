@@ -5,6 +5,9 @@ import {
   getAllModuleFeedback,
   getAllFeedback,
   getAllBaselineSurveys,
+  getAllPostCompletionSurveys,
+  getAllPostCompletionEmails,
+  getAllCompletedLists,
   getAllModuleProgress,
 } from "@/lib/db";
 import { allModulesInOrder } from "@/lib/modules";
@@ -31,13 +34,23 @@ export default async function AdminFeedbackPage() {
   const admin = await getAdminUser();
   if (!admin) redirect("/admin/no-access");
 
-  const [moduleFeedback, generalFeedback, baseline, progress] =
-    await Promise.all([
-      getAllModuleFeedback(),
-      getAllFeedback(),
-      getAllBaselineSurveys(),
-      getAllModuleProgress(),
-    ]);
+  const [
+    moduleFeedback,
+    generalFeedback,
+    baseline,
+    postCompletion,
+    postCompletionEmails,
+    completedLists,
+    progress,
+  ] = await Promise.all([
+    getAllModuleFeedback(),
+    getAllFeedback(),
+    getAllBaselineSurveys(),
+    getAllPostCompletionSurveys(),
+    getAllPostCompletionEmails(),
+    getAllCompletedLists(),
+    getAllModuleProgress(),
+  ]);
 
   const modules = allModulesInOrder();
 
@@ -47,6 +60,9 @@ export default async function AdminFeedbackPage() {
       moduleFeedback={moduleFeedback}
       generalFeedback={generalFeedback}
       baseline={baseline}
+      postCompletion={postCompletion}
+      postCompletionEmails={postCompletionEmails}
+      completedLists={completedLists}
       progress={progress}
       modules={modules}
     />

@@ -5,6 +5,9 @@ import type {
   ModuleFeedbackRow,
   FeedbackRow,
   BaselineSurveyRow,
+  PostCompletionSurveyRow,
+  PostCompletionEmailRow,
+  CompletedListRow,
   ModuleProgressRow,
 } from "@/lib/db";
 import { RATING_MIN, RATING_MAX } from "@/lib/moduleFeedback";
@@ -30,6 +33,9 @@ type Props = {
   moduleFeedback: ModuleFeedbackRow[];
   generalFeedback: FeedbackRow[];
   baseline: BaselineSurveyRow[];
+  postCompletion: PostCompletionSurveyRow[];
+  postCompletionEmails: PostCompletionEmailRow[];
+  completedLists: CompletedListRow[];
   progress: ModuleProgressRow[];
   modules: ModuleMeta[];
 };
@@ -161,7 +167,14 @@ function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url);
 }
 
-type Tab = "participants" | "summary" | "baseline" | "comments" | "general";
+type Tab =
+  | "participants"
+  | "completions"
+  | "summary"
+  | "baseline"
+  | "post"
+  | "comments"
+  | "general";
 type SortKey = "order" | "responses" | "useful" | "engaging";
 
 // One stage's modules, in programme order — used to draw a participant's
@@ -210,6 +223,9 @@ export default function AdminFeedbackView({
   moduleFeedback: moduleFeedbackAll,
   generalFeedback: generalFeedbackAll,
   baseline,
+  postCompletion,
+  postCompletionEmails,
+  completedLists,
   progress: progressAll,
   modules,
 }: Props) {
@@ -341,6 +357,106 @@ export default function AdminFeedbackView({
     for (const r of baselineRows) m.set(r.userId, r);
     return m;
   }, [baselineRows]);
+
+  // --- Post-completion survey ----------------------------------------------
+  // One row per participant who finished the programme, oldest first (same
+  // reading order as the baseline). Each is joined to that person's baseline via
+  // baselineByUser so the before/after — confidence and feelings — reads on one
+  // line.
+  const postRows = useMemo(
+    () =>
+      [...postCompletion]
+        .filter((r) => keep(r.userId, r.createdAt))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [postCompletion, keep]
+  );
+
+  // Mean of the five Vita ratings that were answered, or null if none were.
+  const vitaAvg = (r: PostCompletionSurveyRow): number | null => {
+    const vals = [
+      r.vitaUnderstood,
+      r.vitaGoodQuestions,
+      r.vitaAuthentic,
+      r.vitaChallenged,
+      r.vitaDiscovered,
+    ].filter((v): v is number => v !== null);
+    if (vals.length === 0) return null;
+    return vals.reduce((s, v) => s + v, 0) / vals.length;
+  };
+
+  // --- Completions funnel ---------------------------------------------------
+  // Who has finished their plan, been sent the survey invite, and completed the
+  // survey — plus, for members with a partner, whether they went on to the
+  // couples session. That couples session ("Plan with your partner", 5.1) is a
+  // separate feature not live here yet, so its column stays empty until it lands;
+  // partner status meanwhile comes from the baseline question.
+  const lastPlanId = useMemo(() => {
+    const plan = modules.filter((m) => m.stageNumber === 4);
+    return plan.length ? plan[plan.length - 1].id : "4.7";
+  }, [modules]);
+  const coupleId = useMemo(() => {
+    const s5 = modules.filter((m) => m.stageNumber === 5);
+    return s5.length ? s5[0].id : null;
+  }, [modules]);
+
+  const completions = useMemo(() => {
+    // Session finish dates come from module_progress where we have them.
+    const prog = new Map<string, Map<string, string | null>>();
+    for (const p of progressAll) {
+      if (!prog.has(p.userId)) prog.set(p.userId, new Map());
+      prog.get(p.userId)!.set(p.moduleId, p.completedAt);
+    }
+    const invited = new Map<string, string>();
+    for (const e of postCompletionEmails) invited.set(e.userId, e.claimedAt);
+    const surveyed = new Map<string, string>();
+    for (const s of postCompletion) surveyed.set(s.userId, s.createdAt);
+
+    const rows: {
+      userId: string;
+      planAt: string;
+      planApprox: boolean;
+      inviteAt: string | null;
+      surveyAt: string | null;
+      partner: string;
+      coupleAt: string | null;
+    }[] = [];
+    // Membership comes from the authoritative `completed` list: anyone who has
+    // finished the final Plan session. The finish DATE is module_progress when we
+    // have it, otherwise the list's updated_at (approximate — flagged with ~ —
+    // for completions recorded before per-session timing existed).
+    for (const c of completedLists) {
+      const done = new Set(c.completed);
+      if (!done.has(lastPlanId)) continue;
+      const mods = prog.get(c.userId);
+      const mpPlan = mods?.get(lastPlanId) ?? null;
+      const planAt = mpPlan ?? c.updatedAt;
+      if (!keep(c.userId, planAt)) continue;
+      const b = baselineByUser.get(c.userId);
+      const mpCouple = coupleId ? (mods?.get(coupleId) ?? null) : null;
+      const coupleAt =
+        mpCouple ?? (coupleId && done.has(coupleId) ? c.updatedAt : null);
+      rows.push({
+        userId: c.userId,
+        planAt,
+        planApprox: !mpPlan,
+        inviteAt: invited.get(c.userId) ?? null,
+        surveyAt: surveyed.get(c.userId) ?? null,
+        partner: b?.partner ?? "",
+        coupleAt,
+      });
+    }
+    rows.sort((a, b) => b.planAt.localeCompare(a.planAt));
+    return rows;
+  }, [
+    completedLists,
+    progressAll,
+    postCompletionEmails,
+    postCompletion,
+    baselineByUser,
+    lastPlanId,
+    coupleId,
+    keep,
+  ]);
 
   // One person's progress on one session, for putting time-spent next to the
   // rating they gave it.
@@ -749,6 +865,67 @@ export default function AdminFeedbackView({
     downloadCsv("baseline-survey.csv", [header, ...rows]);
   }
 
+  // One row per participant who finished: the post-completion answers, with the
+  // baseline confidence and feelings joined in, so the whole before/after is a
+  // single CSV.
+  function exportPostCsv() {
+    const header = [
+      "user_id",
+      "taken_at_utc",
+      "overall_value_1_5",
+      "confidence_before_1_5",
+      "confidence_after_1_5",
+      "feelings_before",
+      "feelings_after",
+      "feelings_other",
+      "before_thought",
+      "after_thought",
+      "expectations_met",
+      "vita_understood_1_5",
+      "vita_good_questions_1_5",
+      "vita_authentic_1_5",
+      "vita_challenged_1_5",
+      "vita_discovered_1_5",
+      "comfort_sharing_1_5",
+      "comfort_improve",
+      "session_stayed_id",
+      "session_stayed_title",
+      "session_stayed_why",
+      "team_message",
+    ];
+    const num = (v: number | null) => (v === null ? "" : String(v));
+    const rows = postRows.map((r) => {
+      const b = baselineByUser.get(r.userId);
+      return [
+        r.userId,
+        r.createdAt,
+        num(r.overallValue),
+        b?.confidence == null ? "" : String(b.confidence),
+        num(r.planningConfidence),
+        b ? b.feelings.join("; ") : "",
+        r.feelings.join("; "),
+        r.feelingsOther ?? "",
+        r.beforeThought ?? "",
+        r.afterThought ?? "",
+        r.expectationsMet ?? "",
+        num(r.vitaUnderstood),
+        num(r.vitaGoodQuestions),
+        num(r.vitaAuthentic),
+        num(r.vitaChallenged),
+        num(r.vitaDiscovered),
+        num(r.comfortSharing),
+        r.comfortImprove ?? "",
+        r.sessionStayed ?? "",
+        r.sessionStayed
+          ? (moduleMetaById.get(r.sessionStayed)?.title ?? "")
+          : "",
+        r.sessionStayedWhy ?? "",
+        r.teamMessage ?? "",
+      ];
+    });
+    downloadCsv("post-completion-survey.csv", [header, ...rows]);
+  }
+
   // One row per participant: where they are in the programme, for a spreadsheet
   // read of the whole cohort's progress at a glance.
   function exportParticipantsCsv() {
@@ -901,11 +1078,20 @@ export default function AdminFeedbackView({
           >
             Participants ({participants.length})
           </TabButton>
+          <TabButton
+            active={tab === "completions"}
+            onClick={() => setTab("completions")}
+          >
+            Completions ({completions.length})
+          </TabButton>
           <TabButton active={tab === "summary"} onClick={() => setTab("summary")}>
             Per-module summary
           </TabButton>
           <TabButton active={tab === "baseline"} onClick={() => setTab("baseline")}>
             Baseline ({baselineRows.length})
+          </TabButton>
+          <TabButton active={tab === "post"} onClick={() => setTab("post")}>
+            Post-completion ({postRows.length})
           </TabButton>
           <TabButton active={tab === "comments"} onClick={() => setTab("comments")}>
             Comments ({comments.length})
@@ -1156,6 +1342,226 @@ export default function AdminFeedbackView({
                     ))}
                 </ul>
               </section>
+            )}
+          </section>
+        )}
+
+        {tab === "completions" && (
+          <section>
+            <div style={S.toolbar}>
+              <p style={S.help}>
+                One row per member who has finished their plan (read from the
+                completed-sessions list) — the funnel from finishing, to the survey
+                invite being sent (30 minutes after they finish), to completing the
+                survey. Each cell is the date that step happened; a dash means it
+                hasn&apos;t yet, and a ~ marks an approximate finish date for an
+                older completion recorded before per-session timing. The{" "}
+                <strong>Couples session</strong> column fills in once the &ldquo;Plan
+                with your partner&rdquo; session is live here; partner status is the
+                baseline answer in the meantime.
+              </p>
+            </div>
+            {completions.length === 0 ? (
+              <Empty>
+                No finished plans yet. A member appears here once they complete the
+                final Plan session.
+              </Empty>
+            ) : (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 16,
+                    flexWrap: "wrap",
+                    marginBottom: 18,
+                  }}
+                >
+                  <Stat label="Finished plan" value={completions.length} />
+                  <Stat
+                    label="Invite sent"
+                    value={completions.filter((c) => c.inviteAt).length}
+                  />
+                  <Stat
+                    label="Survey done"
+                    value={completions.filter((c) => c.surveyAt).length}
+                  />
+                </div>
+                <div style={S.tableWrap}>
+                  <table style={S.table}>
+                    <thead>
+                      <tr>
+                        <Th>Participant</Th>
+                        <Th>Finished plan</Th>
+                        <Th>Invite sent</Th>
+                        <Th>Survey done</Th>
+                        <Th>Partner</Th>
+                        <Th>Couples session</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {completions.map((c) => (
+                        <tr key={c.userId} style={S.tr}>
+                          <td style={S.tdModule}>
+                            <span style={S.testerTag} title={c.userId}>
+                              {shortUser(c.userId)}
+                            </span>
+                          </td>
+                          <td style={S.tdWrap}>
+                            {c.planApprox
+                              ? `~${fmtDate(c.planAt)}`
+                              : fmtDate(c.planAt)}
+                          </td>
+                          <DateCell iso={c.inviteAt} />
+                          <DateCell iso={c.surveyAt} />
+                          <Cell v={c.partner} />
+                          <DateCell iso={c.coupleAt} />
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        {tab === "post" && (
+          <section>
+            <div style={S.toolbar}>
+              <p style={S.help}>
+                One row per participant who finished the programme — the{" "}
+                <em>after</em> to the baseline&apos;s <em>before</em>. Confidence
+                and feelings show baseline → now, joined by participant. Blanks
+                are skipped questions; every one is optional. The written answers
+                are below the table, and the full before/after is in the CSV.
+              </p>
+              <button style={S.csvBtn} onClick={exportPostCsv}>
+                ↓ Download CSV
+              </button>
+            </div>
+            {postRows.length === 0 ? (
+              <Empty>
+                No post-completion responses yet. They&apos;re captured once
+                someone finishes the final Plan session, so the first will land
+                when a participant completes the programme.
+              </Empty>
+            ) : (
+              <>
+                <div style={S.tableWrap}>
+                  <table style={S.table}>
+                    <thead>
+                      <tr>
+                        <Th>Participant</Th>
+                        <Th align="right">Value</Th>
+                        <Th>Confidence (before → after)</Th>
+                        <Th align="right">Vita avg</Th>
+                        <Th align="right">Comfort</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {postRows.map((r) => {
+                        const b = baselineByUser.get(r.userId);
+                        const va = vitaAvg(r);
+                        return (
+                          <tr key={r.userId} style={S.tr}>
+                            <td style={S.tdModule}>
+                              <span style={S.testerTag} title={r.userId}>
+                                {shortUser(r.userId)}
+                              </span>
+                              <div style={S.moduleMeta}>
+                                {fmtDate(r.createdAt)}
+                              </div>
+                            </td>
+                            <td style={S.tdNum}>
+                              {r.overallValue === null ? (
+                                <span style={S.muted}>—</span>
+                              ) : (
+                                `${r.overallValue} / ${RATING_MAX}`
+                              )}
+                            </td>
+                            <td style={S.tdNum}>
+                              <BeforeAfter
+                                before={b?.confidence ?? null}
+                                after={r.planningConfidence}
+                              />
+                            </td>
+                            <td style={S.tdNum}>
+                              {va === null ? (
+                                <span style={S.muted}>—</span>
+                              ) : (
+                                `${va.toFixed(1)} / ${RATING_MAX}`
+                              )}
+                            </td>
+                            <td style={S.tdNum}>
+                              {r.comfortSharing === null ? (
+                                <span style={S.muted}>—</span>
+                              ) : (
+                                `${r.comfortSharing} / ${RATING_MAX}`
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <section style={S.expectBlock}>
+                  <h2 style={S.expectHeading}>In their words</h2>
+                  <ul style={S.cardList}>
+                    {postRows.map((r) => {
+                      const b = baselineByUser.get(r.userId);
+                      const sessionTitle = r.sessionStayed
+                        ? (moduleMetaById.get(r.sessionStayed)?.title ??
+                          r.sessionStayed)
+                        : null;
+                      return (
+                        <li key={r.userId} style={S.card}>
+                          <div style={S.cardHead}>
+                            <span style={S.testerTag} title={r.userId}>
+                              {shortUser(r.userId)}
+                            </span>
+                            <span style={S.cardDate}>
+                              {fmtDate(r.createdAt)}
+                            </span>
+                          </div>
+                          <FeelingsBeforeAfter
+                            before={b?.feelings ?? []}
+                            after={r.feelings}
+                            other={r.feelingsOther}
+                          />
+                          <Field
+                            label="Before Chorus Life, I thought…"
+                            value={r.beforeThought}
+                          />
+                          <Field
+                            label="After Chorus Life, I now think…"
+                            value={r.afterThought}
+                          />
+                          <Field
+                            label="Did the programme meet what they hoped?"
+                            value={r.expectationsMet}
+                          />
+                          <Field
+                            label="What would have made them more comfortable"
+                            value={r.comfortImprove}
+                          />
+                          {sessionTitle && (
+                            <Field
+                              label={`Session that stayed: ${sessionTitle}`}
+                              value={r.sessionStayedWhy ?? "(no reason given)"}
+                            />
+                          )}
+                          <Field
+                            label="One thing for the team"
+                            value={r.teamMessage}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              </>
             )}
           </section>
         )}
@@ -1501,6 +1907,124 @@ function Th({
 function Cell({ v }: { v: string }) {
   return (
     <td style={S.tdWrap}>{v ? v : <span style={S.muted}>—</span>}</td>
+  );
+}
+
+// A date, or a muted dash when the step hasn't happened. Used across the
+// completions funnel (finished / invited / surveyed / couples).
+function DateCell({ iso }: { iso: string | null }) {
+  return (
+    <td style={S.tdWrap}>
+      {iso ? fmtDate(iso) : <span style={S.muted}>—</span>}
+    </td>
+  );
+}
+
+// "3 → 5" with a coloured delta, for a before/after rating. A dash on either side
+// means that end was skipped, so no delta is shown.
+function BeforeAfter({
+  before,
+  after,
+}: {
+  before: number | null;
+  after: number | null;
+}) {
+  const b = before === null ? "—" : String(before);
+  const a = after === null ? "—" : String(after);
+  const delta = before !== null && after !== null ? after - before : null;
+  return (
+    <span>
+      {b} <span style={S.muted}>→</span> {a}
+      {delta !== null && delta !== 0 && (
+        <span
+          style={{
+            marginLeft: 6,
+            fontWeight: 600,
+            color: delta > 0 ? "#1a7f37" : "#b42318",
+          }}
+        >
+          {delta > 0 ? `▲${delta}` : `▼${Math.abs(delta)}`}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// A labelled block of free text in an "in their words" card. Renders nothing when
+// the answer was skipped, so a card only shows what the person actually wrote.
+function Field({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "#6b7280",
+          marginBottom: 2,
+        }}
+      >
+        {label}
+      </div>
+      <p style={S.cardBody}>{value}</p>
+    </div>
+  );
+}
+
+// The feelings multi-select as baseline → now, plus any free-text note. Chips on
+// both sides so the shift in sentiment is readable at a glance.
+function FeelingsBeforeAfter({
+  before,
+  after,
+  other,
+}: {
+  before: string[];
+  after: string[];
+  other: string | null;
+}) {
+  if (before.length === 0 && after.length === 0 && !other) return null;
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "#6b7280",
+          marginBottom: 4,
+        }}
+      >
+        Feelings — before → after
+      </div>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        {before.length === 0 ? (
+          <span style={S.muted}>—</span>
+        ) : (
+          before.map((f) => (
+            <span key={`b-${f}`} style={S.chip}>
+              {f}
+            </span>
+          ))
+        )}
+        <span style={S.muted}>→</span>
+        {after.length === 0 ? (
+          <span style={S.muted}>—</span>
+        ) : (
+          after.map((f) => (
+            <span key={`a-${f}`} style={S.chip}>
+              {f}
+            </span>
+          ))
+        )}
+      </div>
+      {other && <p style={{ ...S.cardBody, marginTop: 6 }}>{other}</p>}
+    </div>
   );
 }
 

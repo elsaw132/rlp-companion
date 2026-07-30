@@ -109,6 +109,30 @@ export type BaselineSurveyAnswers = {
   horizon: string | null;
 };
 
+// The post-completion survey payload, sent to /api/post-completion-survey. The
+// ratings are 1–5 or null; feelings is the up-to-three multi-select; the rest are
+// free text or null. planningConfidence and feelings mirror the baseline so the
+// two can be compared directly.
+export type PostCompletionSurveyAnswers = {
+  overallValue: number | null;
+  feelings: string[];
+  feelingsOther: string | null;
+  planningConfidence: number | null;
+  beforeThought: string | null;
+  afterThought: string | null;
+  expectationsMet: string | null;
+  vitaUnderstood: number | null;
+  vitaGoodQuestions: number | null;
+  vitaAuthentic: number | null;
+  vitaChallenged: number | null;
+  vitaDiscovered: number | null;
+  comfortSharing: number | null;
+  comfortImprove: string | null;
+  sessionStayed: string | null;
+  sessionStayedWhy: string | null;
+  teamMessage: string | null;
+};
+
 export type ConversationMessage = {
   role: "coach" | "user";
   text: string;
@@ -213,6 +237,10 @@ const KEYS = {
   // claimed to be created on whatever day you happened to look at it, and its
   // review date moved with you.
   planCreatedOn: "plan-created-on",
+  // Set once the member submits the post-completion survey. The authoritative
+  // record is the post_completion_survey table; this flag lets the dashboard flip
+  // its card to the completed state from the snapshot it already loads.
+  postSurveyDone: "post-survey-done",
 };
 
 // Versioned key families where only the current version (per KEYS above) should
@@ -1302,6 +1330,31 @@ export function useUserData() {
 
   const savePlanCreatedOn = (iso: string) => setKey(KEYS.planCreatedOn, iso);
 
+  // Persist the one-time post-completion survey to its own table — a direct POST
+  // like saveBaselineSurvey (research data, kept out of the coaching snapshot).
+  // Optimistic and best-effort; a network blip never traps the person on the form.
+  const savePostCompletionSurvey = async (
+    answers: PostCompletionSurveyAnswers
+  ) => {
+    try {
+      await fetch("/api/post-completion-survey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(answers),
+      });
+    } catch {
+      // best-effort — the thank-you still shows
+    }
+  };
+
+  // Whether this member has finished the post-completion survey. Read from the
+  // snapshot the dashboard already holds, so its card can show the completed
+  // state without a second fetch. markPostSurveyDone is set alongside the save.
+  const getPostSurveyDone = (): boolean =>
+    snapshot[KEYS.postSurveyDone] === true;
+
+  const markPostSurveyDone = () => setKey(KEYS.postSurveyDone, true);
+
   // Generated scene images, keyed by slot ("hero", "s1"…). Cached so each is
   // generated once, not per view.
   const getPlanImages = (): Record<string, string> => {
@@ -1431,6 +1484,9 @@ export function useUserData() {
     getOnboarding,
     saveOnboarding,
     saveBaselineSurvey,
+    savePostCompletionSurvey,
+    getPostSurveyDone,
+    markPostSurveyDone,
     hasPartner,
     getRetirementStage,
     getCoachTone,

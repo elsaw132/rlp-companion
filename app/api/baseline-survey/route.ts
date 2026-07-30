@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { upsertBaselineSurvey } from "@/lib/db";
+import { FEELINGS_SET, FEELINGS_MAX } from "@/lib/retirementSentiment";
 
 // Receives the one-time pilot baseline captured at the end of onboarding. The
 // user id always comes from the authenticated Clerk session, never from client
@@ -8,33 +9,18 @@ import { upsertBaselineSurvey } from "@/lib/db";
 // can be skipped, and the flag-gated status/horizon steps may never be asked),
 // so unusable values become null rather than rejecting the whole submission.
 
-// The fixed feelings list ("select up to three"). Anything outside it is
-// dropped, and the result is capped at three to match the survey's limit. Must
-// stay in step with FEELINGS_OPTIONS in the onboarding form — an option missing
-// here is silently discarded rather than stored.
-const FEELINGS = new Set([
-  "Excited",
-  "Curious",
-  "Hopeful",
-  "Confident",
-  "Relieved",
-  "Settled",
-  "Neutral",
-  "Uncertain",
-  "At a loose end",
-  "Lonely",
-  "Overwhelmed",
-  "Anxious",
-  "Avoiding thinking about it",
-]);
-
+// The fixed feelings list ("select up to three") is defined once in
+// lib/retirementSentiment.ts and shared with the onboarding form and the
+// post-completion survey, so the allowlist here can never fall out of step with
+// what the form offers. Anything outside it is dropped, and the result is capped
+// at the survey's limit.
 function toFeelings(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   const seen = new Set<string>();
   for (const item of v) {
-    if (typeof item === "string" && FEELINGS.has(item)) seen.add(item);
+    if (typeof item === "string" && FEELINGS_SET.has(item)) seen.add(item);
   }
-  return Array.from(seen).slice(0, 3);
+  return Array.from(seen).slice(0, FEELINGS_MAX);
 }
 
 // How much non-financial retirement planning they've already done. Stored as the

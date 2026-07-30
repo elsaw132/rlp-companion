@@ -1,5 +1,17 @@
 import { auth } from "@clerk/nextjs/server";
-import { recordModuleProgress } from "@/lib/db";
+import {
+  recordModuleProgress,
+  claimPostCompletionEmail,
+  setPostCompletionEmailResendId,
+} from "@/lib/db";
+import { sendPostCompletionSurveyEmail } from "@/lib/email";
+import { allModulesInOrder } from "@/lib/modules";
+
+// The last Plan (Stage 4) session — finishing it means the Retirement Life Plan
+// is complete. Derived from the module list so it can't drift from the
+// curriculum (rather than hard-coding "4.7").
+const PLAN_SESSIONS = allModulesInOrder().filter((m) => m.stageNumber === 4);
+const LAST_PLAN_SESSION = PLAN_SESSIONS[PLAN_SESSIONS.length - 1]?.id ?? "4.7";
 
 // Receives a slice of time spent on a session, and whether it was finished.
 //
@@ -49,6 +61,23 @@ export async function POST(request: Request) {
     newVisit: body.newVisit === true,
     completed: body.completed === true,
   });
+
+  // Finishing the final Plan session means the Retirement Life Plan is complete:
+  // fire the one-time survey invite (Resend delays it 15 minutes). The claim is
+  // atomic and once-ever, so repeat flushes and revisits never re-send. We store
+  // the scheduled message id so the send can be cancelled if the member completes
+  // the survey in-app first. Wholly best-effort — a failed invite must never fail
+  // the progress write.
+  if (moduleId === LAST_PLAN_SESSION && body.completed === true) {
+    try {
+      if (await claimPostCompletionEmail(userId)) {
+        const resendId = await sendPostCompletionSurveyEmail(userId);
+        if (resendId) await setPostCompletionEmailResendId(userId, resendId);
+      }
+    } catch (err) {
+      console.error("[module-progress] survey email trigger failed:", err);
+    }
+  }
 
   return Response.json({ ok: true });
 }

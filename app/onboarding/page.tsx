@@ -12,6 +12,14 @@ import {
   type RetirementStage,
 } from "@/lib/userData";
 import { RETIREMENT_PATHS } from "@/lib/flags";
+import {
+  FEELINGS_OPTIONS,
+  FEELINGS_MAX,
+  FEELINGS_QUESTION,
+  CONFIDENCE_QUESTION,
+  CONFIDENCE_LOW_LABEL,
+  CONFIDENCE_HIGH_LABEL,
+} from "@/lib/retirementSentiment";
 
 // Where the person is with work and retirement, asked before the horizon and
 // motivation questions when the RETIREMENT_PATHS flag is on. Each label maps to a
@@ -59,28 +67,10 @@ const GENDER_OPTIONS = [
 ];
 const GENDER_SELF_DESCRIBE = "Prefer to self-describe";
 
-// Multi-select, up to three. The pilot spec's original nine, plus four that speak
-// to someone already retired ("Relieved", "Settled", "At a loose end", "Lonely")
-// — feeling adrift or isolated is common after retiring and nothing in the
-// original nine caught it. One list for everyone, whatever stage they're at.
-// Ordered on a positive → neutral → difficult gradient. Keep this in step with
-// the allowlist in /api/baseline-survey, which bounds what actually gets stored.
-const FEELINGS_OPTIONS = [
-  "Excited",
-  "Curious",
-  "Hopeful",
-  "Confident",
-  "Relieved",
-  "Settled",
-  "Neutral",
-  "Uncertain",
-  "At a loose end",
-  "Lonely",
-  "Overwhelmed",
-  "Anxious",
-  "Avoiding thinking about it",
-];
-const FEELINGS_MAX = 3;
+// The feelings multi-select ("select up to three") and the confidence scale now
+// live in lib/retirementSentiment.ts — the single source the baseline (here) and
+// the post-completion survey share, so the pilot's before/after comparison can't
+// drift. Imported at the top of this file.
 
 // Single-select. How much non-financial retirement planning they've already
 // done — asked before the confidence question, so "confident in your plans"
@@ -457,7 +447,7 @@ export default function OnboardingPage() {
 
           {current === "feelings" && (
             <MultiSelectStep
-              heading="How do you feel about your retirement right now?"
+              heading={FEELINGS_QUESTION}
               subheading="Choose up to three."
               options={FEELINGS_OPTIONS}
               selected={feelings}
@@ -496,9 +486,9 @@ export default function OnboardingPage() {
 
           {current === "confidence" && (
             <ScaleStep
-              heading="How confident do you feel in your plans for retirement?"
-              lowLabel="Not at all confident"
-              highLabel="Very confident"
+              heading={CONFIDENCE_QUESTION}
+              lowLabel={CONFIDENCE_LOW_LABEL}
+              highLabel={CONFIDENCE_HIGH_LABEL}
               value={confidence}
               onPick={setConfidence}
               onContinue={goNext}

@@ -6,6 +6,8 @@ import {
   deleteAllFeedback,
   deleteAllModuleFeedback,
   deleteAllBaselineSurvey,
+  deleteAllPostCompletionSurvey,
+  deleteAllPostCompletionEmail,
   deleteAllModuleProgress,
 } from "@/lib/db";
 
@@ -47,6 +49,8 @@ export async function deleteAllUserContext(userId: string): Promise<void> {
     deleteAllFeedback(userId),
     deleteAllModuleFeedback(userId),
     deleteAllBaselineSurvey(userId),
+    deleteAllPostCompletionSurvey(userId),
+    deleteAllPostCompletionEmail(userId),
     deleteAllModuleProgress(userId),
   ]);
 
