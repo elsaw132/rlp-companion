@@ -11,8 +11,9 @@ import {
 // live. One structured Claude call returns those activities, each with a rough
 // frequency (most days / a few times a week / weekly / now and then), whether it's
 // a regular anchor, and whether it gives energy — no day of the week, no time of
-// day. Anything that goes wrong falls back to a grounded generic rhythm so the
-// surface always renders.
+// day. When the model can't build a real, activity-grounded week — or anything
+// goes wrong — the route returns a null seed so the surface fails honestly and
+// offers a retry, never a generic rhythm passed off as the person's own.
 
 export const maxDuration = 60;
 
@@ -149,7 +150,9 @@ export async function POST(request: Request) {
     const end = text.lastIndexOf("}");
     const slice = start !== -1 && end !== -1 ? text.slice(start, end + 1) : text;
 
-    return Response.json({ seed: coerceWeekShape(JSON.parse(slice), input) });
+    // null when the model supplied no real activities — the client then shows the
+    // honest "couldn't draft" state instead of a generic rhythm.
+    return Response.json({ seed: coerceWeekShape(JSON.parse(slice)) });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       console.error(

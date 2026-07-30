@@ -206,14 +206,22 @@ const KEYS = {
   // The path Vita drafted for each spotlighted goal in the goal-paths module
   // (4.4), persisted so a refresh never re-drafts it. v2: paths now carry the
   // person's own named strengths (was a prose "lean" line), so v1 caches re-draft.
-  goalPathSeed: (id: string) => `goal-path-v2:${id}`,
+  // v3: coerce no longer substitutes a generic fallback for empty model output
+  // (the draft fails honestly instead), so any v2 cache that holds a generic path
+  // set is left unread and re-drafted.
+  goalPathSeed: (id: string) => `goal-path-v3:${id}`,
   // The trade-off scenarios and candidate decision principles Vita drafted for
   // the trade-offs module (4.5), persisted so a refresh never re-drafts them. v2:
   // the values-to-sort now come from the canonical value facts (marked core-five,
   // ranked) instead of the AI-distilled stage3-values summary, so v1 caches (which
   // may hold the wrong values) are left unread and re-drafted.
-  tradeOffSeed: (id: string) => `trade-off-v2:${id}`,
-  weekShapeSeed: (id: string) => `week-shape-v2:${id}`,
+  // v3: coerce no longer substitutes generic scenarios for empty model output, so
+  // any v2 cache holding a generic scenario set is left unread and re-drafted.
+  tradeOffSeed: (id: string) => `trade-off-v3:${id}`,
+  // v3: a prefetch race could draft the week from a not-yet-loaded fact snapshot and
+  // cache a generic fallback rhythm in its place; v2 caches may hold that generic
+  // seed, so they are left unread and re-drafted from the real activities.
+  weekShapeSeed: (id: string) => `week-shape-v3:${id}`,
   // The curated seasons-board cards Vita chose for "The chapters of retirement"
   // (4.2) — a balanced set of the person's real priorities across chapters, in a
   // consistent voice — so a refresh never re-runs the curation. v3: sourcing widened
@@ -222,7 +230,9 @@ const KEYS = {
   seasonsCardsSeed: (id: string) => `seasons-cards-v3:${id}`,
   // The assembled first-year draft Vita built for "Your first year" (4.7), kept in
   // sync with the working timeline so a mid-session refresh resumes it.
-  firstYearSeed: (id: string) => `first-year-v1:${id}`,
+  // v2: coerce no longer substitutes a templated year for empty model output, so
+  // any v1 cache holding a fallback year is left unread and re-drafted.
+  firstYearSeed: (id: string) => `first-year-v2:${id}`,
   // The editing chat for "Your first year" (4.7), persisted separately from the
   // module conversation so a refresh resumes the reshaping in progress.
   firstYearChat: (id: string) => `first-year-chat-v1:${id}`,

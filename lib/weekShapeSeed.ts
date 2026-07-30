@@ -9,8 +9,9 @@
 // week, no time of day — that precision is false this far out. The person sets the
 // overall structure-to-freedom feel (pre-set to where they landed in Stage 1),
 // adjusts the activities, and adds or removes anything. One structured Claude call
-// (/api/week-shape) returns the activities and a suggested feel. Anything that goes
-// wrong falls back to a grounded generic rhythm so the surface always renders.
+// (/api/week-shape) returns the activities and a suggested feel. If it can't produce
+// a real, activity-grounded week, the draft fails honestly and the surface offers a
+// retry — it never substitutes a generic rhythm dressed up as the person's own.
 
 import type {
   BalancedGoalsResult,
@@ -152,60 +153,6 @@ export async function fetchWeekShapeDraft(
   );
 }
 
-// ---- Fallback (grounded where it can be, never empty) ----
-// Only used when the model call fails entirely. Builds a reasonable ordinary
-// rhythm from whatever inputs exist, so the surface reads as a sensible starting
-// point the person shapes, never a dead end.
-export function fallbackWeekShape(input: WeekShapeDraftInput): WeekShapeSeed {
-  const activities: WeekActivitySeed[] = [];
-
-  // A few universal threads of an ordinary week.
-  activities.push(
-    {
-      label: "A regular walk or bit of movement",
-      category: "movement",
-      frequency: "Most days",
-      anchor: true,
-      energy: true,
-    },
-    {
-      label: "Time with the people close to you",
-      category: "people",
-      frequency: "Weekly",
-      anchor: true,
-      energy: true,
-    },
-    {
-      label: "A slower, unplanned stretch",
-      category: "rest",
-      frequency: "Most days",
-    }
-  );
-
-  // Turn a few goals into activities so the rhythm feels theirs and spans areas.
-  for (const g of (input.goals ?? []).slice(0, 5)) {
-    activities.push({
-      label: g.goal,
-      category: g.track === "be" ? "way of living" : "goal",
-      frequency: "Weekly",
-      energy: true,
-    });
-  }
-
-  // If they're phasing out of work, the week is planned around it.
-  if (input.transition?.lean === "gradual") {
-    activities.push({
-      label: "Ongoing work",
-      category: "work",
-      frequency: "A few times a week",
-      anchor: true,
-      fixed: true,
-    });
-  }
-
-  return { structure: 50, activities };
-}
-
 // ---- Coercion ----
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
@@ -261,14 +208,11 @@ function coerceActivity(raw: unknown): WeekActivitySeed | null {
 }
 
 // Validate and clean whatever the model returned into the seed shape. The model
-// supplies the activities and a suggested feel; anything missing falls back to
-// the grounded generic rhythm. Activities sharing a label are de-duplicated so an
-// activity never appears more than once.
-export function coerceWeekShape(
-  raw: unknown,
-  input: WeekShapeDraftInput
-): WeekShapeSeed {
-  const fb = fallbackWeekShape(input);
+// supplies the activities and a suggested feel; activities sharing a label are
+// de-duplicated so one never appears twice. Returns null when the model supplied
+// no usable activities — the caller then signals an honest draft failure rather
+// than dressing up a generic rhythm as the person's real week.
+export function coerceWeekShape(raw: unknown): WeekShapeSeed | null {
   const obj =
     raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
 
@@ -293,8 +237,10 @@ export function coerceWeekShape(
     }
   }
 
+  if (activities.length === 0) return null;
+
   return {
     structure: obj.structure === undefined ? 50 : clampStructure(obj.structure),
-    activities: activities.length ? activities : fb.activities,
+    activities,
   };
 }

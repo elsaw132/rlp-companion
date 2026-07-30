@@ -68,9 +68,16 @@ export function coerceCuratedCards(raw: unknown): SeasonsCardsSeed | null {
     const o = c as Record<string, unknown>;
     const raw = typeof o.label === "string" ? o.label.trim() : "";
     if (!raw) continue;
+    // The curation model occasionally slips "genuinely" into a label despite the
+    // prompt banning it (CLAUDE.md voice rule). It's a pure intensifier, so strip
+    // it — the card's meaning is unchanged ("Be genuinely useful" → "Be useful").
+    // Other banned words (share, growth, explore…) are content-bearing in a label,
+    // so they're left to the prompt rather than blindly deleted here.
+    const cleaned = raw.replace(/\bgenuinely\b\s*/gi, "").replace(/\s{2,}/g, " ").trim();
+    if (!cleaned) continue;
     // Sentence-case: a card sometimes echoes a lower-case source label, which
     // reads as messy on the board. First letter only; the rest is left as-is.
-    const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+    const label = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
     const key = label.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

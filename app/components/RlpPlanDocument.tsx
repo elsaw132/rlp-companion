@@ -778,6 +778,34 @@ export default function RlpPlanDocument({
     { id: "reflections", label: "Reflections" },
   ];
   const [tab, setTab] = useState<string>("overview");
+
+  // Foot-of-tab pager. The plan is one artefact spread across six tabs, and
+  // people were reading tab 1, hitting the exit box at the bottom, and leaving
+  // without ever seeing the other five. So the foot of each tab now points at
+  // the NEXT tab (and back at the previous one); only the last tab shows the
+  // real exit. These derive the neighbours of the tab currently on screen.
+  const tabIndex = TABS.findIndex((t) => t.id === tab);
+  const prevTab = tabIndex > 0 ? TABS[tabIndex - 1] : null;
+  const nextTab =
+    tabIndex >= 0 && tabIndex < TABS.length - 1 ? TABS[tabIndex + 1] : null;
+  function goToTab(id: string) {
+    // Moving tab from a button at the FOOT of the page: bring the reader up to
+    // the tab strip so they start the new tab at its top, not stranded at the
+    // bottom of a fresh, shorter panel. The strip sits above the panels at a
+    // stable offset (it doesn't move when the panel swaps), so we can read its
+    // position now — before the re-render — and jump there. An INSTANT jump, not
+    // smooth: a tab switch is a view change, and a smooth animation running over
+    // the simultaneous panel swap is unreliable.
+    if (typeof window !== "undefined") {
+      const anchor = document.querySelector(".rlp-tabs");
+      const y = anchor
+        ? anchor.getBoundingClientRect().top + window.scrollY - 8
+        : 0;
+      window.scrollTo(0, Math.max(0, y));
+    }
+    setTab(id);
+  }
+
   const areaLabels = Object.fromEntries(
     balance.areas.map((a) => [a.id, a.label])
   ) as Record<BalancedAreaId, string>;
@@ -865,7 +893,6 @@ export default function RlpPlanDocument({
               at display size that two pills alongside it just wrap, which put the
               buttons between the title and its own opening line. */}
           <div className="rlp-head-actions">
-            <a href="#whats-next" className="rlp-headbtn">Next Stage</a>
             <a href="/home" className="rlp-headbtn">Return Home</a>
             <button type="button" onClick={printPlan} className="rlp-headbtn">
               Save as PDF
@@ -1354,20 +1381,54 @@ export default function RlpPlanDocument({
 
       </PlanTabs>
 
-      {/* §11 — first steps. Outside the tabs, at the foot of the plan: what
-          comes next follows the WHOLE plan, not the Reflections tab, and
-          shouldn't be reachable only by whoever happens to open tab 6. The
-          button in the head jumps here. */}
-      <section id="whats-next" className="rlp-section rlp-firststeps">
-        <p className="rlp-eyebrow">What comes next</p>
-        <h2 className="rlp-firststeps-title">First steps</h2>
-        <p className="rlp-lede">
-          This plan is the shape of the years ahead. The next stage turns the
-          stepping stones into real, dated first actions &mdash; one small move at
-          a time.
-        </p>
-        <a href="/home" className="rlp-begin">Begin Act →</a>
-      </section>
+      {/* §11 — the foot of the plan. Interactive reading: tabs 1–5 end with a
+          pager INTO the next tab (with a way back), so nobody hits the exit at
+          the bottom of tab 1 and leaves before seeing the rest; only the last
+          tab ends with the real exit box. None of the pager belongs in the PDF —
+          the unfolded document is one continuous read with no "next tab" — so it
+          is only rendered when NOT unfolded. */}
+      {!unfolded && nextTab && (
+        <nav className="rlp-plannav" aria-label="Move through your plan">
+          <p className="rlp-plannav-count">
+            {title}: Part {tabIndex + 1} of {TABS.length}
+          </p>
+          <div className="rlp-plannav-row">
+            {prevTab ? (
+              <button
+                type="button"
+                className="rlp-plannav-back"
+                onClick={() => goToTab(prevTab.id)}
+              >
+                ← Back: {prevTab.label}
+              </button>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            <button
+              type="button"
+              className="rlp-plannav-next"
+              onClick={() => goToTab(nextTab.id)}
+            >
+              Next: {nextTab.label} →
+            </button>
+          </div>
+        </nav>
+      )}
+
+      {/* The real exit — only at the true end of the plan (the last tab), and in
+          the unfolded document where @media print then hides it from the PDF. */}
+      {(unfolded || !nextTab) && (
+        <section className="rlp-section rlp-firststeps">
+          <p className="rlp-eyebrow">What comes next</p>
+          <h2 className="rlp-firststeps-title">First steps</h2>
+          <p className="rlp-lede">
+            This plan is the shape of the years ahead. The next stage turns the
+            stepping stones into real, dated first actions &mdash; one small move
+            at a time.
+          </p>
+          <a href="/home" className="rlp-begin">Begin Act →</a>
+        </section>
+      )}
     </main>
   );
 }
@@ -1617,6 +1678,25 @@ const css = `
 .rlp-begin{display:inline-block;background:var(--brand-band);color:var(--brand-on-band);font-weight:700;font-size:var(--fs-body);padding:13px 28px;border-radius:var(--r-pill);text-decoration:none}
 .rlp-begin:hover{filter:brightness(.96)}
 
+/* Foot-of-tab pager — carries the reader THROUGH the six tabs instead of leaving
+   the plan at the bottom of tab 1. Deliberately lighter than the terminal
+   .rlp-firststeps block (a hairline rule, not a dark-green ground) so the real
+   "Begin Act" exit keeps its weight as the end of the plan. Never in the PDF —
+   it isn't rendered when unfolded, and the print rule below is belt-and-braces. */
+.rlp-plannav{margin-top:56px;padding-top:26px;border-top:1px solid var(--border)}
+/* Title case as written (it names the plan), so no uppercase transform or the
+   caps letter-spacing that goes with it — kept small and muted so it stays
+   subordinate to the plan's content. */
+.rlp-plannav-count{font-size:var(--fs-sm);color:var(--text-muted);font-weight:600;margin:0 0 14px}
+.rlp-plannav-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rlp-plannav-back{font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:600;color:var(--text-muted);background:none;border:none;padding:10px 2px;cursor:pointer;text-align:left}
+.rlp-plannav-back:hover{color:var(--ink)}
+/* Primary forward action = Chorus green (interaction layer), pushed to the right
+   edge so it reads as "onward" even when the back link wraps under it. */
+.rlp-plannav-next{margin-left:auto;font-family:var(--font-sans);font-size:var(--fs-body);font-weight:700;color:var(--brand-on-primary);background:var(--brand-primary);border:none;border-radius:var(--r-pill);padding:13px 26px;cursor:pointer;white-space:nowrap}
+.rlp-plannav-next:hover{filter:brightness(.96)}
+.rlp-plannav-back:focus-visible,.rlp-plannav-next:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-pill)}
+
 /* See how it all connects — the web. Stacked (visual on top, detail below) so
    the node labels, which render outside the SVG box, never collide with the
    detail panel. The SVG is capped and centred, leaving side margin for labels. */
@@ -1686,6 +1766,10 @@ const css = `
      you do here, not something you read on paper. The whole card goes, not just
      its button; a printed plan ends on the member's own open threads. */
   .rlp-firststeps{display:none!important}
+  /* The tab pager is on-screen wayfinding only — the PDF is one continuous read
+     with no tabs to move between. (It also isn't rendered when unfolded; this is
+     the belt-and-braces guard.) */
+  .rlp-plannav{display:none!important}
 
   /* This is "Save as PDF", not a memo on office paper: the colour IS the plan —
      the cover field, the area colours, the energy tint, the value tags. Browsers

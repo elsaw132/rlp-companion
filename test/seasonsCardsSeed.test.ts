@@ -58,6 +58,19 @@ describe("coerceCuratedCards", () => {
     expect(seed!.cards).toHaveLength(12);
   });
 
+  it("strips the banned word 'genuinely' from labels (voice rule)", () => {
+    const seed = coerceCuratedCards({
+      cards: [
+        { label: "Be genuinely useful to your daughters", category: "People" },
+        { label: "Genuinely present for the grandchildren", category: "People" },
+      ],
+    });
+    expect(seed!.cards).toEqual([
+      { label: "Be useful to your daughters", category: "People" },
+      { label: "Present for the grandchildren", category: "People" },
+    ]);
+  });
+
   it("returns null on empty or malformed responses (so the caller falls back)", () => {
     expect(coerceCuratedCards({ cards: [] })).toBeNull();
     expect(coerceCuratedCards(null)).toBeNull();
