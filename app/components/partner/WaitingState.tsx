@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { THEY, type Pronouns } from "@/lib/pronouns";
 
 // Shown to whoever finishes their share step first, while the other hasn't. The
 // motif's own side is filled with a tick; the partner's is a dashed outline. No
@@ -7,8 +8,13 @@ import type { CSSProperties } from "react";
 // alert (there's no notification in the pilot), hence "pop back any time".
 export default function WaitingState({
   partnerFirstName,
+  partnerPronouns = THEY,
 }: {
   partnerFirstName: string;
+  // The partner's pronouns, derived from their collected gender (defaults to
+  // "they/theirs" when unknown — see lib/pronouns.ts). Personalises the
+  // closing line without ever risking a misgendering.
+  partnerPronouns?: Pronouns;
 }) {
   const name = partnerFirstName || "your partner";
   return (
@@ -75,7 +81,7 @@ export default function WaitingState({
           {`We'll open your shared view here as soon as ${name} has done the same — pop back any time to check.`}
         </p>
         <p style={styles.rush}>
-          {`There's no rush. ${name} can do theirs whenever they're ready.`}
+          {`There's no rush. ${name} can do ${partnerPronouns.possessive} whenever ${partnerPronouns.subjectIs} ready.`}
         </p>
 
         <Link href="/home" style={styles.primary}>

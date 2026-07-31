@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import {
   getActivePairingFor,
+  getBaselineGender,
   getShareSelections,
   getUserData,
 } from "@/lib/db";
+import { pronounsForGender } from "@/lib/pronouns";
 import ShareStep from "@/app/components/partner/ShareStep";
 import WaitingState from "@/app/components/partner/WaitingState";
 import ComparisonView from "@/app/components/partner/ComparisonView";
@@ -73,7 +75,17 @@ export default async function PartnerPage({
 
   if (iCompleted && partnerCompleted) return <ComparisonView />;
   if (iCompleted && !partnerCompleted) {
-    return <WaitingState partnerFirstName={mine.partnerName} />;
+    // Personalise the closing line with the partner's pronoun. Sourced from
+    // their explicitly collected gender only; unknown falls back to "they".
+    const partnerPronouns = pronounsForGender(
+      await getBaselineGender(partnerId)
+    );
+    return (
+      <WaitingState
+        partnerFirstName={mine.partnerName}
+        partnerPronouns={partnerPronouns}
+      />
+    );
   }
   return <ShareStep />;
 }

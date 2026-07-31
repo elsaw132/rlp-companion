@@ -9,7 +9,13 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import FeedbackPanel from "@/app/components/FeedbackPanel";
+import ModuleFeedbackCard from "@/app/components/ModuleFeedbackCard";
 import VitaMark from "../VitaMark";
+
+// Where we remember that this person has already answered (or skipped) the
+// couples-module feedback, so the foot-of-report card shows once and never
+// nags on a revisit. Both Done and Skip set it.
+const FEEDBACK_DONE_KEY = "couples-feedback-5.1-done";
 
 // The comparison view: two plans side by side, organised into tabs so it reads
 // like the RLP plan rather than one long scroll. A persistent header (partner
@@ -63,6 +69,12 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
   const [adding, setAdding] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [tab, setTab] = useState<TabId | null>(null);
+  // Foot-of-report feedback (module 5.1). `null` while we're still checking
+  // whether they've answered before; once known, `true` hides the card for
+  // good and `false` shows it. Never shown in the dummy-data preview.
+  const [feedbackDone, setFeedbackDone] = useState<boolean | null>(
+    preview ? true : null
+  );
 
   useEffect(() => {
     if (preview) return;
@@ -79,6 +91,34 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
       live = false;
     };
   }, [preview]);
+
+  // Have they already given (or skipped) feedback for this module? One read of
+  // their stored flag; if the read fails we treat it as "not yet" so feedback
+  // still gets a chance to be collected. Best-effort, never blocks the report.
+  useEffect(() => {
+    if (preview) return;
+    let live = true;
+    fetch("/api/user-data")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((all: Record<string, unknown>) => {
+        if (live) setFeedbackDone(all[FEEDBACK_DONE_KEY] === true);
+      })
+      .catch(() => live && setFeedbackDone(false));
+    return () => {
+      live = false;
+    };
+  }, [preview]);
+
+  // Hide the card and remember the answer, on both Done and Skip. The save is
+  // best-effort — a failed write just means they might see it once more.
+  function markFeedbackDone() {
+    setFeedbackDone(true);
+    fetch("/api/user-data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: FEEDBACK_DONE_KEY, value: true }),
+    }).catch(() => {});
+  }
 
   const slotForName = useMemo(() => {
     return (name: string): Slot | null => {
@@ -429,6 +469,19 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
         intro="Tell us what you expected to see — this helps us spot a glitch in the shared view."
         context="couples-talk-empty"
       />
+
+      {/* Foot-of-report feedback, once the joint report is ready — the couples
+          module's version of the close-of-session card every other module
+          shows. Appears once per person; Done or Skip both retire it. */}
+      {feedbackDone === false && (
+        <div style={styles.feedbackFoot}>
+          <ModuleFeedbackCard
+            moduleId="5.1"
+            onDone={markFeedbackDone}
+            onSkip={markFeedbackDone}
+          />
+        </div>
+      )}
     </main>
   );
 }
@@ -666,6 +719,7 @@ const styles: Record<string, CSSProperties> = {
     color: "var(--text)",
   },
   loadNote: { color: "var(--text-muted)", padding: "40px 0" },
+  feedbackFoot: { marginTop: 48, paddingTop: 40, borderTop: "1px solid var(--warm-line)" },
   eyebrow: {
     fontSize: "var(--fs-eyebrow)",
     letterSpacing: "0.14em",

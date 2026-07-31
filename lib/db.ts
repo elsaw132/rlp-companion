@@ -689,6 +689,19 @@ export type BaselineSurveyRow = {
   createdAt: string;
 };
 
+// One user's collected gender, or null when they have no baseline row or left
+// it blank. Used only to personalise pronouns in couples copy; callers must
+// treat null as "unknown" and fall back to "they" (see lib/pronouns.ts).
+export async function getBaselineGender(
+  userId: string
+): Promise<string | null> {
+  await ensureBaselineSurveyTable();
+  const rows = (await sql()`
+    SELECT gender FROM baseline_survey WHERE user_id = ${userId} LIMIT 1
+  `) as { gender: string | null }[];
+  return rows.length ? rows[0].gender : null;
+}
+
 // Every baseline submission, newest first — for the admin portal. Reads across
 // all users, so it is only ever called behind the admin gate.
 export async function getAllBaselineSurveys(): Promise<BaselineSurveyRow[]> {
