@@ -262,9 +262,9 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
 
       <p style={styles.tabsIntro}>
         Your two plans are compared across the {tabs.length} parts below. Move
-        through them with these buttons — or the <b>Back</b> and <b>Next</b> links at
-        the foot of each part — and at the very end you&rsquo;ll be asked for a little
-        feedback on the shared view.
+        through them with these buttons — or the <b>Back</b> and <b>Next</b>{" "}
+        links at the foot of each part — and at the very end you&rsquo;ll be asked
+        for a little feedback on the shared view.
       </p>
 
       <div role="tablist" aria-label="Comparison sections" style={styles.tabBar}>
