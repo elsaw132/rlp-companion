@@ -93,3 +93,12 @@ conversation works, not a production app. Built by a non-technical founder.
 - `npm run build` — production build
 - `npm run start` — serve the production build
 - `npm run lint` — run ESLint
+
+## Deploying
+Production is `main`, and `main` only. **Never `vercel --prod` from a feature
+branch or the shared checkout** — a deploy ships the whole working tree, so
+that silently reverts whatever `main` has that the branch lacks (the recurring
+"deploy clobber"). Merge to `main`, push, then deploy from the dedicated deploy
+worktree at `/Users/elsawakeman/Projects/rlp-companion-deploy` (it only ever
+holds `main` and carries the correct `.vercel` project link). Full procedure and
+rationale: see `DEPLOY.md`.
