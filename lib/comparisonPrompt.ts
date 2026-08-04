@@ -4,12 +4,12 @@
 // the input shape (ParticipantShared) so the assembler and the model agree.
 
 // Bump when the prompt or input shape changes so caches regenerate.
-export const PROMPT_VERSION = "cmp-v4";
+export const PROMPT_VERSION = "cmp-v5";
 
 // Appended verbatim after the generated opener in the view — never produced by
-// the model.
+// the model. Second person to the pair, matching the register of the rest.
 export const FIXED_CLOSE =
-  "I've laid out where they meet, where they fit together, and where they point in different directions. None of it is a verdict, and most differences between two people don't resolve — they're for understanding, not fixing.";
+  "I've laid out where you meet, where you fit together, and where you point in different directions. None of it is a verdict, and most differences between two people don't resolve — they're for understanding, not fixing.";
 
 // One participant's shared-only plan, already filtered and summarised. Any null/
 // empty field means it was not shared and must never reach the model.
@@ -40,7 +40,7 @@ A person's decision principles may be recorded in more than one phrasing — tre
 A person's hope is a single line, but it may hold several distinct threads (e.g. feeling useful, staying close to family, and travelling more). Read those threads separately: a shared thread between the two hopes belongs in shared ground; a diverging one may belong in the differences. Never invent a thread that isn't in the line.
 
 REGISTER (important)
-- The view is a shared artefact both partners read. Address the pair collectively ("you both", "each of you") and name individuals in the third person ("Maya wants…", "Ray pictures…"). It must read identically whichever partner opens it — never make one partner "you" and the other "them".
+- The view is ONE document both partners open, and it MUST read identically whichever of them opens it. Speak TO the two of them together in the second person — "you both", "each of you", "your plans", "you're both still working". When you point to just ONE of them, name that person and use the third person ("Sarah wants…", "John pictures…"). Never make one partner "you" and the other "them": with two readers a singular "you" is ambiguous and breaks for one of them. So the pair is always "you"; a single individual is always named.
 - UK English throughout.
 
 STRICT RULES
@@ -49,14 +49,15 @@ STRICT RULES
 - Never use these words or moves: "genuinely", "quietly powerful", AI-tell filler, feeling-probes ("how does that feel?"), negative-contrast/parataxis ("it's not X, it's Y").
 
 WHAT TO PRODUCE (JSON)
-- framingOpener: name warmly and without judgement where the two of them are in the transition — the same place or different places — and let that set up the view. Different points → note that different positions naturally produce different plans. In step → say so plainly; do not manufacture a difference that isn't there. Draw only on their cohorts and plans; do not infer feeling. Do NOT append any closing line — that is added for you.
+- framingOpener: warmly and without judgement, name where the two of you are in the transition — the same place or different places — speaking to you both in the second person ("You're both still working…", "Each of you is…"), and let that set up the view. Different points → note that different positions naturally produce different plans. In step → say so plainly; do not manufacture a difference that isn't there. Base it only on their cohorts and plans; do not infer feeling. Do NOT append any closing line — that is added for you.
+- goalsSummary / mattersSummary / feelingsSummary: a short synthesis (2–3 sentences) that opens each of the other three views — goals; values and strengths ("what matters"); hopes and fears. Draw the two sets together in your voice: where they meet, where they differ, what is worth noticing. Same rules as everything else — only what was shared, no invented reasons, second person to the pair and named third person for one individual. If only one of you shared anything for that view, write a single sentence on what that person shared, without implying the other is lacking. Keep each to 2–3 sentences.
 - sharedGround: genuinely shared priorities, present tense, concrete, plain. Only what BOTH actually expressed. A value, strength, hope or goal BOTH hold especially belongs here. Surface all that are genuinely relevant — no fixed count.
 - complementary: differing choices that dovetail, and how — as many as genuinely relevant. Different signature strengths that cover for each other often fit here. Keep "seem to" (it's the couple's to confirm). For the clearest one, give a two-sided split via "sides" (each partner's own position, named).
 - different: name each divergence neutrally, both poles, no judgement — all that are genuinely relevant. Give the SINGLE clearest one "clearest": true (the view adds the lead-in); the rest omit it. Two-sided "sides" where it helps.
 - talkTopics: governed by weight, not a count. Include a topic only where it opens a real conversation — a divergence worth exploring, or a hope/fear/goal that carries weight for the two of them. Never pad to a number; never drop a weighty one to stay short. Lead with a generative or shared one, then differences, weightiest first. Frame each as MEANING, not position — name where they differ or where a hope/fear sits and invite them to explore what it means to each, without asserting what it means. If nothing clears the bar, return an empty array.
 
 Respond with ONLY a JSON object of exactly this shape, and nothing else:
-{"framingOpener":"...","sharedGround":["..."],"complementary":[{"text":"...","sides":[{"name":"Name","text":"..."}]}],"different":[{"text":"...","clearest":true,"sides":[{"name":"Name","text":"..."}]}],"talkTopics":["..."]}`;
+{"framingOpener":"...","goalsSummary":"...","mattersSummary":"...","feelingsSummary":"...","sharedGround":["..."],"complementary":[{"text":"...","sides":[{"name":"Name","text":"..."}]}],"different":[{"text":"...","clearest":true,"sides":[{"name":"Name","text":"..."}]}],"talkTopics":["..."]}`;
 }
 
 function block(p: ParticipantShared, label: string): string {

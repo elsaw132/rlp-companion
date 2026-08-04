@@ -45,7 +45,9 @@ async function generate(
   try {
     const response = await anthropic.messages.create({
       model: SONNET_MODEL,
-      max_tokens: 2000,
+      // Room for the opener, three per-tab summaries and the observation groups.
+      // 2000 was clipping the opener mid-sentence once the summaries were added.
+      max_tokens: 3200,
       system: comparisonSystemPrompt(),
       messages: [{ role: "user", content: userContent }],
     });
@@ -148,6 +150,13 @@ export async function GET(request: Request) {
       b: { name: b.name, cohort: b.cohort, planName: b.planName, initial: initialFor(b.name) },
     },
     framing: { opener: comparison.framingOpener, close: FIXED_CLOSE },
+    // Short Vita synthesis that opens each of the other three tabs (may be absent
+    // on a report cached before these existed — the tab renders without one).
+    summaries: {
+      goals: comparison.goalsSummary ?? null,
+      matters: comparison.mattersSummary ?? null,
+      feelings: comparison.feelingsSummary ?? null,
+    },
     sharedGround: comparison.sharedGround,
     complementary: comparison.complementary,
     different: comparison.different,

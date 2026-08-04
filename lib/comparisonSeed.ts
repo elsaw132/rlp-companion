@@ -17,6 +17,12 @@ export type ComparisonObservation = {
 export type Comparison = {
   // The generated opener only — the fixed close is appended in the view.
   framingOpener: string;
+  // Short Vita synthesis that opens each of the other three tabs. Optional: a
+  // report generated before these existed (or a partial response) simply omits
+  // them, and the tab falls back to its list with no summary.
+  goalsSummary?: string;
+  mattersSummary?: string;
+  feelingsSummary?: string;
   sharedGround: string[];
   complementary: ComparisonObservation[];
   different: ComparisonObservation[];
@@ -99,8 +105,14 @@ export function coerceComparison(raw: unknown): Comparison {
   const o = (raw ?? {}) as Record<string, unknown>;
   const framingOpener = str(o.framingOpener);
   if (!framingOpener) return FALLBACK_COMPARISON;
+  const goalsSummary = str(o.goalsSummary);
+  const mattersSummary = str(o.mattersSummary);
+  const feelingsSummary = str(o.feelingsSummary);
   return {
     framingOpener,
+    ...(goalsSummary ? { goalsSummary } : null),
+    ...(mattersSummary ? { mattersSummary } : null),
+    ...(feelingsSummary ? { feelingsSummary } : null),
     sharedGround: strArray(o.sharedGround),
     complementary: observations(o.complementary),
     different: observations(o.different),

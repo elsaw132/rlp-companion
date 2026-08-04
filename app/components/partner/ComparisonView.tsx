@@ -42,6 +42,10 @@ type StrengthEntry = { label: string; both: boolean; note?: string };
 export type Payload = {
   partners: { a: PM; b: PM };
   framing: { opener: string; close: string };
+  // Short Vita synthesis that opens the goals / matters / feelings tabs, so they
+  // read as intentional rather than as bare lists. Any may be null (a report
+  // cached before these existed) — the tab then renders without one.
+  summaries?: { goals: string | null; matters: string | null; feelings: string | null };
   sharedGround: string[];
   complementary: Obs[];
   different: Obs[];
@@ -203,6 +207,23 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
     tabs.push({ id: "feelings", label: "Hopes & fears" });
   tabs.push({ id: "talk", label: "Talk together" });
   const active: TabId = tab ?? tabs[0]?.id ?? "talk";
+  const activeIndex = Math.max(0, tabs.findIndex((t) => t.id === active));
+  const prevTab = tabs[activeIndex - 1] ?? null;
+  const nextTab = tabs[activeIndex + 1] ?? null;
+
+  const goToTab = (id: TabId) => {
+    setTab(id);
+    // Bring the reader back to the top of the report when they page forward, so
+    // the next part starts at its heading rather than mid-scroll.
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // A row is only tap-to-expand when it actually carries detail. The "tap to
+  // see more" hints are gated on this so they never invite a tap that does
+  // nothing (goals carry detail; values/strengths only sometimes do).
+  const goalsExpandable = [...data.goals.a, ...data.goals.b].some((g) => !!g.detail);
+  const valuesExpandable = [...data.values.a, ...data.values.b].some((v) => !!v.description);
+  const strengthsExpandable = [...data.strengths.a, ...data.strengths.b].some((s) => !!s.note);
 
   return (
     <main style={styles.page}>
@@ -238,6 +259,13 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
           {data.framing.opener} {data.framing.close}
         </p>
       </div>
+
+      <p style={styles.tabsIntro}>
+        Your two plans are compared across the {tabs.length} parts below. Move
+        through them with these buttons — or the <b>Back</b> and <b>Next</b> links at
+        the foot of each part — and at the very end you&rsquo;ll be asked for a little
+        feedback on the shared view.
+      </p>
 
       <div role="tablist" aria-label="Comparison sections" style={styles.tabBar}>
         {tabs.map((t) => (
@@ -285,10 +313,12 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
 
       {/* GOALS */}
       {active === "goals" && (
+        <>
+          <TabSummary text={data.summaries?.goals ?? null} />
         <Section
           heading="Goals — the full picture"
           note="Every goal each of you named, including those that are simply your own. The ones that stood out are marked."
-          hint="Tap a goal to see more of what it means."
+          hint={goalsExpandable ? "Tap a goal to see more of what it means." : undefined}
         >
           <TwoColumns
             partners={partners}
@@ -309,16 +339,18 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
             }}
           />
         </Section>
+        </>
       )}
 
       {/* WHAT MATTERS — values, strengths, principles */}
       {active === "matters" && (
         <div>
+          <TabSummary text={data.summaries?.matters ?? null} />
           {(data.values.a.length > 0 || data.values.b.length > 0) && (
             <Section
               heading="What you each value most"
               note="The values at the heart of each of your plans. Where you share one, it's marked."
-              hint="Tap a value to read what it means to each of you."
+              hint={valuesExpandable ? "Tap a value to read what it means to each of you." : undefined}
             >
               <TwoColumns
                 partners={partners}
@@ -345,7 +377,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
             <Section
               heading="What you each bring"
               note="The strengths each of you leans on. Different strengths often cover for each other."
-              hint="Tap a strength to see how it shows up."
+              hint={strengthsExpandable ? "Tap a strength to see how it shows up." : undefined}
             >
               <TwoColumns
                 partners={partners}
@@ -369,6 +401,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
       {/* HOPES & FEARS — a warmer, quote-led treatment */}
       {active === "feelings" && (
         <div>
+          <TabSummary text={data.summaries?.feelings ?? null} />
           {data.hopes.length > 0 && (
             <Section heading="What you're each hoping for" note="The hopes you each chose to share.">
               {data.hopes.map((h, i) => (
@@ -439,6 +472,67 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
               Add
             </button>
           </div>
+          <p style={styles.addHelp}>
+            This just adds to the shared list above — a prompt for the two of you to
+            talk through in person. It isn&rsquo;t a message to Vita or to your
+            partner.
+          </p>
+        </div>
+      )}
+
+      {/* Foot-of-part navigation: parts 1…n-1 page INTO the next part (with a way
+          back) so nobody leaves at the foot of part one; the last part closes the
+          module — a plain end, a way back to the plans, and the whole-module
+          feedback card. Mirrors the /plan foot-of-tab pager. */}
+      {nextTab ? (
+        <nav style={styles.pager} aria-label="Move through the shared view">
+          <p style={styles.pagerCount}>
+            Part {activeIndex + 1} of {tabs.length}
+          </p>
+          <div style={styles.pagerRow}>
+            {prevTab ? (
+              <button type="button" style={styles.pagerBack} onClick={() => goToTab(prevTab.id)}>
+                ← Back: {prevTab.label}
+              </button>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            <button type="button" style={styles.pagerNext} onClick={() => goToTab(nextTab.id)}>
+              Next: {nextTab.label} →
+            </button>
+          </div>
+        </nav>
+      ) : (
+        <div style={styles.endBlock}>
+          <p style={styles.endEyebrow}>That&rsquo;s the whole picture</p>
+          <h2 style={styles.endTitle}>
+            You&rsquo;ve been through all {tabs.length} parts
+          </h2>
+          <p style={styles.endText}>
+            There&rsquo;s nothing more to work through here — the shared view stays
+            available whenever either of you wants to come back to it.
+          </p>
+          <div style={styles.endActions}>
+            {prevTab && (
+              <button type="button" style={styles.pagerBack} onClick={() => goToTab(prevTab.id)}>
+                ← Back: {prevTab.label}
+              </button>
+            )}
+            {!preview && (
+              <a href="/home" style={styles.endHome}>
+                Back to your plans →
+              </a>
+            )}
+          </div>
+          {feedbackDone === false && (
+            <div style={styles.feedbackFoot}>
+              <ModuleFeedbackCard
+                moduleId="5.1"
+                onDone={markFeedbackDone}
+                onSkip={markFeedbackDone}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -469,20 +563,24 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
         intro="Tell us what you expected to see — this helps us spot a glitch in the shared view."
         context="couples-talk-empty"
       />
-
-      {/* Foot-of-report feedback, once the joint report is ready — the couples
-          module's version of the close-of-session card every other module
-          shows. Appears once per person; Done or Skip both retire it. */}
-      {feedbackDone === false && (
-        <div style={styles.feedbackFoot}>
-          <ModuleFeedbackCard
-            moduleId="5.1"
-            onDone={markFeedbackDone}
-            onSkip={markFeedbackDone}
-          />
-        </div>
-      )}
     </main>
+  );
+}
+
+// The short Vita synthesis that opens the goals / matters / feelings tabs, so
+// each reads as an intentional part rather than a bare list. Renders nothing
+// when the report carries no summary for this tab (e.g. one cached before these
+// existed) — the tab then falls back to its list alone.
+function TabSummary({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <div style={styles.summaryCard}>
+      <span style={styles.summaryTag}>
+        <VitaMark size={18} />
+        From Vita
+      </span>
+      <p style={styles.summaryText}>{text}</p>
+    </div>
   );
 }
 
@@ -719,7 +817,115 @@ const styles: Record<string, CSSProperties> = {
     color: "var(--text)",
   },
   loadNote: { color: "var(--text-muted)", padding: "40px 0" },
-  feedbackFoot: { marginTop: 48, paddingTop: 40, borderTop: "1px solid var(--warm-line)" },
+  feedbackFoot: { marginTop: 32, paddingTop: 8 },
+  tabsIntro: {
+    fontSize: "var(--fs-sm)",
+    color: "var(--text-muted)",
+    lineHeight: "var(--lh-body)",
+    maxWidth: "64ch",
+    margin: "0 0 14px",
+  },
+  summaryCard: {
+    background: "var(--warm-surface)",
+    border: "1px solid var(--warm-line)",
+    borderRadius: "var(--r-md)",
+    padding: "16px 18px",
+    marginBottom: 22,
+  },
+  summaryTag: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    color: "var(--color-vita)",
+    fontWeight: 600,
+    fontSize: "var(--fs-label)",
+    marginBottom: 8,
+  },
+  summaryText: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-body)",
+    lineHeight: 1.55,
+    margin: 0,
+    color: "var(--ink)",
+  },
+  addHelp: {
+    fontSize: "var(--fs-label)",
+    color: "var(--text-faint)",
+    lineHeight: 1.5,
+    margin: "8px 2px 0",
+    maxWidth: "58ch",
+  },
+  pager: { marginTop: 34, paddingTop: 22, borderTop: "1px solid var(--border)" },
+  pagerCount: {
+    fontSize: "var(--fs-label)",
+    color: "var(--text-muted)",
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    margin: "0 0 12px",
+  },
+  pagerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  pagerBack: {
+    border: "1px solid var(--border-strong)",
+    background: "#fff",
+    color: "var(--text)",
+    borderRadius: "var(--r-pill)",
+    padding: "10px 18px",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "var(--font-sans)",
+  },
+  pagerNext: {
+    border: "1px solid var(--brand-primary)",
+    background: "var(--brand-primary)",
+    color: "var(--brand-on-primary)",
+    borderRadius: "var(--r-pill)",
+    padding: "10px 20px",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "var(--font-sans)",
+  },
+  endBlock: { marginTop: 34, paddingTop: 26, borderTop: "1px solid var(--border)" },
+  endEyebrow: {
+    fontSize: "var(--fs-eyebrow)",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
+    fontWeight: 700,
+    margin: "0 0 8px",
+  },
+  endTitle: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "var(--fs-h2)",
+    fontWeight: 600,
+    margin: "0 0 8px",
+    color: "var(--ink)",
+  },
+  endText: {
+    fontSize: "var(--fs-body)",
+    color: "var(--text-muted)",
+    lineHeight: "var(--lh-body)",
+    maxWidth: "60ch",
+    margin: "0 0 16px",
+  },
+  endActions: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" },
+  endHome: {
+    display: "inline-block",
+    background: "var(--brand-primary)",
+    color: "var(--brand-on-primary)",
+    borderRadius: "var(--r-pill)",
+    padding: "10px 20px",
+    fontSize: "var(--fs-sm)",
+    fontWeight: 700,
+    textDecoration: "none",
+  },
   eyebrow: {
     fontSize: "var(--fs-eyebrow)",
     letterSpacing: "0.14em",
