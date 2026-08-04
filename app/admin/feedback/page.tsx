@@ -9,6 +9,7 @@ import {
   getAllPostCompletionEmails,
   getAllCompletedLists,
   getAllModuleProgress,
+  getAllCoupleCompletions,
 } from "@/lib/db";
 import { allModulesInOrder } from "@/lib/modules";
 import AdminFeedbackView from "./AdminFeedbackView";
@@ -42,6 +43,7 @@ export default async function AdminFeedbackPage() {
     postCompletionEmails,
     completedLists,
     progress,
+    coupleCompletions,
   ] = await Promise.all([
     getAllModuleFeedback(),
     getAllFeedback(),
@@ -50,6 +52,7 @@ export default async function AdminFeedbackPage() {
     getAllPostCompletionEmails(),
     getAllCompletedLists(),
     getAllModuleProgress(),
+    getAllCoupleCompletions(),
   ]);
 
   const modules = allModulesInOrder();
@@ -64,6 +67,7 @@ export default async function AdminFeedbackPage() {
       postCompletionEmails={postCompletionEmails}
       completedLists={completedLists}
       progress={progress}
+      coupleCompletions={coupleCompletions}
       modules={modules}
     />
   );

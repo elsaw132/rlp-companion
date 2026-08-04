@@ -1561,6 +1561,42 @@ export async function getActivePairings(): Promise<PairingRow[]> {
   return rows.map(mapPairing);
 }
 
+// For the admin dashboard: the couples-module ("Plan with your partner", 5.1)
+// status per participant. The couples flow records to its own tables and NEVER
+// to module_progress, so this is the only place the admin can see who has done
+// it. One row per person in an ACTIVE pairing: when they finished their own
+// share step (their consent), and — once BOTH partners have shared — when the
+// joint report was generated (the point the module is complete for the pair).
+export type CoupleCompletionRow = {
+  userId: string;
+  sharedAt: string | null;
+  reportReadyAt: string | null;
+};
+
+export async function getAllCoupleCompletions(): Promise<CoupleCompletionRow[]> {
+  await ensureCouplePairingTable();
+  await ensureShareSelectionTable();
+  await ensureGeneratedComparisonTable();
+  const rows = (await sql()`
+    SELECT ss.participant_id AS user_id,
+           ss.completed_at    AS shared_at,
+           gc.generated_at    AS report_ready_at
+    FROM couple_pairing cp
+    JOIN share_selection ss ON ss.pairing_id = cp.id
+    LEFT JOIN generated_comparison gc ON gc.pairing_id = cp.id
+    WHERE cp.status = 'active'
+  `) as {
+    user_id: string;
+    shared_at: string | Date | null;
+    report_ready_at: string | Date | null;
+  }[];
+  return rows.map((r) => ({
+    userId: r.user_id,
+    sharedAt: toIso(r.shared_at),
+    reportReadyAt: toIso(r.report_ready_at),
+  }));
+}
+
 // Stop sharing (either partner, or an admin). Collapses the shared view (status
 // → withdrawn, only if still active — idempotent), keeps each consent timestamp
 // but clears WHAT was shared (data minimisation), and deletes all derived

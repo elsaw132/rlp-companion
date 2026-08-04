@@ -9,6 +9,7 @@ import type {
   PostCompletionEmailRow,
   CompletedListRow,
   ModuleProgressRow,
+  CoupleCompletionRow,
 } from "@/lib/db";
 import { RATING_MIN, RATING_MAX } from "@/lib/moduleFeedback";
 import { toAnalysisRow, type BaselineAnalysisRow } from "@/lib/baselineAnalysis";
@@ -37,6 +38,7 @@ type Props = {
   postCompletionEmails: PostCompletionEmailRow[];
   completedLists: CompletedListRow[];
   progress: ModuleProgressRow[];
+  coupleCompletions: CoupleCompletionRow[];
   modules: ModuleMeta[];
 };
 
@@ -231,6 +233,7 @@ export default function AdminFeedbackView({
   postCompletionEmails,
   completedLists,
   progress: progressAll,
+  coupleCompletions,
   modules,
 }: Props) {
   const [tab, setTab] = useState<Tab>("participants");
@@ -391,9 +394,9 @@ export default function AdminFeedbackView({
   // --- Completions funnel ---------------------------------------------------
   // Who has finished their plan, been sent the survey invite, and completed the
   // survey — plus, for members with a partner, whether they went on to the
-  // couples session. That couples session ("Plan with your partner", 5.1) is a
-  // separate feature not live here yet, so its column stays empty until it lands;
-  // partner status meanwhile comes from the baseline question.
+  // couples session ("Plan with your partner", 5.1). Couples status comes from
+  // coupleDoneByUser below (the couples tables), not module_progress, which the
+  // couples flow never writes; partner status comes from the baseline question.
   const lastPlanId = useMemo(() => {
     const plan = modules.filter((m) => m.stageNumber === 4);
     return plan.length ? plan[plan.length - 1].id : "4.7";
@@ -402,6 +405,19 @@ export default function AdminFeedbackView({
     const s5 = modules.filter((m) => m.stageNumber === 5);
     return s5.length ? s5[0].id : null;
   }, [modules]);
+
+  // Couples-module completion by user, read from the couples tables. The
+  // report-ready date (both partners shared, joint view generated) means the
+  // module is complete for the pair; failing that, the person's own share date
+  // shows they've done their part and are waiting on their partner.
+  const coupleDoneByUser = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of coupleCompletions) {
+      const at = r.reportReadyAt ?? r.sharedAt;
+      if (at) m.set(r.userId, at);
+    }
+    return m;
+  }, [coupleCompletions]);
 
   const completions = useMemo(() => {
     // Session finish dates come from module_progress where we have them.
@@ -438,7 +454,9 @@ export default function AdminFeedbackView({
       const b = baselineByUser.get(c.userId);
       const mpCouple = coupleId ? (mods?.get(coupleId) ?? null) : null;
       const coupleAt =
-        mpCouple ?? (coupleId && done.has(coupleId) ? c.updatedAt : null);
+        coupleDoneByUser.get(c.userId) ??
+        mpCouple ??
+        (coupleId && done.has(coupleId) ? c.updatedAt : null);
       rows.push({
         userId: c.userId,
         planAt,
@@ -459,6 +477,7 @@ export default function AdminFeedbackView({
     baselineByUser,
     lastPlanId,
     coupleId,
+    coupleDoneByUser,
     keep,
   ]);
 
@@ -1360,9 +1379,10 @@ export default function AdminFeedbackView({
                 survey. Each cell is the date that step happened; a dash means it
                 hasn&apos;t yet, and a ~ marks an approximate finish date for an
                 older completion recorded before per-session timing. The{" "}
-                <strong>Couples session</strong> column fills in once the &ldquo;Plan
-                with your partner&rdquo; session is live here; partner status is the
-                baseline answer in the meantime.
+                <strong>Couples session</strong> column shows when the &ldquo;Plan
+                with your partner&rdquo; joint report became ready (both partners
+                shared), or their own share date if they&rsquo;re still waiting on
+                their partner; partner status is the baseline answer.
               </p>
             </div>
             {completions.length === 0 ? (
