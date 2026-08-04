@@ -21,7 +21,6 @@ import { getActiveStageNumber } from "@/lib/progress";
 import { useUserData } from "@/lib/userData";
 import { tailorCopy } from "@/lib/retirementCopy";
 import StageIntro from "./StageIntro";
-import ActPilotPopup from "./ActPilotPopup";
 import OpeningCapture from "./OpeningCapture";
 import VitaMark from "./VitaMark";
 import { stageColorFor, stageForegroundFor, stageWashFor, stageHeroGroundFor, stageHeroGraphicFor, STAGE_KEYS } from "@/lib/stageColors";
@@ -56,7 +55,31 @@ function shortenRecap(text: string): string {
   return out;
 }
 
-export default function HomeDashboard() {
+// A one-line "what this stage is about" for the coming-up panel, so someone
+// looking ahead sees the point of a stage — not just that it's still to come.
+// Stage 5 (Act) has its own pilot message and isn't here.
+const COMING_UP_BLURB: Record<number, string> = {
+  2: "A closer look at the parts of a full retirement, one area at a time — how you move, keep your mind alive, spend time with people, and find your purpose.",
+  3: "What sits underneath the picture — your strengths, the values you lead by, and what a truly good day looks like for you.",
+  4: "Where it turns into decisions — when and how you leave work, the goals worth stretching for, and the shape of an ordinary week.",
+  5: "One session to do together — bringing your plan and your partner's into one, and shaping these years side by side.",
+};
+
+// Join names into natural prose: "A", "A and B", "A, B and C".
+function listNames(names: string[]): string {
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+export default function HomeDashboard({
+  hasActivePairing = false,
+}: {
+  // True when the signed-in user has been admin-paired with a partner: the Act
+  // "Plan with your partner" card (5.1) becomes an active link instead of the
+  // "Coming soon" placeholder. Defaults false, so unpaired users are unchanged.
+  hasActivePairing?: boolean;
+} = {}) {
   const { user } = useUser();
   const userData = useUserData();
   // The person's retirement stage, used to tailor stage-intro and module-card
@@ -91,9 +114,6 @@ export default function HomeDashboard() {
   // It's a stage-opening step, not a module — shown once, after the Imagine
   // intro and before module 1.1, while 1.1 isn't done yet. Set once on load.
   const [showOpeningCapture, setShowOpeningCapture] = useState(false);
-  // Set true when the person dismisses the Act pilot popup this visit, so it
-  // hides at once (the persisted "seen" flag also stops it returning next time).
-  const [actPopupDismissed, setActPopupDismissed] = useState(false);
 
   // Sync the mobile app bar's "Jump to a stage" deep-link (?stage=N) into the
   // viewed stage — reactively, so it also works when we're already on /home (a
@@ -139,13 +159,13 @@ export default function HomeDashboard() {
         ? new URLSearchParams(window.location.search)
         : null;
     // Deep-link from the mobile app bar's "Jump to a stage": pin the viewed stage
-    // to ?stage=N. Only stages already reached are honoured (later stages are
-    // locked and clamp back to the current one anyway).
+    // to ?stage=N. Any real stage can now be previewed — upcoming stages show
+    // their sessions as visible-but-locked, so people can see what's ahead.
     const stageParam = params ? Number(params.get("stage")) : NaN;
     if (
       Number.isInteger(stageParam) &&
       stageParam >= 1 &&
-      stageParam <= currentStage
+      stageParam <= TOTAL_STAGES
     ) {
       setViewedStage(stageParam);
     }
@@ -254,11 +274,30 @@ export default function HomeDashboard() {
     );
   }
 
+  // The modules a person sees in a stage. For a couples-pilot participant the
+  // "Plan with your partner" session in Act is a real session like any other, so
+  // it's folded in here — and then flows through the ordinary locked / next-step
+  // / done rendering, exactly like every other stage. Everyone else's programme
+  // is unchanged (Act stays empty for them).
+  const effectiveModules = (s: (typeof STAGES)[number]) => {
+    const mods = visibleModules(s, retirementStage);
+    if (hasActivePairing && s.number === 5) {
+      const partner = s.modules.find((m) => m.id === "5.1");
+      if (partner) return [...mods, partner];
+    }
+    return mods;
+  };
+
+  // Where a session card / next-step button points. The partner session opens
+  // its own flow at /partner; every other session opens at /session/[id].
+  const sessionHref = (id: string) =>
+    id === "5.1" ? "/partner" : `/session/${id}`;
+
   // Every module in programme order this person actually sees, tagged with its
   // stage number. Cohort-scoped so a winding-down user's extra first module is
   // counted and everyone else's programme is unchanged.
   const allModules = STAGES.flatMap((s) =>
-    visibleModules(s, retirementStage).map((m) => ({ ...m, stageNumber: s.number }))
+    effectiveModules(s).map((m) => ({ ...m, stageNumber: s.number }))
   );
 
   // The single next step: the first incomplete module in programme order.
@@ -289,40 +328,53 @@ export default function HomeDashboard() {
   // Whether a stage is fully finished (every module this person sees is
   // complete). Empty future stages don't count as done.
   const isStageDone = (s: (typeof STAGES)[number]) => {
-    const mods = visibleModules(s, retirementStage);
+    const mods = effectiveModules(s);
     return mods.length > 0 && mods.every((m) => completed.includes(m.id));
   };
 
-  // The stage being looked at. Defaults to the current stage and stays there
-  // until the person pins an earlier one. Stages past the current one are locked
-  // and can't be viewed, so clamp to the current stage if anything tries.
+  // The stage being looked at. Defaults to the current stage, and can now be
+  // pinned to ANY real stage — earlier finished ones, the current one, or a
+  // later one still to come. Upcoming stages are shown so people can see what's
+  // ahead; their sessions render as visible-but-locked (only completed modules
+  // and the single next module stay openable). Clamp to a real stage number.
   const viewedStageNumber =
-    viewedStage !== null && viewedStage <= activeStageNumber
+    viewedStage !== null && viewedStage >= 1 && viewedStage <= TOTAL_STAGES
       ? viewedStage
       : activeStageNumber;
   const viewedStageData =
     stagesView.find((s) => s.number === viewedStageNumber) ?? activeStage;
   const isViewingCurrent = viewedStageNumber === activeStageNumber;
+  // Looking ahead at a stage the person hasn't reached yet: the hero becomes a
+  // calm "coming up" panel and every session in it reads as locked.
+  const isViewingUpcoming = viewedStageNumber > activeStageNumber;
+  // Act (stage 5) is an ordinary stage for a couples participant (its one partner
+  // session flows through the same rendering as every other stage). It's only
+  // special for everyone ELSE: with no partner session, the programme completes
+  // after Stage 4, and Act shows a message saying so instead of a session list.
+  const isViewingActSolo = viewedStageNumber === 5 && !hasActivePairing;
+  // Stages still between where the person is and the stage they're previewing,
+  // named in order — so the "you'll get here after…" line stays accurate however
+  // many stages ahead it is (it lists them all, not just the current one).
+  const stagesUntilViewed = stagesView
+    .filter((s) => s.number >= activeStageNumber && s.number < viewedStageNumber)
+    .map((s) => s.name);
   // The hero photograph (and, on a finished stage, Vita's recap) for the stage
   // being viewed. One image per stage; see lib/stageHeroes.ts.
   const viewedHero = stageHeroFor(viewedStageNumber);
 
-  const stageModules = visibleModules(viewedStageData, retirementStage);
+  const stageModules = effectiveModules(viewedStageData);
   const doneInStage = stageModules.filter((m) => completed.includes(m.id)).length;
   const totalInStage = stageModules.length;
-  // The Act (stage 5) pilot stand-in: shown as a popup once the person is looking
-  // at Act while it has no sessions to open, and only until they've met it once
-  // (its own seen flag). Replaces the old full-screen home takeover for Act.
-  const showActPopup =
-    viewedStageNumber === 5 &&
-    totalInStage === 0 &&
-    !actPopupDismissed &&
-    !userData.hasSeenPilotCallout();
   // Coming-soon placeholders live on the stage but outside the real programme
   // (see moduleVisibleFor). Shown on the dashboard only, and only to people the
   // module is for (e.g. partner-gated modules need a partner).
   const comingSoonModules = viewedStageData.modules.filter(
-    (m) => m.comingSoon && (!m.requiresPartner || userData.hasPartner())
+    (m) =>
+      m.comingSoon &&
+      (!m.requiresPartner || userData.hasPartner()) &&
+      // A paired user gets 5.1 as a real session (via effectiveModules), not a
+      // placeholder.
+      !(m.id === "5.1" && hasActivePairing)
   );
   const stagePct =
     totalInStage > 0 ? Math.round((doneInStage / totalInStage) * 100) : 0;
@@ -402,19 +454,6 @@ export default function HomeDashboard() {
     >
       <style>{homeCss}</style>
 
-      {showActPopup && (
-        <ActPilotPopup
-          onBackToPlan={() => {
-            if (user) void userData.markPilotCalloutSeen();
-            router.push("/plan");
-          }}
-          onClose={() => {
-            if (user) void userData.markPilotCalloutSeen();
-            setActPopupDismissed(true);
-          }}
-        />
-      )}
-
       <div className="shell">
         {/* SIDEBAR */}
         <aside className="sidebar">
@@ -423,7 +462,9 @@ export default function HomeDashboard() {
             {stagesView.map((s) => {
               const isCurrent = s.number === activeStageNumber;
               const isDone = isStageDone(s);
-              const isLocked = s.number > activeStageNumber;
+              // Not yet reached. Still selectable now — so people can look ahead
+              // at what's coming — but shown muted.
+              const isUpcoming = s.number > activeStageNumber;
               const isViewing = s.number === viewedStageNumber;
               const numClass = isCurrent
                 ? "n n--current"
@@ -433,7 +474,7 @@ export default function HomeDashboard() {
               const navClass = [
                 "nav",
                 isViewing ? "is-viewing" : "",
-                isLocked ? "is-locked" : "",
+                isUpcoming ? "is-upcoming" : "",
                 !isCurrent && !isDone ? "is-idle" : "",
               ]
                 .filter(Boolean)
@@ -450,24 +491,9 @@ export default function HomeDashboard() {
                       color: stageForegroundFor(s.number),
                     } as React.CSSProperties)
                   : undefined;
-              const inner = (
-                <>
-                  <span className={numClass} style={stageCircleStyle}>
-                    {isDone ? "✓" : s.number}
-                  </span>
-                  <span>
-                    <span className="t">{s.name}</span>
-                    <span className="s">{s.subtitle}</span>
-                  </span>
-                </>
-              );
-              // Finished stages and the current stage are navigable; later stages
-              // are locked and inert.
-              return isLocked ? (
-                <div key={s.number} className={navClass} aria-disabled="true">
-                  {inner}
-                </div>
-              ) : (
+              // Every stage — finished, current, or still to come — is now
+              // navigable so people can see what's ahead.
+              return (
                 <button
                   key={s.number}
                   type="button"
@@ -475,7 +501,13 @@ export default function HomeDashboard() {
                   aria-current={isViewing ? "true" : undefined}
                   onClick={() => setViewedStage(s.number)}
                 >
-                  {inner}
+                  <span className={numClass} style={stageCircleStyle}>
+                    {isDone ? "✓" : s.number}
+                  </span>
+                  <span>
+                    <span className="t">{s.name}</span>
+                    <span className="s">{s.subtitle}</span>
+                  </span>
                 </button>
               );
             })}
@@ -536,14 +568,14 @@ export default function HomeDashboard() {
               {stagesView.map((s) => {
                 const isCurrent = s.number === activeStageNumber;
                 const isDone = isStageDone(s);
-                const isLocked = s.number > activeStageNumber;
+                const isUpcoming = s.number > activeStageNumber;
                 const isViewing = s.number === viewedStageNumber;
                 const stepState = isDone ? "done" : isCurrent ? "active" : "todo";
                 const stepClass = [
                   "step",
                   stepState,
                   isViewing ? "is-viewing" : "",
-                  isLocked ? "is-locked" : "",
+                  isUpcoming ? "is-upcoming" : "",
                 ]
                   .filter(Boolean)
                   .join(" ");
@@ -556,19 +588,7 @@ export default function HomeDashboard() {
                         color: stageForegroundFor(s.number),
                       } as React.CSSProperties)
                     : undefined;
-                const inner = (
-                  <>
-                    <div className="dot" style={stageDotStyle}>
-                      {isDone ? "✓" : s.number}
-                    </div>
-                    <div className="cap">{s.name}</div>
-                  </>
-                );
-                return isLocked ? (
-                  <div key={s.number} className={stepClass} aria-disabled="true">
-                    {inner}
-                  </div>
-                ) : (
+                return (
                   <button
                     key={s.number}
                     type="button"
@@ -576,7 +596,10 @@ export default function HomeDashboard() {
                     aria-current={isViewing ? "true" : undefined}
                     onClick={() => setViewedStage(s.number)}
                   >
-                    {inner}
+                    <div className="dot" style={stageDotStyle}>
+                      {isDone ? "✓" : s.number}
+                    </div>
+                    <div className="cap">{s.name}</div>
                   </button>
                 );
               })}
@@ -618,9 +641,48 @@ export default function HomeDashboard() {
                 </Link>
               ))}
 
-            {/* COACH NEXT-STEP HERO — only when looking at the current stage.
-                Viewing an earlier, finished stage shows a calmer header instead. */}
-            {!isViewingCurrent ? (
+            {/* Three headers for the viewed stage: a finished stage gets a calm
+                "complete" panel; a stage still to come gets a "coming up" panel so
+                people can see what's ahead; the current stage gets Vita's live
+                next-step hero. */}
+            {isViewingActSolo ? (
+              <section
+                className="done-head done-head--upcoming"
+                style={{ background: stageHeroGroundFor(viewedStageNumber) }}
+              >
+                <div
+                  className="hero-gfx"
+                  style={{ color: stageHeroGraphicFor(viewedStageNumber) }}
+                  aria-hidden="true"
+                >
+                  <ChorusVectorGraphic className="hero-gfx-svg" />
+                </div>
+                <div className="hero-card">
+                  <h2>
+                    <span className="tick tick--act" aria-hidden="true">
+                      ✦
+                    </span>
+                    {viewedStageData.name} — coming later
+                  </h2>
+                  <p>
+                    For this pilot, your plan is complete once you&apos;ve finished
+                    Stage 4. {viewedStageData.name}
+                    {" "}is where you&apos;ll turn your plan into action — the one
+                    part still being built — and we&apos;ll be in touch the moment it
+                    opens.
+                  </p>
+                  {isViewingUpcoming && (
+                    <button
+                      type="button"
+                      className="link-back"
+                      onClick={() => setViewedStage(null)}
+                    >
+                      Back to your current step ›
+                    </button>
+                  )}
+                </div>
+              </section>
+            ) : !isViewingCurrent && !isViewingUpcoming ? (
               <section
                 className="done-head"
                 style={{ background: stageHeroGroundFor(viewedStageNumber) }}
@@ -645,6 +707,39 @@ export default function HomeDashboard() {
                       : "Revisit any session below; your answers are saved."}
                   </p>
                   <p className="dh-hint">Revisit any session below — your answers are saved.</p>
+                  <button
+                    type="button"
+                    className="link-back"
+                    onClick={() => setViewedStage(null)}
+                  >
+                    Back to your current step ›
+                  </button>
+                </div>
+              </section>
+            ) : isViewingUpcoming ? (
+              <section
+                className="done-head done-head--upcoming"
+                style={{ background: stageHeroGroundFor(viewedStageNumber) }}
+              >
+                <div
+                  className="hero-gfx"
+                  style={{ color: stageHeroGraphicFor(viewedStageNumber) }}
+                  aria-hidden="true"
+                >
+                  <ChorusVectorGraphic className="hero-gfx-svg" />
+                </div>
+                <div className="hero-card">
+                  <h2>
+                    <span className="tick tick--lock" aria-hidden="true">
+                      🔒
+                    </span>
+                    {viewedStageData.name} — coming up
+                  </h2>
+                  <p>{COMING_UP_BLURB[viewedStageNumber]}</p>
+                  <p className="dh-hint">
+                    These sessions will become available once you&apos;ve worked
+                    through {listNames(stagesUntilViewed)} — no rush.
+                  </p>
                   <button
                     type="button"
                     className="link-back"
@@ -679,7 +774,7 @@ export default function HomeDashboard() {
                 </div>
                 {nextModule && (
                   <div className="ctarow">
-                    <Link className="btn btn-navy" href={`/session/${nextModule.id}`}>
+                    <Link className="btn btn-navy" href={sessionHref(nextModule.id)}>
                       {ctaLabel}
                     </Link>
                     <span className="chip-time">🕐 {nextModule.durationMin} min</span>
@@ -803,12 +898,14 @@ export default function HomeDashboard() {
               </Link>
             )}
 
-            {/* The post-completion feedback ask lives in the sidebar on desktop
-                and, for mobile/tablet, in a stage-independent card just below the
-                stage arc (see above) — so it isn't tied to viewing the Plan
-                stage. Nothing renders here. */}
-
-            {/* STAGE SESSIONS */}
+            {/* STAGE SESSIONS. For everyone except couples participants, Act has no
+                session list — its panel above already says the pilot completes
+                after Stage 4. Every other stage (and Act for couples) renders the
+                normal list. The post-completion feedback ask lives in the sidebar
+                on desktop and, for mobile/tablet, in a stage-independent card just
+                below the stage arc (see above). */}
+            {isViewingActSolo ? null : (
+              <>
             <div className="sec-row">
               <div className="sec-head">Your sessions in {viewedStageData.name}</div>
               {totalInStage > 0 && (
@@ -866,7 +963,7 @@ export default function HomeDashboard() {
                       <Link
                         key={m.id}
                         className="scard scard-done"
-                        href={`/session/${m.id}`}
+                        href={sessionHref(m.id)}
                       >
                         {body}
                         <span className="done-cap">
@@ -878,16 +975,30 @@ export default function HomeDashboard() {
                       </Link>
                     );
                   }
+                  // Sessions in a stage still to come are shown but not openable —
+                  // a clear "Locked" card, so people see what's ahead without being
+                  // able to jump the queue. Within the current stage, later sessions
+                  // keep the gentler "Not started" look. Neither is a link, so the
+                  // access rule (only completed + the single next step) is unchanged.
                   return (
                     <div
                       key={m.id}
-                      className={isActiveStep ? "scard is-active" : "scard"}
+                      className={
+                        isActiveStep
+                          ? "scard is-active"
+                          : isViewingUpcoming
+                            ? "scard scard-locked"
+                            : "scard"
+                      }
+                      aria-disabled={isViewingUpcoming ? "true" : undefined}
                     >
                       {body}
                       {isActiveStep ? (
-                        <Link className="btn btn-navy" href={`/session/${m.id}`}>
+                        <Link className="btn btn-navy" href={sessionHref(m.id)}>
                           {ctaLabel}
                         </Link>
+                      ) : isViewingUpcoming ? (
+                        <span className="badge badge-locked">🔒 Locked</span>
                       ) : (
                         <span className="badge badge-notstarted">Not started</span>
                       )}
@@ -910,6 +1021,8 @@ export default function HomeDashboard() {
                   </div>
                 ))}
               </div>
+            )}
+              </>
             )}
 
             {/* ENCOURAGEMENT */}
@@ -961,8 +1074,10 @@ const homeCss = `
    with a stage-colour hairline (drawn as an inset shadow so it adds no layout). */
 .rlp-home .nav.is-viewing{background:var(--stage-wash);box-shadow:inset 0 0 0 1.5px var(--stage-color)}
 .rlp-home .nav.is-viewing:hover{background:var(--stage-wash)}
-.rlp-home .nav.is-locked{opacity:.5;cursor:default}
-.rlp-home .nav.is-locked:hover{background:none}
+/* Upcoming (not-yet-reached) stage rows stay clickable so people can look ahead,
+   shown muted — no per-row lock, so a fresh Stage 1 doesn't read as all locked. */
+.rlp-home .nav.is-upcoming .t{color:var(--text-muted)}
+.rlp-home .nav.is-upcoming .n{opacity:.7}
 .rlp-home .nav .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-brand-primary) 55%,transparent)}
 .rlp-home .nav .n--current{background:var(--brand-primary);color:#fff}
 .rlp-home .nav .n--idle{background:var(--brand-primary-tint);color:var(--brand-primary)}
@@ -1031,7 +1146,7 @@ const homeCss = `
 .rlp-home .steps{display:flex;align-items:flex-start;gap:0;margin:8px 0 42px}
 .rlp-home .step{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;flex:1;position:relative;background:none;border:none;font-family:inherit;padding:0}
 .rlp-home button.step{cursor:pointer}
-.rlp-home .step.is-locked{opacity:.5;cursor:default}
+.rlp-home .step.is-upcoming{opacity:.72}
 .rlp-home .step .dot{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;z-index:1;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-brand-primary) 55%,transparent)}
 .rlp-home .step.done .dot{background:var(--brand-primary);color:#fff}
 .rlp-home .step.active .dot{background:var(--accent);color:#fff}
@@ -1062,6 +1177,11 @@ const homeCss = `
    green. The tick circle is the full stage colour; body text stays neutral. */
 .rlp-home .done-head h2{font-family:var(--font-serif);font-size:24px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:8px;display:flex;align-items:center;gap:10px}
 .rlp-home .done-head .tick{width:30px;height:30px;border-radius:50%;background:var(--stage-color);color:var(--stage-fg);display:grid;place-items:center;font-size:15px;flex-shrink:0}
+/* The "coming up" panel softens the same circle to a tint and carries a lock. */
+.rlp-home .done-head .tick--lock{background:color-mix(in srgb,var(--stage-color) 20%,#fff);color:var(--ink);font-size:13px}
+/* Act's panel uses the same soft tint circle with the Act motif (not a lock —
+   for couples the session is open, so a lock would read wrong). */
+.rlp-home .done-head .tick--act{background:color-mix(in srgb,var(--stage-color) 20%,#fff);color:var(--ink);font-size:14px}
 .rlp-home .done-head p{font-size:15px;color:var(--text);margin-bottom:10px}
 .rlp-home .done-head .dh-hint{font-size:13px;color:var(--text-muted);margin-bottom:14px}
 .rlp-home .link-back{background:none;border:none;cursor:pointer;font-family:inherit;font-size:15px;font-weight:600;color:var(--brand-primary);padding:8px 0;min-height:44px}
@@ -1104,6 +1224,10 @@ const homeCss = `
 .rlp-home .badge-complete{color:var(--success-text);background:#fff;border:1.5px solid var(--success-line)}
 .rlp-home .badge-notstarted{color:var(--text-muted);background:var(--muted-surface)}
 .rlp-home .badge-soon{color:var(--text-muted);background:var(--muted-surface)}
+/* Locked session (a stage still to come): visible but not openable. */
+.rlp-home .badge-locked{color:var(--text-muted);background:var(--muted-surface)}
+.rlp-home .scard-locked{cursor:default}
+.rlp-home .scard-locked .thumb{opacity:.85}
 /* Coming-soon placeholder card: a real-looking module card that isn't clickable. */
 .rlp-home .scard-soon{cursor:default}
 .rlp-home .scard-soon .badge-soon{grid-column:3 / -1;justify-self:end}

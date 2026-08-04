@@ -11,7 +11,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.stubEnv("NEXT_PUBLIC_RETIREMENT_PATHS", "1");
-const { STAGES, visibleModules, stageNameFor, PILOT_CALLOUT } = await import("@/lib/modules");
+const { STAGES, visibleModules, stageNameFor } = await import("@/lib/modules");
 const { tailorCopy } = await import("@/lib/retirementCopy");
 const { getActiveStageNumber } = await import("@/lib/progress");
 import type { RetirementStage } from "@/lib/userData";
@@ -112,11 +112,12 @@ describe("Stage 5 meets each cohort where they are", () => {
   });
 });
 
-describe("the pilot callout stands in for Act, and stands down on its own", () => {
-  it("Act has no sessions for anyone today, so the callout is what shows", () => {
+describe("Act has no built sessions, so the dashboard stands in for it", () => {
+  it("Act has no sessions for anyone today", () => {
+    // The dashboard relies on this: with nothing in Act's visible set, it shows
+    // an in-stage message instead of a session list (couples get the one partner
+    // session; everyone else is told the pilot completes after Stage 4).
     for (const rs of ALL) expect(visibleModules(stage(5), rs)).toHaveLength(0);
-    expect(PILOT_CALLOUT.buttonLabel).toBe("Back to my plan");
-    expect(PILOT_CALLOUT.body[0]).toContain("isn't ready yet");
   });
 
   it("every cohort can actually reach Stage 5 once they've finished", () => {

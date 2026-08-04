@@ -22,6 +22,10 @@ type FeedbackPanelProps = {
   // to "feedback" (the floating pill); the header's Support button passes
   // "support".
   kind?: "feedback" | "support";
+  // Optional free-text tag identifying where this panel was opened from (e.g.
+  // "couples-talk-empty"), stored alongside the submission so specific report
+  // sources are easy to triage. Distinct from `page` (the route) and `kind`.
+  context?: string;
 };
 
 export default function FeedbackPanel({
@@ -30,6 +34,7 @@ export default function FeedbackPanel({
   title = "Send feedback",
   intro = "Tell us anything — what worked, what didn’t, what confused you.",
   kind = "feedback",
+  context,
 }: FeedbackPanelProps) {
   const pathname = usePathname();
   const [message, setMessage] = useState("");
@@ -64,6 +69,7 @@ export default function FeedbackPanel({
           replyEmail,
           page: pathname,
           type: kind,
+          context,
         }),
       });
       if (!res.ok) throw new Error("send failed");

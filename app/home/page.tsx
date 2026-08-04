@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { getUserData } from "@/lib/db";
+import { getUserData, getActivePairingFor } from "@/lib/db";
+import { currentUserCouplesAllowed } from "@/lib/couplesAccess";
 import ProviderBand from "../components/ProviderBand";
 import HomeDashboard from "../components/HomeDashboard";
 
@@ -18,10 +19,17 @@ export default async function HomePage() {
   const onboardingComplete = await getUserData(userId, "onboarding-complete");
   if (onboardingComplete !== true) redirect("/onboarding");
 
+  // Activate the Act "Plan with your partner" card only for an allowlisted user
+  // who has an active pairing — dormant for everyone else.
+  const [activePairing, couplesAllowed] = await Promise.all([
+    getActivePairingFor(userId),
+    currentUserCouplesAllowed(),
+  ]);
+
   return (
     <>
       <ProviderBand />
-      <HomeDashboard />
+      <HomeDashboard hasActivePairing={couplesAllowed && activePairing !== null} />
     </>
   );
 }

@@ -84,4 +84,10 @@
      controls sitting on the dark-green header, where green would not show. */
   --focus-ring:0 0 0 3px color-mix(in srgb, var(--chorus-green) 45%, transparent);
   --focus-ring-accent:0 0 0 3px color-mix(in srgb, var(--chorus-lime) 75%, transparent);
+  /* The two "person" colours for "Plan with your partner" — non-semantic, and
+     deliberately NOT one of the reserved colours (purple=Vita, green=interaction,
+     orange=cursor). Reused from the in-system accent foregrounds (slate + ochre),
+     which already read accessibly as marks/text. Stable per pairing slot (a/b),
+     so the comparison reads identically whichever partner opens it. */
+  --partner-a:var(--area-senses-fg);--partner-b:var(--reveal-strengths-fg);
 }

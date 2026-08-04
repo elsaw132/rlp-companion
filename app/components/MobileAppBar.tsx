@@ -187,16 +187,15 @@ export default function MobileAppBar() {
 
             <div className="ab-group-label">Jump to a stage</div>
             {STAGES.map((s) => {
-              const locked = s.number > activeStage;
-              return locked ? (
-                <span key={s.number} className="ab-item ab-stage ab-locked" aria-disabled="true">
-                  <span className="ab-stage-num">{s.number}</span> {s.name}
-                </span>
-              ) : (
+              // Not yet reached. Still a link — so people can look ahead at what's
+              // coming — just shown muted; the locked state is spelled out once
+              // they open the stage, not repeated on every row here.
+              const upcoming = s.number > activeStage;
+              return (
                 <Link
                   key={s.number}
                   href={`/home?stage=${s.number}`}
-                  className="ab-item ab-stage"
+                  className={upcoming ? "ab-item ab-stage ab-upcoming" : "ab-item ab-stage"}
                   role="menuitem"
                   onClick={closeMenu}
                 >
@@ -334,9 +333,8 @@ const appBarCss = `
   .ab-group-label{padding:12px 10px 4px;font-size:var(--fs-eyebrow);letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);font-weight:700}
   .ab-stage{color:var(--ink);font-weight:600}
   .ab-stage-num{flex:none;width:24px;height:24px;border-radius:50%;background:var(--brand-primary-tint);color:var(--brand-primary);display:grid;place-items:center;font-size:13px;font-weight:700}
-  .ab-locked{color:var(--text-faint);cursor:default}
-  .ab-locked .ab-stage-num{background:var(--muted-surface);color:var(--text-faint)}
-  .ab-locked:hover{background:none}
+  .ab-upcoming{color:var(--text-muted)}
+  .ab-upcoming .ab-stage-num{background:var(--muted-surface);color:var(--text-muted)}
   .ab-divider{height:1px;background:var(--border);margin:6px 4px}
   .ab-signout{color:var(--text-muted)}
 
