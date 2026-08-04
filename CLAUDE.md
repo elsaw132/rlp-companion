@@ -95,10 +95,11 @@ conversation works, not a production app. Built by a non-technical founder.
 - `npm run lint` — run ESLint
 
 ## Deploying
-Production is `main`, and `main` only. **Never `vercel --prod` from a feature
-branch or the shared checkout** — a deploy ships the whole working tree, so
-that silently reverts whatever `main` has that the branch lacks (the recurring
-"deploy clobber"). Merge to `main`, push, then deploy from the dedicated deploy
-worktree at `/Users/elsawakeman/Projects/rlp-companion-deploy` (it only ever
-holds `main` and carries the correct `.vercel` project link). Full procedure and
-rationale: see `DEPLOY.md`.
+Production is `main`, and Vercel **auto-deploys it on push** (the project is
+connected to GitHub with `main` as the production branch). To ship: merge to
+`main` and `git push origin main` — Vercel builds and promotes it to
+`app.chorus-life.com` automatically. **Do NOT run `vercel --prod` by hand** — a
+manual deploy ships the whole working tree (so a feature branch reverts what
+`main` has that it lacks — the recurring "deploy clobber") and fights the git
+deploy for the alias. Feature-branch pushes get preview deploys, not production.
+Full procedure and rationale: see `DEPLOY.md`.

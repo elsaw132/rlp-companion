@@ -1,60 +1,56 @@
 # Deploying rlp-companion
 
-**Production is `main`, and `main` only.**
+**Production is the `main` branch, and Vercel deploys it automatically.**
 
-A Vercel deploy ships the *entire working tree of whatever branch is checked
-out*. So deploying from a feature branch (or the shared checkout) silently
-reverts anything on `main` that the branch doesn't have. This is the recurring
-"deploy clobber" — it has, more than once, taken live features back off the site
-because a later deploy went out from an older branch.
-
-There is one rule that prevents it.
-
-## The one rule
-
-**Never `vercel --prod` from a feature branch or the shared checkout. Merge to
-`main` first, then deploy from the dedicated deploy worktree.**
+The Vercel project is connected to `github.com/elsaw132/rlp-companion` with
+`main` as the production branch. **Pushing to `main` triggers a production
+deploy on its own** — you do not run any deploy command by hand.
 
 ## To ship a change
 
-1. Merge your branch into `main` (PR or fast-forward) and push it:
+1. Merge your branch into `main` (PR or fast-forward).
+2. Push it:
    ```
    git push origin main
    ```
-2. Deploy from the deploy worktree, which only ever holds `main`:
+3. That's it. Vercel builds `main` and promotes it to `app.chorus-life.com`
+   automatically. Watch it in the Vercel dashboard, or confirm from the CLI:
    ```
-   cd /Users/elsawakeman/Projects/rlp-companion-deploy
-   git fetch origin main && git reset --hard origin/main
-   npx vercel --prod --yes
+   npx vercel inspect app.chorus-life.com
    ```
-3. Confirm it landed on the right project and domain:
-   ```
-   npx vercel inspect <deploy-url>
-   ```
-   Expect `target production` and the `app.chorus-life.com` alias. If the URL is
-   `rlp-companion-integrate-*` or any project other than `rlp-companion`, STOP —
-   the `.vercel` link is wrong (see below).
+   Expect `target production` and a `rlp-companion-git-main-*` alias (the tell
+   that it was the git deploy of `main`).
 
-## Why a dedicated deploy worktree
+## Do NOT run `vercel --prod` by hand
 
-- **It only ever holds `main`.** A deploy can never accidentally ship a feature
-  branch, half-finished work, or another session's changes.
-- **It carries the correct `.vercel/project.json`** (project `rlp-companion`,
-  `prj_Nr1jNfGZ…`). A fresh `git worktree` does **not** copy `.vercel` — and
-  without it, `vercel --prod` invents a brand-new throwaway project named after
-  the folder instead of deploying to production. If `.vercel` ever goes missing
-  here, restore it with:
+This is what caused the repeated "deploy clobbers." A manual `vercel --prod`:
+- ships the **whole local working tree** of whatever branch is checked out, so
+  deploying a feature branch silently reverts whatever `main` has that the
+  branch lacks; and
+- **overrides** the automatic git deploy, so the two fight over the production
+  alias.
+
+The automatic git deploy avoids both: it only ever builds committed `main`.
+Feature-branch pushes get their own **preview** deploys (not production), which
+is exactly what you want.
+
+If you ever genuinely must deploy by hand (git integration down, etc.), do it
+ONLY from this deploy worktree, which holds `main` and the correct `.vercel`
+project link:
+```
+cd /Users/elsawakeman/Projects/rlp-companion-deploy
+git fetch origin main && git reset --hard origin/main
+npx vercel --prod --yes
+```
+Never from a feature branch or the shared checkout.
+
+## Notes
+
+- `main` was made current on 2026-08-04 (it had been ~25 commits behind the live
+  code); it now reflects production.
+- A fresh `git worktree` does not copy `.vercel/`. If this worktree ever loses
+  it, restore with:
   ```
   cp /Users/elsawakeman/Projects/rlp-companion/.vercel/project.json \
      /Users/elsawakeman/Projects/rlp-companion-deploy/.vercel/project.json
   ```
-
-## The stronger fix (optional): let Vercel auto-deploy `main`
-
-Connecting the GitHub repo (`github.com/elsaw132/rlp-companion`) to the Vercel
-project and setting the production branch to `main` makes `git push origin main`
-deploy on its own. Then nobody runs `vercel --prod` by hand, and the clobber
-becomes structurally impossible rather than a rule people have to remember. This
-needs a one-time setup in the Vercel dashboard (Git → Connect) or
-`vercel git connect`; ask before enabling it, since it changes *when* things go
-live (every push to `main` ships).
