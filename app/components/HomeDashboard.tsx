@@ -92,11 +92,17 @@ function PilotSurveyPrompt() {
 
 export default function HomeDashboard({
   hasActivePairing = false,
+  couplesWaiting = false,
+  partnerName = "",
 }: {
   // True when the signed-in user has been admin-paired with a partner: the Act
   // "Plan with your partner" card (5.1) becomes an active link instead of the
   // "Coming soon" placeholder. Defaults false, so unpaired users are unchanged.
   hasActivePairing?: boolean;
+  // True when they've finished their own side of the couples session but their
+  // partner hasn't — the 5.1 session then reads "Waiting for [partner]".
+  couplesWaiting?: boolean;
+  partnerName?: string;
 } = {}) {
   const { user } = useUser();
   const userData = useUserData();
@@ -536,6 +542,17 @@ export default function HomeDashboard({
             })}
           </nav>
 
+          {/* The finished Retirement Life Plan, persistent in the sidebar once
+              Stage 4 is complete, so it stays one click away from any stage. */}
+          {isStageDone(STAGES[3]) && (
+            <Link className="side-plan" href="/plan">
+              <span className="sp-title">Your Retirement Life Plan</span>
+              <span className="sp-cta" aria-hidden="true">
+                View plan ›
+              </span>
+            </Link>
+          )}
+
           <div className="clarity">
             <div className="radial-wrap">
               <div
@@ -810,10 +827,18 @@ export default function HomeDashboard({
                     </div>
                     {nextModule && (
                       <div className="ctarow">
-                        <Link className="btn btn-navy" href={sessionHref(nextModule.id)}>
-                          {ctaLabel}
-                        </Link>
-                        <span className="chip-time">🕐 {nextModule.durationMin} min</span>
+                        {couplesWaiting && nextModule.id === "5.1" ? (
+                          <Link className="badge badge-waiting" href="/partner">
+                            Waiting for {partnerName}
+                          </Link>
+                        ) : (
+                          <>
+                            <Link className="btn btn-navy" href={sessionHref(nextModule.id)}>
+                              {ctaLabel}
+                            </Link>
+                            <span className="chip-time">🕐 {nextModule.durationMin} min</span>
+                          </>
+                        )}
                       </div>
                     )}
                   </>
@@ -994,6 +1019,29 @@ export default function HomeDashboard({
                       <span className="chip-time">🕐 {m.durationMin} min</span>
                     </>
                   );
+                  // Couples session, waiting on the partner: they've done their
+                  // side, so it isn't an actionable next step — label it
+                  // "Waiting for [partner]". Still clickable, to review or change
+                  // what they've shared.
+                  if (m.id === "5.1" && couplesWaiting) {
+                    return (
+                      <Link
+                        key={m.id}
+                        className="scard scard-done"
+                        href={sessionHref(m.id)}
+                      >
+                        {body}
+                        <span className="done-cap">
+                          <span className="badge badge-waiting">
+                            Waiting for {partnerName}
+                          </span>
+                          <span className="chev" aria-hidden="true">
+                            ›
+                          </span>
+                        </span>
+                      </Link>
+                    );
+                  }
                   // Completed steps are clickable — they reopen the module to
                   // re-read or carry on. The whole card is the link.
                   if (isComplete) {
@@ -1180,6 +1228,12 @@ const homeCss = `
 .rlp-home .side-feedback .sf-sub{display:block;font-size:12.5px;color:var(--text-muted);line-height:1.45;margin-bottom:10px}
 .rlp-home .side-feedback .sf-cta{display:block;font-size:13px;font-weight:600;color:var(--brand-primary)}
 .rlp-home .side-feedback-done{margin-top:22px;padding:2px 4px;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text-muted);line-height:1.45}
+/* The finished plan, persistent in the sidebar once Stage 4 is done — the
+   flagship dark-green card (matches the main-column RLP card), one click away. */
+.rlp-home .side-plan{display:block;margin:-14px 0 24px;padding:15px 16px;background:var(--color-brand-primary);border-radius:var(--r-sm);box-shadow:var(--shadow-sm);transition:box-shadow .15s ease,transform .15s ease}
+.rlp-home .side-plan:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.rlp-home .side-plan .sp-title{display:block;font-family:var(--font-sans);font-size:15px;font-weight:600;color:#fff;line-height:1.3;margin-bottom:10px}
+.rlp-home .side-plan .sp-cta{display:block;font-size:13px;font-weight:600;color:var(--chorus-lime)}
 /* Survey ask placed inside a completion panel (Vita's pilot sign-off, or the
    plan-complete panel). Inherits the panel's text colour so it reads on either
    ground; the button reuses the standard primary (.btn-navy). */
@@ -1266,6 +1320,7 @@ const homeCss = `
 .rlp-home .badge{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;border-radius:var(--r-pill);padding:7px 14px;white-space:nowrap}
 .rlp-home .badge-complete{color:var(--success-text);background:#fff;border:1.5px solid var(--success-line)}
 .rlp-home .badge-notstarted{color:var(--text-muted);background:var(--muted-surface)}
+.rlp-home .badge-waiting{color:var(--coach-pill-text);background:color-mix(in srgb,var(--sun) 22%,#fff);border:1.5px solid color-mix(in srgb,var(--sun) 45%,#fff);text-decoration:none}
 .rlp-home .badge-soon{color:var(--text-muted);background:var(--muted-surface)}
 /* Locked session (a stage still to come): visible but not openable. */
 .rlp-home .badge-locked{color:var(--text-muted);background:var(--muted-surface)}

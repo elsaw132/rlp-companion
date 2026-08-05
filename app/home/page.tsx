@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { getUserData, getActivePairingFor } from "@/lib/db";
+import {
+  getUserData,
+  getActivePairingFor,
+  getShareSelections,
+} from "@/lib/db";
 import { currentUserCouplesAllowed } from "@/lib/couplesAccess";
 import ProviderBand from "../components/ProviderBand";
 import HomeDashboard from "../components/HomeDashboard";
@@ -25,11 +29,34 @@ export default async function HomePage() {
     getActivePairingFor(userId),
     currentUserCouplesAllowed(),
   ]);
+  const hasActivePairing = couplesAllowed && activePairing !== null;
+
+  // If they're in the couples module and have finished their own side but their
+  // partner hasn't yet, the dashboard labels the session "Waiting for [partner]"
+  // instead of an actionable next step. Cheap DB read, only for paired users.
+  let couplesWaiting = false;
+  let partnerName = "";
+  if (hasActivePairing && activePairing) {
+    const selections = await getShareSelections(activePairing.id);
+    const mine = selections.find((s) => s.participantId === userId) ?? null;
+    const partnerId =
+      activePairing.participantAId === userId
+        ? activePairing.participantBId
+        : activePairing.participantAId;
+    const partnerSel =
+      selections.find((s) => s.participantId === partnerId) ?? null;
+    couplesWaiting = Boolean(mine?.completedAt) && !partnerSel?.completedAt;
+    partnerName = (mine?.partnerName || "").trim() || "your partner";
+  }
 
   return (
     <>
       <ProviderBand />
-      <HomeDashboard hasActivePairing={couplesAllowed && activePairing !== null} />
+      <HomeDashboard
+        hasActivePairing={hasActivePairing}
+        couplesWaiting={couplesWaiting}
+        partnerName={partnerName}
+      />
     </>
   );
 }
