@@ -83,11 +83,25 @@ export async function getUserData(
 
 // Upsert one key for one user. JSON.stringify + ::jsonb keeps the value typed
 // as jsonb rather than a quoted string.
+// Demo walkthrough accounts are frozen: server-side writes for exactly these
+// user ids are silently ignored, so the shared demo always shows the same
+// seeded state no matter what a viewer types or clicks. This is an EXACT-id
+// allowlist (Set membership on the full Clerk id) — it can only ever match
+// these specific ids, so every real user's writes are completely unaffected.
+const DEMO_READONLY_USER_IDS = new Set<string>([
+  "user_3HUeGmsA9U27UxD9mauOiBnjrbO", // Diane — the demo login account
+  "user_demoPaulPartnerForDiane1", // Paul — seeded partner, no login
+]);
+export function isDemoReadOnlyUser(id: string | null | undefined): boolean {
+  return id != null && DEMO_READONLY_USER_IDS.has(id);
+}
+
 export async function setUserData(
   userId: string,
   key: string,
   value: unknown
 ): Promise<void> {
+  if (isDemoReadOnlyUser(userId)) return; // frozen demo account — never persist
   await ensureTable();
   await sql()`
     INSERT INTO user_data (user_id, key, value, updated_at)
@@ -101,6 +115,7 @@ export async function deleteUserData(
   userId: string,
   key: string
 ): Promise<void> {
+  if (isDemoReadOnlyUser(userId)) return; // frozen demo account
   await ensureTable();
   await sql()`DELETE FROM user_data WHERE user_id = ${userId} AND key = ${key}`;
 }
@@ -144,6 +159,7 @@ export async function getAllCoachTones(): Promise<CoachToneRow[]> {
 
 // Wipe everything for one user — the "start over" reset.
 export async function deleteAllUserData(userId: string): Promise<void> {
+  if (isDemoReadOnlyUser(userId)) return; // frozen demo account
   await ensureTable();
   await sql()`DELETE FROM user_data WHERE user_id = ${userId}`;
 }
@@ -235,6 +251,24 @@ export async function addFact(
   userId: string,
   fact: DraftFact
 ): Promise<StoredFact> {
+  // Frozen demo account: don't persist. Return a synthetic (non-stored) fact of
+  // the right shape so best-effort capture callers don't break.
+  if (isDemoReadOnlyUser(userId)) {
+    return {
+      id: "demo-noop",
+      userId,
+      category: fact.category,
+      domain: fact.domain ?? null,
+      data: fact.data,
+      provenanceModule: fact.provenanceModule,
+      provenanceSource: fact.provenanceSource,
+      status: "active",
+      supersededBy: null,
+      confidence: fact.confidence,
+      createdAt: new Date().toISOString(),
+      lastAffirmedAt: null,
+    };
+  }
   await ensureContextFactsTable();
   const rows = (await sql()`
     INSERT INTO context_facts
@@ -1312,6 +1346,7 @@ export async function anonymiseModuleProgress(userId: string): Promise<void> {
 // Every context fact for a user, regardless of status (active, superseded,
 // rejected). Used by the "start over" reset and by full erasure.
 export async function deleteAllContextFacts(userId: string): Promise<void> {
+  if (isDemoReadOnlyUser(userId)) return; // frozen demo account
   await ensureContextFactsTable();
   await sql()`DELETE FROM context_facts WHERE user_id = ${userId}`;
 }
@@ -1668,6 +1703,7 @@ export async function withdrawPairing(input: {
   await ensureTalkTopicTable();
   await ensureGeneratedComparisonTable();
   const { pairingId, withdrawnById } = input;
+  if (isDemoReadOnlyUser(withdrawnById)) return; // frozen demo account
   await sql()`
     UPDATE couple_pairing
     SET status = 'withdrawn', withdrawn_by_id = ${withdrawnById}, withdrawn_at = now()
@@ -1770,6 +1806,7 @@ export async function upsertShareSelection(input: {
   complete: boolean;
 }): Promise<void> {
   await ensureShareSelectionTable();
+  if (isDemoReadOnlyUser(input.participantId)) return; // frozen demo account
   const shared = JSON.stringify(input.sharedItemRefs);
   const about = JSON.stringify(input.aboutPartnerRefs);
   await sql()`
