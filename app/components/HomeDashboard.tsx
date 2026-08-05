@@ -72,6 +72,24 @@ function listNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+// The post-completion survey, asked right at the finish line — inside Vita's
+// pilot sign-off (couples participants) and the plan-complete panel (everyone
+// else). Rendered only until the person has taken it; distinct from the quieter
+// sidebar/mobile asks, so the survey is front-and-centre at the moment they end.
+function PilotSurveyPrompt() {
+  return (
+    <div className="pilot-survey-ask">
+      <p className="psa-text">
+        Before you go, we&rsquo;d love to get your immediate thoughts on the app.
+        A copy of this survey has also been sent to your email.
+      </p>
+      <Link className="btn btn-navy" href="/completion-survey">
+        Complete the survey →
+      </Link>
+    </div>
+  );
+}
+
 export default function HomeDashboard({
   hasActivePairing = false,
 }: {
@@ -676,6 +694,9 @@ export default function HomeDashboard({
                     part still being built — and we&apos;ll be in touch the moment it
                     opens.
                   </p>
+                  {isStageDone(STAGES[3]) && !userData.getPostSurveyDone() && (
+                    <PilotSurveyPrompt />
+                  )}
                   {isViewingUpcoming && (
                     <button
                       type="button"
@@ -773,10 +794,13 @@ export default function HomeDashboard({
                 </div>
                 <span className="coachpill">Your retirement coach</span>
                 {couplesDone ? (
-                  <p className="intro">
-                    That&rsquo;s all we&rsquo;ve got for you in the pilot. Thank you
-                    for taking part!
-                  </p>
+                  <>
+                    <p className="intro">
+                      That&rsquo;s all we&rsquo;ve got for you in the pilot. Thank
+                      you for taking part!
+                    </p>
+                    {!userData.getPostSurveyDone() && <PilotSurveyPrompt />}
+                  </>
                 ) : (
                   <>
                     <p className="intro">{heroIntro}</p>
@@ -1156,6 +1180,11 @@ const homeCss = `
 .rlp-home .side-feedback .sf-sub{display:block;font-size:12.5px;color:var(--text-muted);line-height:1.45;margin-bottom:10px}
 .rlp-home .side-feedback .sf-cta{display:block;font-size:13px;font-weight:600;color:var(--brand-primary)}
 .rlp-home .side-feedback-done{margin-top:22px;padding:2px 4px;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text-muted);line-height:1.45}
+/* Survey ask placed inside a completion panel (Vita's pilot sign-off, or the
+   plan-complete panel). Inherits the panel's text colour so it reads on either
+   ground; the button reuses the standard primary (.btn-navy). */
+.rlp-home .pilot-survey-ask{margin-top:20px;padding-top:18px;border-top:1px solid color-mix(in srgb,currentColor 20%,transparent)}
+.rlp-home .pilot-survey-ask .psa-text{margin:0 0 14px;font-size:15px;line-height:1.5;color:inherit;opacity:.92;max-width:52ch}
 
 .rlp-home .steps{display:flex;align-items:flex-start;gap:0;margin:8px 0 42px}
 .rlp-home .step{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;flex:1;position:relative;background:none;border:none;font-family:inherit;padding:0}
