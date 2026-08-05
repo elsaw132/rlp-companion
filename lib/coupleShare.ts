@@ -136,7 +136,13 @@ export function deriveShareableItems(
       });
     }
   }
-  if (hasTravelSignal(goals, firstYear)) {
+  // The aggregate "Travel" item only earns its place when travel isn't already
+  // captured as one of the goals above — otherwise it just duplicates a goal the
+  // person already sees (e.g. "Take two long-haul trips a year…").
+  const goalsCoverTravel = (goals?.goals ?? []).some(
+    (g) => TRAVEL_HINT.test(g.label ?? "") || TRAVEL_HINT.test(g.area ?? "")
+  );
+  if (!goalsCoverTravel && hasTravelSignal(goals, firstYear)) {
     items.push({
       ref: "plan:travel",
       group: "plan",

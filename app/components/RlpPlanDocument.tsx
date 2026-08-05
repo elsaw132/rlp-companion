@@ -997,7 +997,7 @@ export default function RlpPlanDocument({
           are a compact summary in Overview, while "Worth picking up" (below) is a
           source of goals and belongs in Goals. Separating them also stops the
           member reading their own `change` items twice on one screen. */}
-      {(unfolded || tab === "overview") && reset && (
+      {(unfolded || tab === "overview") && retired && reset && (
         <section className="rlp-section">
           <SectionHead eyebrow="The reset" title="Carrying forward, reshaping, letting go" />
           {onsetGentle && (
@@ -1128,7 +1128,7 @@ export default function RlpPlanDocument({
 
       {/* Worth picking up (Tab 3 · Goals) — candidate goals drawn from what the
           member said they'd reshape, plus any unfinished work. */}
-      {(unfolded || tab === "goals") && resetActions.length > 0 && (
+      {(unfolded || tab === "goals") && retired && resetActions.length > 0 && (
         <section className="rlp-section">
           <div className="rlp-candidates">
             <h3 className="rlp-reset-head">Worth picking up</h3>

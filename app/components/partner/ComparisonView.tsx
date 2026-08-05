@@ -426,18 +426,42 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
       {active === "feelings" && (
         <div>
           <TabSummary text={data.summaries?.feelings ?? null} />
-          {data.hopes.length > 0 && (
-            <Section heading="What you're each hoping for" note="The hopes you each chose to share.">
-              {data.hopes.map((h, i) => (
-                <QuoteCard key={i} partners={partners} slot={h.slot} text={h.text} />
-              ))}
-            </Section>
-          )}
-          {data.fears.length > 0 && (
-            <Section heading="What you each fear" note="The fears you each chose to share. Anything either of you kept private doesn't appear here.">
-              {data.fears.map((f, i) => (
-                <QuoteCard key={i} partners={partners} slot={f.slot} text={f.text} />
-              ))}
+          {(data.hopes.length > 0 || data.fears.length > 0) && (
+            <Section
+              heading="Your hopes and fears, side by side"
+              note="The hopes and fears you each chose to share. Anything either of you kept private doesn't appear here."
+            >
+              <div style={styles.feelingsCols}>
+                {(["a", "b"] as Slot[]).map((slot) => {
+                  const hopes = data.hopes.filter((h) => h.slot === slot);
+                  const fears = data.fears.filter((f) => f.slot === slot);
+                  if (!hopes.length && !fears.length) return null;
+                  return (
+                    <div key={slot} style={styles.feelingsCol}>
+                      <div style={styles.quoteWho}>
+                        <Dot partners={partners} slot={slot} size={18} />
+                        {partners[slot].name}
+                      </div>
+                      {hopes.length > 0 && (
+                        <span style={styles.feelingsKind}>Hoping for</span>
+                      )}
+                      {hopes.map((h, i) => (
+                        <div key={`h${i}`} style={{ ...styles.quote, borderLeftColor: colourFor(slot) }}>
+                          <p style={styles.quoteText}>{h.text}</p>
+                        </div>
+                      ))}
+                      {fears.length > 0 && (
+                        <span style={styles.feelingsKind}>Worried about</span>
+                      )}
+                      {fears.map((f, i) => (
+                        <div key={`f${i}`} style={{ ...styles.quote, borderLeftColor: colourFor(slot) }}>
+                          <p style={styles.quoteText}>{f.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
             </Section>
           )}
         </div>
@@ -843,7 +867,23 @@ const styles: Record<string, CSSProperties> = {
     color: "var(--text)",
   },
   loadNote: { color: "var(--text-muted)", padding: "40px 0" },
-  feedbackFoot: { marginTop: 32, paddingTop: 8 },
+  feedbackFoot: { marginTop: 32, paddingTop: 8, marginBottom: 28 },
+  feelingsCols: {
+    display: "flex",
+    gap: 16,
+    flexWrap: "wrap" as const,
+    alignItems: "flex-start" as const,
+  },
+  feelingsCol: { flex: "1 1 260px", minWidth: 0 },
+  feelingsKind: {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 600,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.4,
+    opacity: 0.55,
+    margin: "16px 0 6px",
+  },
   tabsIntro: {
     fontSize: "var(--fs-sm)",
     color: "var(--text-muted)",

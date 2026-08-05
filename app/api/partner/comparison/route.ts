@@ -46,8 +46,9 @@ async function generate(
     const response = await anthropic.messages.create({
       model: SONNET_MODEL,
       // Room for the opener, three per-tab summaries and the observation groups.
-      // 2000 was clipping the opener mid-sentence once the summaries were added.
-      max_tokens: 3200,
+      // 2000 clipped the opener; 3200 still clipped the last summary (feelings)
+      // mid-word once both partners had several hopes/fears, so give it headroom.
+      max_tokens: 4600,
       system: comparisonSystemPrompt(),
       messages: [{ role: "user", content: userContent }],
     });
