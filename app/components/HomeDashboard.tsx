@@ -303,6 +303,11 @@ export default function HomeDashboard({
   // The single next step: the first incomplete module in programme order.
   const nextModule = allModules.find((m) => !completed.includes(m.id)) ?? null;
 
+  // A couples-pilot participant who has finished the "Plan with your partner"
+  // session has reached the end of the pilot — there's nothing more to point
+  // them to, so Vita signs off rather than showing a "next step".
+  const couplesDone = hasActivePairing && completed.includes("5.1");
+
   // First-time wording for the next-step button: a brand-new user who hasn't
   // started or completed any module is invited to "Get started"; everyone else
   // picks up where they left off. Derived from the DB-backed user data.
@@ -767,18 +772,27 @@ export default function HomeDashboard({
                   <span className="name">Vita</span>
                 </div>
                 <span className="coachpill">Your retirement coach</span>
-                <p className="intro">{heroIntro}</p>
-                <div className="ns-eyebrow">Your next step</div>
-                <div className="ns-title">
-                  {nextModule ? nextModule.title : "More coming soon"}
-                </div>
-                {nextModule && (
-                  <div className="ctarow">
-                    <Link className="btn btn-navy" href={sessionHref(nextModule.id)}>
-                      {ctaLabel}
-                    </Link>
-                    <span className="chip-time">🕐 {nextModule.durationMin} min</span>
-                  </div>
+                {couplesDone ? (
+                  <p className="intro">
+                    That&rsquo;s all we&rsquo;ve got for you in the pilot. Thank you
+                    for taking part!
+                  </p>
+                ) : (
+                  <>
+                    <p className="intro">{heroIntro}</p>
+                    <div className="ns-eyebrow">Your next step</div>
+                    <div className="ns-title">
+                      {nextModule ? nextModule.title : "More coming soon"}
+                    </div>
+                    {nextModule && (
+                      <div className="ctarow">
+                        <Link className="btn btn-navy" href={sessionHref(nextModule.id)}>
+                          {ctaLabel}
+                        </Link>
+                        <span className="chip-time">🕐 {nextModule.durationMin} min</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </section>

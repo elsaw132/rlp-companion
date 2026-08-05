@@ -536,6 +536,17 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
             There&rsquo;s nothing more to work through here — the shared view stays
             available whenever either of you wants to come back to it.
           </p>
+          {/* Feedback sits ABOVE the nav buttons so people answer it before
+              moving on, rather than after they've already left. */}
+          {feedbackDone === false && (
+            <div style={styles.feedbackFoot}>
+              <ModuleFeedbackCard
+                moduleId="5.1"
+                onDone={markFeedbackDone}
+                onSkip={markFeedbackDone}
+              />
+            </div>
+          )}
           <div style={styles.endActions}>
             {prevTab && (
               <button type="button" style={styles.pagerBack} onClick={() => goToTab(prevTab.id)}>
@@ -548,15 +559,6 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
               </a>
             )}
           </div>
-          {feedbackDone === false && (
-            <div style={styles.feedbackFoot}>
-              <ModuleFeedbackCard
-                moduleId="5.1"
-                onDone={markFeedbackDone}
-                onSkip={markFeedbackDone}
-              />
-            </div>
-          )}
         </div>
       )}
 
