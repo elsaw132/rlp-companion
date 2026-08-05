@@ -37,6 +37,27 @@ function toAddMs(v: unknown): number {
   return Math.min(Math.round(v), MAX_SLICE_MS);
 }
 
+// Coarse device class for the session, read from the request's user-agent so
+// the browser is never trusted to self-report and the client timer needs no
+// change (every flush, sendBeacon included, carries this header). We store only
+// this three-way label, never the raw user-agent, so it stays non-identifying.
+//
+// Order matters: tablets are checked first because an iPad or a non-"mobile"
+// Android also match tokens the phone check looks for. Known blind spot: modern
+// iPadOS Safari sends a desktop (Mac) user-agent, so those iPads count as
+// desktop — acceptable here, tablets are ~1% of traffic. null when there's no
+// user-agent at all, so it reads as "not recorded" rather than a wrong guess.
+function classifyDevice(ua: string | null): "mobile" | "tablet" | "desktop" | null {
+  if (!ua) return null;
+  const s = ua.toLowerCase();
+  if (s.includes("ipad")) return "tablet";
+  if (s.includes("android") && !s.includes("mobile")) return "tablet";
+  if (/tablet|kindle|silk|playbook/.test(s)) return "tablet";
+  if (s.includes("iphone") || s.includes("ipod") || s.includes("mobile"))
+    return "mobile";
+  return "desktop";
+}
+
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return new Response("Unauthorized", { status: 401 });
@@ -60,6 +81,7 @@ export async function POST(request: Request) {
     addMs: toAddMs(body.addMs),
     newVisit: body.newVisit === true,
     completed: body.completed === true,
+    device: classifyDevice(request.headers.get("user-agent")),
   });
 
   // Finishing the final Plan session means the Retirement Life Plan is complete:

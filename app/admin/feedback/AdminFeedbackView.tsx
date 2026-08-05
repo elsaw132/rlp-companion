@@ -10,10 +10,15 @@ import type {
   CompletedListRow,
   ModuleProgressRow,
   CoupleCompletionRow,
+  CoachToneRow,
 } from "@/lib/db";
 import { RATING_MIN, RATING_MAX } from "@/lib/moduleFeedback";
 import { toAnalysisRow, type BaselineAnalysisRow } from "@/lib/baselineAnalysis";
 import { medianMs, fmtDuration } from "@/lib/durations";
+import {
+  VERCEL_ANALYTICS_SNAPSHOT,
+  type VercelBreakdownRow,
+} from "@/lib/vercelAnalyticsSnapshot";
 import AdminSignOut from "../AdminSignOut";
 
 // The read-only admin view over both feedback sources. All data is passed in
@@ -39,8 +44,61 @@ type Props = {
   completedLists: CompletedListRow[];
   progress: ModuleProgressRow[];
   coupleCompletions: CoupleCompletionRow[];
+  coachTones: CoachToneRow[];
   modules: ModuleMeta[];
 };
+
+// The three Vita registers, in the order they appear at onboarding, with the
+// exact label each person saw. "warm" is both the pre-selected default and the
+// fallback the app applies to anyone with no recorded choice (see getCoachTone
+// in lib/userData.tsx) — so the Vita voices panel counts a missing choice as
+// warm, the same register Vita actually uses for that person.
+const TONE_ORDER = ["warm", "professional", "playful"] as const;
+type ToneKey = (typeof TONE_ORDER)[number];
+const TONE_LABEL: Record<ToneKey, string> = {
+  warm: "Warm and friendly",
+  professional: "More professional",
+  playful: "Lighter and playful",
+};
+
+// Normalise a stored tone to one of the three registers, mirroring the app: any
+// value that isn't "professional" or "playful" (including null, for people
+// onboarded before the tone step) is treated as "warm".
+function normaliseTone(tone: string | null): ToneKey {
+  return tone === "professional" || tone === "playful" ? tone : "warm";
+}
+
+// The device classes, in the order we show them (mobile first, tablet last —
+// the split the pilot cares about). Stored on each session by the
+// module-progress route; null for sessions recorded before device capture
+// shipped, which are reported separately as "not recorded".
+const DEVICE_ORDER = ["mobile", "desktop", "tablet"] as const;
+type DeviceKey = (typeof DEVICE_ORDER)[number];
+const DEVICE_LABEL: Record<DeviceKey, string> = {
+  mobile: "Mobile",
+  desktop: "Desktop",
+  tablet: "Tablet",
+};
+
+// The Vercel snapshot turned into display rows: each row's share is its % of
+// visitors (distinct people). Computed once at module load — the snapshot is a
+// static constant, so no hook is needed. Devices are combined with live session
+// data at render (see deviceStats); the OS rows are shown as-is.
+function toShareRows(rows: VercelBreakdownRow[]) {
+  const total = rows.reduce((a, r) => a + r.visitors, 0);
+  return rows.map((r) => ({
+    ...r,
+    pct: total > 0 ? Math.round((r.visitors / total) * 100) : 0,
+  }));
+}
+const VERCEL_OS_ROWS = toShareRows(VERCEL_ANALYTICS_SNAPSHOT.operatingSystems);
+
+// Deterministic thousands separator (no locale), so a server-rendered number
+// and its client hydration match exactly — Intl/toLocaleString can differ
+// between the two and trip a hydration warning.
+function groupThousands(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
 // The rating scale, imported rather than restated: the card, the route and this
 // portal must agree, and a portal reading 1–5 answers on a 0–10 scale would
@@ -179,6 +237,7 @@ type Tab =
   | "summary"
   | "baseline"
   | "post"
+  | "usage"
   | "comments"
   | "general";
 type SortKey = "order" | "responses" | "useful" | "engaging";
@@ -234,6 +293,7 @@ export default function AdminFeedbackView({
   completedLists,
   progress: progressAll,
   coupleCompletions,
+  coachTones: coachTonesAll,
   modules,
 }: Props) {
   const [tab, setTab] = useState<Tab>("participants");
@@ -318,6 +378,10 @@ export default function AdminFeedbackView({
     () => progressAll.filter((p) => keep(p.userId, p.startedAt)),
     [progressAll, keep]
   );
+  const coachTones = useMemo(
+    () => coachTonesAll.filter((c) => keep(c.userId, c.createdAt)),
+    [coachTonesAll, keep]
+  );
 
   // How many records the date window alone is hiding — counted independently of
   // the account exclusions (which get their own count), so each note is honest
@@ -328,9 +392,17 @@ export default function AdminFeedbackView({
       moduleFeedbackAll.filter((r) => off(r.createdAt)).length +
       generalFeedbackAll.filter((g) => off(g.createdAt)).length +
       progressAll.filter((p) => off(p.startedAt)).length +
-      baseline.filter((b) => off(b.createdAt)).length
+      baseline.filter((b) => off(b.createdAt)).length +
+      coachTonesAll.filter((c) => off(c.createdAt)).length
     );
-  }, [moduleFeedbackAll, generalFeedbackAll, progressAll, baseline, inRange]);
+  }, [
+    moduleFeedbackAll,
+    generalFeedbackAll,
+    progressAll,
+    baseline,
+    coachTonesAll,
+    inRange,
+  ]);
 
   // Every account we know of, with its baseline (if any) for a label — so an
   // excluded account can still be listed and restored after it has vanished
@@ -787,7 +859,93 @@ export default function AdminFeedbackView({
     };
   }, [moduleFeedback, generalFeedback, comments]);
 
+  // --- Voices (which register people chose for Vita) ------------------------
+  // One tally per register, in onboarding order. `noChoice` is how many of the
+  // warm count had no stored choice at all — they default to warm, so they're
+  // inside the warm total, and this is just the footnote saying how many of that
+  // total were defaults rather than active picks.
+  const voiceStats = useMemo(() => {
+    const counts: Record<ToneKey, number> = {
+      warm: 0,
+      professional: 0,
+      playful: 0,
+    };
+    let noChoice = 0;
+    for (const c of coachTones) {
+      const key = normaliseTone(c.tone);
+      counts[key]++;
+      if (c.tone === null) noChoice++;
+    }
+    const total = coachTones.length;
+    const rows = TONE_ORDER.map((key) => ({
+      key,
+      label: TONE_LABEL[key],
+      count: counts[key],
+      pct: total > 0 ? Math.round((counts[key] / total) * 100) : 0,
+    }));
+    // The single most-picked register, for the one-line headline.
+    const top = [...rows].sort((a, b) => b.count - a.count)[0] ?? null;
+    return { rows, total, noChoice, top };
+  }, [coachTones]);
+
+  // --- Devices (mobile / desktop / tablet) ----------------------------------
+  // ONE combined tally: the Vercel snapshot backfills the pilot history, then
+  // each live coaching session that carries a device adds one on top. Cumulative
+  // and deliberately NOT date/exclusion filtered — it reads over `progressAll`
+  // (every session ever) so it stays the whole-pilot picture even when the date
+  // filter above is narrowed. `live` is how many live sessions have been folded
+  // in so far (the rest of the total is the Vercel backfill).
+  const deviceStats = useMemo(() => {
+    const counts: Record<DeviceKey, number> = {
+      mobile: 0,
+      desktop: 0,
+      tablet: 0,
+    };
+    // Backfill from Vercel (visitors — the figure shown for the pilot to date).
+    for (const d of VERCEL_ANALYTICS_SNAPSHOT.devices) {
+      const key = d.label.toLowerCase();
+      if (key === "mobile" || key === "desktop" || key === "tablet")
+        counts[key] += d.visitors;
+    }
+    const backfill = counts.mobile + counts.desktop + counts.tablet;
+    // Add the live per-session data. Sessions with no device (recorded before
+    // capture shipped) carry none and simply aren't counted.
+    for (const p of progressAll) {
+      if (p.device === "mobile" || p.device === "desktop" || p.device === "tablet")
+        counts[p.device]++;
+    }
+    const total = counts.mobile + counts.desktop + counts.tablet;
+    const rows = DEVICE_ORDER.map((key) => ({
+      key,
+      label: DEVICE_LABEL[key],
+      count: counts[key],
+      pct: total > 0 ? Math.round((counts[key] / total) * 100) : 0,
+    }));
+    const top = [...rows].sort((a, b) => b.count - a.count)[0] ?? null;
+    return { rows, total, backfill, live: total - backfill, top };
+  }, [progressAll]);
+
   // --- CSV exports ----------------------------------------------------------
+  function exportVoicesCsv() {
+    const header = ["register", "people", "share_percent"];
+    const rows = voiceStats.rows.map((r) => [
+      r.label,
+      String(r.count),
+      `${r.pct}%`,
+    ]);
+    downloadCsv("vita-voices.csv", [header, ...rows]);
+  }
+
+  function exportDevicesCsv() {
+    const header = ["device", "count", "share_percent"];
+    const rows = deviceStats.rows.map((r) => [
+      r.label,
+      String(r.count),
+      `${r.pct}%`,
+    ]);
+    downloadCsv("device-usage.csv", [header, ...rows]);
+  }
+
   function exportModuleCsv() {
     // Each rating carries the demographics of whoever gave it, so the pilot
     // questions ("do people winding down find this less useful?") are a pivot
@@ -824,7 +982,7 @@ export default function AdminFeedbackView({
     ];
     const rows = moduleFeedback.map((r) => {
       const b = baselineByUser.get(r.userId);
-      const p = progressByUserModule.get(`${r.userId} ${r.moduleId}`);
+      const p = progressByUserModule.get(`${r.userId} ${r.moduleId}`);
       return [
         r.userId,
         r.moduleId,
@@ -1115,6 +1273,9 @@ export default function AdminFeedbackView({
           </TabButton>
           <TabButton active={tab === "post"} onClick={() => setTab("post")}>
             Post-completion ({postRows.length})
+          </TabButton>
+          <TabButton active={tab === "usage"} onClick={() => setTab("usage")}>
+            Usage patterns
           </TabButton>
           <TabButton active={tab === "comments"} onClick={() => setTab("comments")}>
             Comments ({comments.length})
@@ -1590,6 +1751,142 @@ export default function AdminFeedbackView({
           </section>
         )}
 
+        {tab === "usage" && (
+          <section>
+            {/* --- Vita voices ------------------------------------------- */}
+            <div style={S.toolbar}>
+              <h2 style={S.expectHeading}>Vita voices</h2>
+              <button style={S.csvBtn} onClick={exportVoicesCsv}>
+                ↓ Download CSV
+              </button>
+            </div>
+            <p style={S.help}>
+              Which register each person chose for Vita at the end of onboarding.
+              Everyone starts on <strong>Warm and friendly</strong> — it&apos;s
+              the pre-selected option — so some of that count is people keeping
+              the default rather than actively choosing it. Anyone who joined
+              before this question existed is counted as warm too, because
+              that&apos;s the voice Vita actually uses for them; the note under
+              the bars says how many that is.
+            </p>
+            {voiceStats.total === 0 ? (
+              <Empty>
+                No onboarding records yet. Someone appears here as soon as they
+                finish onboarding.
+              </Empty>
+            ) : (
+              <>
+                <p style={S.voicesHeadline}>
+                  <strong>{voiceStats.top?.label}</strong> is the most popular,
+                  chosen by {voiceStats.top?.count} of {voiceStats.total}{" "}
+                  ({voiceStats.top?.pct}%).
+                </p>
+                <ul style={S.voicesList}>
+                  {voiceStats.rows.map((r) => (
+                    <li key={r.key} style={S.voiceRow}>
+                      <div style={S.voiceTop}>
+                        <span style={S.voiceLabel}>{r.label}</span>
+                        <span style={S.voiceNums}>
+                          <strong style={S.voiceCount}>{r.count}</strong>
+                          <span style={S.avgOutOf}> · {r.pct}%</span>
+                        </span>
+                      </div>
+                      <div style={S.voiceBar}>
+                        <div
+                          style={{
+                            width: `${r.pct}%`,
+                            background: "var(--brand-primary)",
+                            height: "100%",
+                          }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {voiceStats.noChoice > 0 && (
+                  <p style={S.voicesFootnote}>
+                    {voiceStats.noChoice} of the {voiceStats.total} joined before
+                    the voice question existed and have no recorded choice — they
+                    are counted under Warm and friendly, the voice Vita uses by
+                    default.
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* --- Where people use the app ----------------------------- */}
+            {/* ONE combined device table: the Vercel snapshot
+                (lib/vercelAnalyticsSnapshot.ts, hand-entered — the app can't
+                query Vercel) backfills the pilot history, and each live coaching
+                session adds on top via the device column the app records itself
+                (lib/db.ts + app/api/module-progress/route.ts). Cumulative and
+                not affected by the date filter above. The OS breakdown stays a
+                separate reference — it's a different dimension, and the app
+                doesn't record OS per session so it can't be added to live. */}
+            <div style={{ ...S.toolbar, marginTop: 36 }}>
+              <h2 style={S.expectHeading}>Where people use the app</h2>
+              <button style={S.csvBtn} onClick={exportDevicesCsv}>
+                ↓ Download CSV
+              </button>
+            </div>
+            <p style={S.help}>
+              How people reach the app, by device — backfilled from{" "}
+              <strong>Vercel Web Analytics</strong> for the pilot so far (
+              {VERCEL_ANALYTICS_SNAPSHOT.rangeLabel}), then added to by each
+              coaching session from the app itself. This is the whole-pilot
+              total, so it isn&apos;t changed by the date filter above.
+            </p>
+            {deviceStats.top && (
+              <p style={S.voicesHeadline}>
+                <strong>{deviceStats.top.label}</strong> leads, at{" "}
+                {deviceStats.top.pct}% of {groupThousands(deviceStats.total)}{" "}
+                recorded so far.
+              </p>
+            )}
+            <BreakdownBars
+              rows={deviceStats.rows.map((r) => ({
+                label: r.label,
+                primary: r.count,
+                pct: r.pct,
+              }))}
+            />
+            <p style={S.voicesFootnote}>
+              Backfilled from Vercel (visitors, {VERCEL_ANALYTICS_SNAPSHOT.updated}
+              ),{" "}
+              {deviceStats.live > 0 ? (
+                <>
+                  plus {groupThousands(deviceStats.live)} coaching session
+                  {deviceStats.live === 1 ? "" : "s"} recorded live since.
+                </>
+              ) : (
+                <>
+                  with live coaching sessions added from here on (none yet —
+                  earlier sessions predate device tracking).
+                </>
+              )}{" "}
+              The two counts blend slightly different things (Vercel counts
+              visitors; the app counts sessions), so read this as a directional
+              split. To refresh the Vercel part, export “Top Devices” from Vercel
+              and I&apos;ll update it. Tablet detection is imperfect — a newer
+              iPad can read as desktop.
+            </p>
+
+            <h3 style={S.usageSubheading}>Operating systems</h3>
+            <p style={S.help}>
+              From Vercel for the whole pilot ({VERCEL_ANALYTICS_SNAPSHOT.rangeLabel}).
+              The app doesn&apos;t record operating system per session, so this
+              one stays a Vercel-only snapshot.
+            </p>
+            <BreakdownBars
+              rows={VERCEL_OS_ROWS.map((r) => ({
+                label: r.label,
+                primary: r.visitors,
+                pct: r.pct,
+              }))}
+            />
+          </section>
+        )}
+
         {tab === "summary" && (
           <section>
             <div style={S.toolbar}>
@@ -1874,6 +2171,40 @@ function Stat({ label, value }: { label: string; value: number }) {
       <div style={S.statValue}>{value}</div>
       <div style={S.statLabel}>{label}</div>
     </div>
+  );
+}
+
+// A labelled percentage-bar list, shared by the Usage patterns tab (Vita voices,
+// the Vercel device/OS snapshot, and the live per-session split). `primary` is
+// the headline count shown next to the bar; `pct` sets the fill width.
+function BreakdownBars({
+  rows,
+}: {
+  rows: { label: string; primary: number; pct: number }[];
+}) {
+  return (
+    <ul style={S.voicesList}>
+      {rows.map((r) => (
+        <li key={r.label} style={S.voiceRow}>
+          <div style={S.voiceTop}>
+            <span style={S.voiceLabel}>{r.label}</span>
+            <span style={S.voiceNums}>
+              <strong style={S.voiceCount}>{groupThousands(r.primary)}</strong>
+              <span style={S.avgOutOf}> · {r.pct}%</span>
+            </span>
+          </div>
+          <div style={S.voiceBar}>
+            <div
+              style={{
+                width: `${r.pct}%`,
+                background: "var(--brand-primary)",
+                height: "100%",
+              }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -2428,6 +2759,59 @@ const S: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     background: "var(--muted-surface)",
     marginTop: 6,
+  },
+  // --- Voices tab ---
+  voicesHeadline: {
+    fontSize: "var(--fs-body)",
+    color: "var(--text)",
+    margin: "0 0 18px",
+  },
+  voicesList: {
+    listStyle: "none",
+    padding: 0,
+    margin: 0,
+    display: "grid",
+    gap: 16,
+  },
+  voiceRow: {},
+  voiceTop: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 2,
+  },
+  voiceLabel: { fontSize: "var(--fs-body)", color: "var(--text)" },
+  voiceNums: { display: "flex", alignItems: "baseline", gap: 2, whiteSpace: "nowrap" },
+  voiceCount: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "22px",
+    fontWeight: 600,
+    lineHeight: 1,
+    fontVariantNumeric: "tabular-nums",
+    color: "var(--text)",
+  },
+  voiceBar: {
+    display: "flex",
+    width: "100%",
+    height: 12,
+    borderRadius: "var(--r-pill)",
+    overflow: "hidden",
+    background: "var(--muted-surface)",
+    marginTop: 6,
+  },
+  voicesFootnote: {
+    fontSize: "var(--fs-sm)",
+    color: "var(--text-muted)",
+    marginTop: 20,
+    lineHeight: 1.5,
+  },
+  usageSubheading: {
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--fs-body)",
+    fontWeight: 700,
+    color: "var(--ink)",
+    margin: "28px 0 12px",
   },
   avgRow: { display: "flex", alignItems: "baseline", gap: 5 },
   avgNum: {

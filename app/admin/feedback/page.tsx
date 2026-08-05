@@ -10,6 +10,7 @@ import {
   getAllCompletedLists,
   getAllModuleProgress,
   getAllCoupleCompletions,
+  getAllCoachTones,
 } from "@/lib/db";
 import { allModulesInOrder } from "@/lib/modules";
 import AdminFeedbackView from "./AdminFeedbackView";
@@ -44,6 +45,7 @@ export default async function AdminFeedbackPage() {
     completedLists,
     progress,
     coupleCompletions,
+    coachTones,
   ] = await Promise.all([
     getAllModuleFeedback(),
     getAllFeedback(),
@@ -53,6 +55,7 @@ export default async function AdminFeedbackPage() {
     getAllCompletedLists(),
     getAllModuleProgress(),
     getAllCoupleCompletions(),
+    getAllCoachTones(),
   ]);
 
   const modules = allModulesInOrder();
@@ -68,6 +71,7 @@ export default async function AdminFeedbackPage() {
       completedLists={completedLists}
       progress={progress}
       coupleCompletions={coupleCompletions}
+      coachTones={coachTones}
       modules={modules}
     />
   );

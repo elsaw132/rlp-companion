@@ -105,6 +105,43 @@ export async function deleteUserData(
   await sql()`DELETE FROM user_data WHERE user_id = ${userId} AND key = ${key}`;
 }
 
+// --- Coach tone (pilot analytics) -----------------------------------------
+// Which register each person picked for Vita at onboarding ("warm" |
+// "professional" | "playful"), for the admin portal's Voices tab.
+//
+// This is the ONE place the portal reaches into `user_data` — the store that
+// otherwise holds conversations and answers the portal deliberately never
+// reads. The exception is narrow and safe: this query pulls ONLY the single
+// tone preference out of the onboarding row (never any conversation or answer),
+// because the tone lives nowhere else. The value is a stated preference, not
+// member content.
+//
+// `tone` is null for anyone onboarded before the tone step existed, or who
+// somehow has no tone field; the app treats those people as "warm" at read time
+// (getCoachTone in lib/userData.tsx), and the portal reports them the same way.
+// createdAt is the onboarding row's updated_at, so these rows sit inside the
+// portal's shared date filter and tester exclusions like every other tab.
+export type CoachToneRow = {
+  userId: string;
+  tone: string | null;
+  createdAt: string;
+};
+
+export async function getAllCoachTones(): Promise<CoachToneRow[]> {
+  await ensureTable();
+  const rows = (await sql()`
+    SELECT user_id, value->>'tone' AS tone, updated_at
+    FROM user_data
+    WHERE key = 'onboarding'
+    ORDER BY updated_at DESC
+  `) as { user_id: string; tone: string | null; updated_at: string | Date }[];
+  return rows.map((r) => ({
+    userId: r.user_id,
+    tone: r.tone,
+    createdAt: toIso(r.updated_at) ?? new Date().toISOString(),
+  }));
+}
+
 // Wipe everything for one user — the "start over" reset.
 export async function deleteAllUserData(userId: string): Promise<void> {
   await ensureTable();
@@ -1135,6 +1172,14 @@ function ensureModuleProgressTable(): Promise<void> {
         CREATE INDEX IF NOT EXISTS module_progress_module_idx
         ON module_progress (module_id)
       `;
+      // Coarse device class for the session ("mobile" | "tablet" | "desktop"),
+      // classified server-side from the user-agent. Added after the fact, so
+      // ADD COLUMN IF NOT EXISTS: rows recorded before this shipped stay null
+      // and read as "not recorded" in the portal. Stored as the coarse enum, not
+      // the raw user-agent, so it adds nothing identifying to anonymiseModuleProgress.
+      await sql()`
+        ALTER TABLE module_progress ADD COLUMN IF NOT EXISTS device text
+      `;
     })()
       .then(() => undefined)
       .catch((err) => {
@@ -1161,16 +1206,22 @@ export async function recordModuleProgress(input: {
   addMs: number;
   newVisit: boolean;
   completed: boolean;
+  // Coarse device class ("mobile" | "tablet" | "desktop"), or null when the
+  // caller couldn't determine one. Like completed_at it's kept from the FIRST
+  // write that has a value (COALESCE below): a session's device is where it
+  // began, and a stray later flush from another tab shouldn't rewrite it.
+  device?: string | null;
 }): Promise<void> {
   await ensureModuleProgressTable();
   await sql()`
     INSERT INTO module_progress (
-      user_id, module_id, active_ms, visits, completed_at, updated_at
+      user_id, module_id, active_ms, visits, completed_at, device, updated_at
     )
     VALUES (
       ${input.userId}, ${input.moduleId}, ${input.addMs},
       ${input.newVisit ? 1 : 0},
-      ${input.completed ? new Date().toISOString() : null}, now()
+      ${input.completed ? new Date().toISOString() : null},
+      ${input.device ?? null}, now()
     )
     ON CONFLICT (user_id, module_id) DO UPDATE SET
       active_ms = module_progress.active_ms + ${input.addMs},
@@ -1178,6 +1229,7 @@ export async function recordModuleProgress(input: {
       completed_at = COALESCE(
         module_progress.completed_at, EXCLUDED.completed_at
       ),
+      device = COALESCE(module_progress.device, EXCLUDED.device),
       updated_at = now()
   `;
 }
@@ -1189,6 +1241,9 @@ export type ModuleProgressRow = {
   visits: number;
   startedAt: string;
   completedAt: string | null;
+  // "mobile" | "tablet" | "desktop", or null for sessions recorded before device
+  // capture shipped (they read as "not recorded" in the portal).
+  device: string | null;
 };
 
 // Every progress row, for the admin portal. Reads across all users, so it is
@@ -1196,7 +1251,7 @@ export type ModuleProgressRow = {
 export async function getAllModuleProgress(): Promise<ModuleProgressRow[]> {
   await ensureModuleProgressTable();
   const rows = (await sql()`
-    SELECT user_id, module_id, active_ms, visits, started_at, completed_at
+    SELECT user_id, module_id, active_ms, visits, started_at, completed_at, device
     FROM module_progress
     ORDER BY started_at
   `) as {
@@ -1206,6 +1261,7 @@ export async function getAllModuleProgress(): Promise<ModuleProgressRow[]> {
     visits: number;
     started_at: string | Date;
     completed_at: string | Date | null;
+    device: string | null;
   }[];
   return rows.map((r) => ({
     userId: r.user_id,
@@ -1216,6 +1272,7 @@ export async function getAllModuleProgress(): Promise<ModuleProgressRow[]> {
     visits: r.visits,
     startedAt: toIso(r.started_at) ?? new Date().toISOString(),
     completedAt: toIso(r.completed_at),
+    device: r.device,
   }));
 }
 
