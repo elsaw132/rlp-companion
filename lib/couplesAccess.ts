@@ -17,11 +17,18 @@ const DEFAULT_COUPLES_EMAILS = [
   "harrywilliamsre@gmail.com",
 ];
 
+// The demo account used for partner / pension-provider walkthroughs. Always
+// allowed on top of whatever the pilot list resolves to (env override or the
+// default group), so enabling the couples view for it never means editing the
+// live COUPLES_PILOT_EMAILS list.
+const DEMO_COUPLES_EMAIL = "hello@chorus-life.com";
+
 export function couplesAllowlist(): string[] {
   const raw = process.env.COUPLES_PILOT_EMAILS;
-  return raw
+  const list = raw
     ? raw.split(",").map((e) => e.trim().toLowerCase()).filter((e) => e.length > 0)
     : DEFAULT_COUPLES_EMAILS;
+  return list.includes(DEMO_COUPLES_EMAIL) ? list : [...list, DEMO_COUPLES_EMAIL];
 }
 
 export function isCouplesEmailAllowed(email: string | null | undefined): boolean {
