@@ -2243,6 +2243,12 @@ export default function SessionContainer({
             <span style={styles.coachPill}>Your retirement coach</span>
           </div>
 
+          {/* A finished letter should always be readable on revisit — show the
+              letter itself, not just the completion buttons. */}
+          {buildResult?.type === "letter" && (
+            <LetterSummary result={buildResult} />
+          )}
+
           {letterAck && (
             <div style={styles.messageList}>
               <CoachBubble text={letterAck} />
