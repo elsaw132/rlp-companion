@@ -11,6 +11,13 @@ import { useRouter } from "next/navigation";
 import FeedbackPanel from "@/app/components/FeedbackPanel";
 import ModuleFeedbackCard from "@/app/components/ModuleFeedbackCard";
 import VitaMark from "../VitaMark";
+import { useUserData } from "@/lib/userData";
+import { useModuleTimer } from "@/lib/useModuleTimer";
+
+// The couples module's id in the programme. Viewing the joint report records
+// time against it and marks it complete, so it behaves like every other session
+// on the dashboard (time tracked, "Complete ✓" not "Get started").
+const MODULE_ID = "5.1";
 
 // Where we remember that this person has already answered (or skipped) the
 // couples-module feedback, so the foot-of-report card shows once and never
@@ -64,6 +71,12 @@ const colourFor = (slot: Slot) =>
 
 export default function ComparisonView({ preview }: { preview?: Payload } = {}) {
   const router = useRouter();
+  const userData = useUserData();
+  // Track on-screen time on the joint report against module 5.1, so the admin's
+  // per-module time picks it up like any other session. `completed` stays false:
+  // there's no single "finish" moment here, and a true would stop the clock at
+  // once; completion for the dashboard is handled separately below.
+  useModuleTimer(MODULE_ID, false);
   const [data, setData] = useState<Payload | null>(preview ?? null);
   const [error, setError] = useState(false);
   const [userTopics, setUserTopics] = useState<Payload["talk"]["user"]>(
@@ -112,6 +125,17 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
       live = false;
     };
   }, [preview]);
+
+  // Viewing the ready joint report IS completing the couples module — there's no
+  // separate finish step. Mark 5.1 complete once it's actually on screen, so the
+  // dashboard shows it done ("Complete ✓") rather than "Get started". Idempotent:
+  // markModuleComplete no-ops if it's already in the completed list.
+  useEffect(() => {
+    if (preview || !data || userData.loading) return;
+    if (!userData.getCompletedIds().includes(MODULE_ID)) {
+      void userData.markModuleComplete(MODULE_ID);
+    }
+  }, [preview, data, userData]);
 
   // Hide the card and remember the answer, on both Done and Skip. The save is
   // best-effort — a failed write just means they might see it once more.
@@ -520,7 +544,7 @@ export default function ComparisonView({ preview }: { preview?: Payload } = {}) 
             )}
             {!preview && (
               <a href="/home" style={styles.endHome}>
-                Back to your plans →
+                Back to home →
               </a>
             )}
           </div>
