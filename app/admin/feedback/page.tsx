@@ -12,6 +12,7 @@ import {
   getAllCoupleCompletions,
   getAllCoachTones,
   getAllPreferredNames,
+  getAllExitSurveys,
 } from "@/lib/db";
 import { allModulesInOrder } from "@/lib/modules";
 import AdminFeedbackView from "./AdminFeedbackView";
@@ -52,6 +53,7 @@ export default async function AdminFeedbackPage() {
     // the name they chose to be called — not Clerk's account name — and the view
     // falls back to the short id for anyone who has none.
     names,
+    exitSurveys,
   ] = await Promise.all([
     getAllModuleFeedback(),
     getAllFeedback(),
@@ -63,6 +65,7 @@ export default async function AdminFeedbackPage() {
     getAllCoupleCompletions(),
     getAllCoachTones(),
     getAllPreferredNames(),
+    getAllExitSurveys(),
   ]);
 
   const modules = allModulesInOrder();
@@ -80,6 +83,7 @@ export default async function AdminFeedbackPage() {
       progress={progress}
       coupleCompletions={coupleCompletions}
       coachTones={coachTones}
+      exitSurveys={exitSurveys}
       modules={modules}
     />
   );

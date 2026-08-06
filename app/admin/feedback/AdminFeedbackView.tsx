@@ -11,6 +11,7 @@ import type {
   ModuleProgressRow,
   CoupleCompletionRow,
   CoachToneRow,
+  ExitSurveyRow,
 } from "@/lib/db";
 import { RATING_MIN, RATING_MAX } from "@/lib/moduleFeedback";
 import { toAnalysisRow, type BaselineAnalysisRow } from "@/lib/baselineAnalysis";
@@ -45,6 +46,7 @@ type Props = {
   progress: ModuleProgressRow[];
   coupleCompletions: CoupleCompletionRow[];
   coachTones: CoachToneRow[];
+  exitSurveys: ExitSurveyRow[];
   modules: ModuleMeta[];
   // The name each participant gave at onboarding ("What should we call you?"),
   // keyed by user id. Not everyone has one (onboarded before the step, or
@@ -240,6 +242,7 @@ type Tab =
   | "completions"
   | "summary"
   | "baseline"
+  | "exit"
   | "post"
   | "usage"
   | "comments"
@@ -298,6 +301,7 @@ export default function AdminFeedbackView({
   progress: progressAll,
   coupleCompletions,
   coachTones: coachTonesAll,
+  exitSurveys,
   modules,
   names,
 }: Props) {
@@ -1149,6 +1153,50 @@ export default function AdminFeedbackView({
     downloadCsv("participant-progress.csv", [header, ...rows]);
   }
 
+  // One row per exit-survey submission — the churned-participant feedback.
+  // Anonymous (no user_id): the only identity is the optional re-contact email.
+  function exportExitCsv() {
+    const header = [
+      "submitted_at_utc",
+      "situation",
+      "situation_other",
+      "reasons",
+      "reasons_other",
+      "looking_back",
+      "looking_back_other",
+      "clarity_1_5",
+      "what_would_have_made_it_easier",
+      "nps_0_10",
+      "nps_why",
+      "hear_from_us_again",
+      "age",
+      "gender",
+      "work_retirement_status",
+      "recontact_email",
+      "ref",
+    ];
+    const rows = exitSurveys.map((r) => [
+      r.createdAt,
+      r.situation ?? "",
+      r.situationOther ?? "",
+      r.reasons.join("; "),
+      r.reasonsOther ?? "",
+      r.lookingBack ?? "",
+      r.lookingBackOther ?? "",
+      r.clarity === null ? "" : String(r.clarity),
+      r.easier ?? "",
+      r.nps === null ? "" : String(r.nps),
+      r.npsWhy ?? "",
+      r.recontact ?? "",
+      r.age === null ? "" : String(r.age),
+      r.gender ?? "",
+      r.workStatus ?? "",
+      r.email ?? "",
+      r.ref ?? "",
+    ]);
+    downloadCsv("exit-survey.csv", [header, ...rows]);
+  }
+
   function exportGeneralCsv() {
     const header = [
       "user_id",
@@ -1284,6 +1332,9 @@ export default function AdminFeedbackView({
           </TabButton>
           <TabButton active={tab === "baseline"} onClick={() => setTab("baseline")}>
             Baseline ({baselineRows.length})
+          </TabButton>
+          <TabButton active={tab === "exit"} onClick={() => setTab("exit")}>
+            Exit survey ({exitSurveys.length})
           </TabButton>
           <TabButton active={tab === "post"} onClick={() => setTab("post")}>
             Post-completion ({postRows.length})
@@ -1540,6 +1591,92 @@ export default function AdminFeedbackView({
                     ))}
                 </ul>
               </section>
+            )}
+          </section>
+        )}
+
+        {tab === "exit" && (
+          <section>
+            <div style={S.toolbar}>
+              <p style={S.help}>
+                One card per response to the exit survey — sent to people who
+                told us they won&apos;t be continuing, including those who never
+                made an account. Responses are <strong>anonymous</strong>: there
+                is no participant id, and the only contact detail is an email a
+                person chose to leave for question 7. Newest first. Blanks are
+                skipped questions; every one was optional. These aren&apos;t tied
+                to the pilot accounts above, so the date filter doesn&apos;t
+                apply to them.
+              </p>
+              <button style={S.csvBtn} onClick={exportExitCsv}>
+                ↓ Download CSV
+              </button>
+            </div>
+            {exitSurveys.length === 0 ? (
+              <Empty>
+                No exit-survey responses yet. They&apos;ll appear here as people
+                fill in the form at /exit-survey.
+              </Empty>
+            ) : (
+              <ul style={S.cardList}>
+                {exitSurveys.map((r) => (
+                  <li key={r.id} style={S.card}>
+                    <div style={S.cardHead}>
+                      <span style={S.cardDate}>{fmtDate(r.createdAt)}</span>
+                      {r.nps !== null && (
+                        <span style={S.exitBadge}>
+                          Would recommend: {r.nps} / 10
+                        </span>
+                      )}
+                    </div>
+                    <div style={S.exitFields}>
+                      <ExitField
+                        label="Situation"
+                        value={withOther(r.situation, r.situationOther)}
+                      />
+                      <div style={S.exitField}>
+                        <span style={S.exitFieldLabel}>Reasons</span>
+                        {r.reasons.length === 0 ? (
+                          <span style={S.muted}>—</span>
+                        ) : (
+                          <div style={S.chips}>
+                            {r.reasons.map((f) => (
+                              <span key={f} style={S.chip}>
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {r.reasonsOther && (
+                        <ExitField label="Reasons — other" value={r.reasonsOther} />
+                      )}
+                      <ExitField
+                        label="Looking back"
+                        value={withOther(r.lookingBack, r.lookingBackOther)}
+                      />
+                      <ExitField
+                        label="Clarity before starting"
+                        value={r.clarity === null ? null : `${r.clarity} / 5`}
+                      />
+                      <ExitField
+                        label="What would have made it easier"
+                        value={r.easier}
+                      />
+                      <ExitField label="Why that score" value={r.npsWhy} />
+                      <ExitField label="Hear from us again" value={r.recontact} />
+                      <ExitField label="Re-contact email" value={r.email} />
+                      <ExitField
+                        label="Age"
+                        value={r.age === null ? null : String(r.age)}
+                      />
+                      <ExitField label="Gender" value={r.gender} />
+                      <ExitField label="Work status" value={r.workStatus} />
+                      {r.ref && <ExitField label="Ref" value={r.ref} />}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
         )}
@@ -2487,6 +2624,26 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <div style={S.empty}>{children}</div>;
 }
 
+// A label/value row inside an exit-survey response card. Shows an em-dash for a
+// skipped answer, so a blank never reads as a rendering fault. The value wraps,
+// so long free-text answers stay fully readable.
+function ExitField({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div style={S.exitField}>
+      <span style={S.exitFieldLabel}>{label}</span>
+      <span style={value ? S.exitFieldValue : S.muted}>{value || "—"}</span>
+    </div>
+  );
+}
+
+// Fold a fixed-choice answer and its "other" free text into one value: the
+// chosen label, with the person's own words quoted after it when present.
+function withOther(choice: string | null, other: string | null): string | null {
+  if (other && choice) return `${choice}  “${other}”`;
+  if (other) return `“${other}”`;
+  return choice;
+}
+
 // --- Styles (semantic tokens only, no hardcoded brand colours) --------------
 
 const S: Record<string, React.CSSProperties> = {
@@ -2893,6 +3050,36 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: "var(--r-pill)",
     padding: "2px 8px",
     whiteSpace: "nowrap",
+  },
+  // Exit-survey response card internals.
+  exitBadge: {
+    fontSize: "12px",
+    fontWeight: 600,
+    color: "var(--text-muted)",
+  },
+  exitFields: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    marginTop: "10px",
+  },
+  exitField: {
+    display: "flex",
+    gap: "14px",
+    alignItems: "baseline",
+  },
+  exitFieldLabel: {
+    flex: "0 0 190px",
+    fontSize: "12px",
+    fontWeight: 600,
+    color: "var(--text-muted)",
+  },
+  exitFieldValue: {
+    flex: "1 1 auto",
+    fontSize: "14px",
+    color: "var(--text)",
+    lineHeight: 1.5,
+    whiteSpace: "pre-wrap",
   },
   expectBlock: {
     marginTop: "28px",

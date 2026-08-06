@@ -12,6 +12,10 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/privacy",
   "/robots.txt",
+  // The churned-participant exit survey and its API. Public because most of the
+  // people it's sent to never made an account, so it must work with no sign-in.
+  "/exit-survey(.*)",
+  "/api/exit-survey",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

@@ -1183,6 +1183,171 @@ export async function getAllCompletedLists(): Promise<CompletedListRow[]> {
   }));
 }
 
+// --- Exit survey (churned-participant feedback) ---------------------------
+// A one-off survey for pilot participants who told us they won't continue —
+// including the many who never made an account. Because it must work for
+// account-less people, its public page and API carry NO Clerk session, so unlike
+// baseline_survey there is no user_id: a row is anonymous. An optional email is
+// the only identity, given only if the person wants to be contacted again
+// (question 7). Append-only (identity PK) like module_feedback — one row per
+// submission, never overwritten. Every column is nullable: every question is
+// optional and a blank submit still saves.
+let exitSurveyTableReady: Promise<void> | null = null;
+
+function ensureExitSurveyTable(): Promise<void> {
+  if (!exitSurveyTableReady) {
+    exitSurveyTableReady = sql()`
+      CREATE TABLE IF NOT EXISTS exit_survey (
+        id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        situation text,
+        situation_other text,
+        reasons jsonb,
+        reasons_other text,
+        looking_back text,
+        looking_back_other text,
+        clarity int,
+        easier text,
+        nps int,
+        nps_why text,
+        recontact text,
+        age int,
+        gender text,
+        work_status text,
+        email text,
+        ref text,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `
+      .then(() => undefined)
+      .catch((err) => {
+        exitSurveyTableReady = null;
+        throw err;
+      });
+  }
+  return exitSurveyTableReady;
+}
+
+// One exit-survey submission. Every field is already allowlist-validated by the
+// public /api/exit-survey route; the labels stored here are the exact option
+// text (or the person's free text for an "other"/self-describe answer), so the
+// admin portal is human-readable without a code lookup. reasons is the Q2
+// multi-select, stored as a JSON array of the chosen labels.
+export type ExitSurveyInput = {
+  situation: string | null;
+  situationOther: string | null;
+  reasons: string[];
+  reasonsOther: string | null;
+  lookingBack: string | null;
+  lookingBackOther: string | null;
+  clarity: number | null; // 1–5
+  easier: string | null;
+  nps: number | null; // 0–10
+  npsWhy: string | null;
+  recontact: string | null;
+  age: number | null;
+  gender: string | null;
+  workStatus: string | null;
+  email: string | null;
+  ref: string | null;
+};
+
+// Record one exit-survey submission. No user_id: the page is public and the
+// respondent is anonymous unless they left an email.
+export async function insertExitSurvey(input: ExitSurveyInput): Promise<void> {
+  await ensureExitSurveyTable();
+  await sql()`
+    INSERT INTO exit_survey (
+      situation, situation_other, reasons, reasons_other,
+      looking_back, looking_back_other, clarity, easier,
+      nps, nps_why, recontact, age, gender, work_status, email, ref
+    )
+    VALUES (
+      ${input.situation}, ${input.situationOther},
+      ${JSON.stringify(input.reasons)}::jsonb, ${input.reasonsOther},
+      ${input.lookingBack}, ${input.lookingBackOther},
+      ${input.clarity}, ${input.easier},
+      ${input.nps}, ${input.npsWhy}, ${input.recontact},
+      ${input.age}, ${input.gender}, ${input.workStatus},
+      ${input.email}, ${input.ref}
+    )
+  `;
+}
+
+// One exit-survey row, as read by the admin portal. Read-only there.
+export type ExitSurveyRow = {
+  id: string;
+  situation: string | null;
+  situationOther: string | null;
+  reasons: string[];
+  reasonsOther: string | null;
+  lookingBack: string | null;
+  lookingBackOther: string | null;
+  clarity: number | null;
+  easier: string | null;
+  nps: number | null;
+  npsWhy: string | null;
+  recontact: string | null;
+  age: number | null;
+  gender: string | null;
+  workStatus: string | null;
+  email: string | null;
+  ref: string | null;
+  createdAt: string;
+};
+
+// Every exit-survey submission, newest first — for the admin portal. Reads
+// across all rows, so it is only ever called behind the admin gate.
+export async function getAllExitSurveys(): Promise<ExitSurveyRow[]> {
+  await ensureExitSurveyTable();
+  const rows = (await sql()`
+    SELECT id, situation, situation_other, reasons, reasons_other,
+           looking_back, looking_back_other, clarity, easier,
+           nps, nps_why, recontact, age, gender, work_status, email, ref,
+           created_at
+    FROM exit_survey
+    ORDER BY created_at DESC
+  `) as {
+    id: number | string;
+    situation: string | null;
+    situation_other: string | null;
+    reasons: unknown;
+    reasons_other: string | null;
+    looking_back: string | null;
+    looking_back_other: string | null;
+    clarity: number | null;
+    easier: string | null;
+    nps: number | null;
+    nps_why: string | null;
+    recontact: string | null;
+    age: number | null;
+    gender: string | null;
+    work_status: string | null;
+    email: string | null;
+    ref: string | null;
+    created_at: string | Date;
+  }[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    situation: r.situation,
+    situationOther: r.situation_other,
+    reasons: Array.isArray(r.reasons) ? (r.reasons as string[]) : [],
+    reasonsOther: r.reasons_other,
+    lookingBack: r.looking_back,
+    lookingBackOther: r.looking_back_other,
+    clarity: r.clarity,
+    easier: r.easier,
+    nps: r.nps,
+    npsWhy: r.nps_why,
+    recontact: r.recontact,
+    age: r.age,
+    gender: r.gender,
+    workStatus: r.work_status,
+    email: r.email,
+    ref: r.ref,
+    createdAt: toIso(r.created_at) ?? new Date().toISOString(),
+  }));
+}
+
 // --- Module progress (pilot analytics) ------------------------------------
 // How long each session actually took, and whether it was finished. One row per
 // (user, session), upserted as they work.
