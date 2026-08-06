@@ -46,6 +46,10 @@ type Props = {
   coupleCompletions: CoupleCompletionRow[];
   coachTones: CoachToneRow[];
   modules: ModuleMeta[];
+  // First name per participant user id, resolved from Clerk on the server. Not
+  // every id has one (older tester accounts, or a name Clerk never captured),
+  // so it's a partial map — the display falls back to the short id.
+  names: Record<string, string>;
 };
 
 // The three Vita registers, in the order they appear at onboarding, with the
@@ -295,8 +299,18 @@ export default function AdminFeedbackView({
   coupleCompletions,
   coachTones: coachTonesAll,
   modules,
+  names,
 }: Props) {
   const [tab, setTab] = useState<Tab>("participants");
+
+  // How a participant reads in the UI: their first name when Clerk gave us one,
+  // otherwise the short id fallback. The full user id always stays on hover
+  // (title=), so an admin can still copy it and two people sharing a first name
+  // stay distinguishable on inspection.
+  const displayName = useCallback(
+    (userId: string) => names[userId] || shortUser(userId),
+    [names]
+  );
 
   // --- Date filter ----------------------------------------------------------
   // Two optional bounds, entered as calendar dates. The point of this is to
@@ -1244,7 +1258,7 @@ export default function AdminFeedbackView({
                   onClick={() => toggleExcluded(a.userId)}
                   title={`${a.userId}\nClick to put this account back in`}
                 >
-                  <span>{shortUser(a.userId)}</span>
+                  <span>{displayName(a.userId)}</span>
                   <span style={S.excludedRestore}>Restore</span>
                 </button>
               ))}
@@ -1313,7 +1327,7 @@ export default function AdminFeedbackView({
                     <div style={S.cardHead}>
                       <div>
                         <span style={S.progressWho} title={p.userId}>
-                          {shortUser(p.userId)}
+                          {displayName(p.userId)}
                         </span>
                         <span style={S.progressMeta}>
                           {p.hasBaseline ? (
@@ -1459,7 +1473,7 @@ export default function AdminFeedbackView({
                       <tr key={r.userId} style={S.tr}>
                         <td style={S.tdModule}>
                           <span style={S.testerTag} title={r.userId}>
-                            {shortUser(r.userId)}
+                            {displayName(r.userId)}
                           </span>
                           <div style={S.moduleMeta}>{fmtDate(r.takenAt)}</div>
                         </td>
@@ -1517,7 +1531,7 @@ export default function AdminFeedbackView({
                       <li key={r.userId} style={S.card}>
                         <div style={S.cardHead}>
                           <span style={S.testerTag} title={r.userId}>
-                            {shortUser(r.userId)}
+                            {displayName(r.userId)}
                           </span>
                           <span style={S.cardDate}>{fmtDate(r.takenAt)}</span>
                         </div>
@@ -1588,7 +1602,7 @@ export default function AdminFeedbackView({
                         <tr key={c.userId} style={S.tr}>
                           <td style={S.tdModule}>
                             <span style={S.testerTag} title={c.userId}>
-                              {shortUser(c.userId)}
+                              {displayName(c.userId)}
                             </span>
                           </td>
                           <td style={S.tdWrap}>
@@ -1651,7 +1665,7 @@ export default function AdminFeedbackView({
                           <tr key={r.userId} style={S.tr}>
                             <td style={S.tdModule}>
                               <span style={S.testerTag} title={r.userId}>
-                                {shortUser(r.userId)}
+                                {displayName(r.userId)}
                               </span>
                               <div style={S.moduleMeta}>
                                 {fmtDate(r.createdAt)}
@@ -1704,7 +1718,7 @@ export default function AdminFeedbackView({
                         <li key={r.userId} style={S.card}>
                           <div style={S.cardHead}>
                             <span style={S.testerTag} title={r.userId}>
-                              {shortUser(r.userId)}
+                              {displayName(r.userId)}
                             </span>
                             <span style={S.cardDate}>
                               {fmtDate(r.createdAt)}
@@ -2033,7 +2047,7 @@ export default function AdminFeedbackView({
                     <option value="all">All testers</option>
                     {commentUserOptions.map((u) => (
                       <option key={u} value={u}>
-                        {shortUser(u)}
+                        {displayName(u)}
                       </option>
                     ))}
                   </select>
@@ -2070,7 +2084,7 @@ export default function AdminFeedbackView({
                       <RatingPill label="Useful" value={c.useful} />
                       <RatingPill label="Engaging" value={c.engaging} />
                       <span style={S.testerTag} title={c.userId}>
-                        {shortUser(c.userId)}
+                        {displayName(c.userId)}
                       </span>
                     </div>
                   </li>
@@ -2105,7 +2119,7 @@ export default function AdminFeedbackView({
                     <option value="all">All testers</option>
                     {generalUserOptions.map((u) => (
                       <option key={u} value={u}>
-                        {shortUser(u)}
+                        {displayName(u)}
                       </option>
                     ))}
                   </select>
@@ -2149,7 +2163,7 @@ export default function AdminFeedbackView({
                         <span style={S.muted}>no reply requested</span>
                       )}
                       <span style={S.testerTag} title={g.userId}>
-                        {shortUser(g.userId)}
+                        {displayName(g.userId)}
                       </span>
                     </div>
                   </li>
