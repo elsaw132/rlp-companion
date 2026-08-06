@@ -293,7 +293,8 @@ export default function ExitSurveyPage() {
         <div className="demo-intro">
           <h2 className="demo-head">A little about you</h2>
           <p className="demo-note">
-            So we understand whose feedback this is. All optional.
+            These questions are optional, but will help us contextualise the
+            feedback we receive.
           </p>
         </div>
 
