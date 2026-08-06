@@ -691,6 +691,9 @@ export default function SessionContainer({
   // re-reveals the composer. Vita signing off again returns to the finished
   // state (this flips back to false).
   const [reopened, setReopened] = useState(false);
+  // Reopening a finished letter for editing (working-cohort letters have no chat,
+  // so they can't use the conversation `reopened` path).
+  const [editingLetter, setEditingLetter] = useState(false);
   // Conversational corrections the takeaway pass flagged but couldn't confirm in
   // chat — surfaced at the close for a quick yes/no, so an un-applied rejection
   // never leaves a stale fact active (it would now resurface, since consumers read
@@ -1640,6 +1643,7 @@ export default function SessionContainer({
   // background — mirroring how the conversation modules close.
   function handleLetterComplete(result: LetterResult, vitaMessage: string) {
     setBuildResult(result);
+    setEditingLetter(false);
     void userData.saveBuild(sessionId, result);
     reconcileBuildFacts(result);
     // The retired letter (Phase 4) doesn't finish here — it flows into a
@@ -2221,7 +2225,7 @@ export default function SessionContainer({
       {interaction &&
         interaction.type === "letter" &&
         phase === "letter" &&
-        !completed && (
+        (!completed || editingLetter) && (
           <LetterFlow
             interaction={interaction}
             priorReflections={resolveSeedText(sessionId, userData.getActiveFacts())}
@@ -2235,7 +2239,7 @@ export default function SessionContainer({
       {/* ZONE 4.5 — LETTER COMPLETE (Vita's closing line + the reveal/home CTAs).
           Only the default letter, which has no conversation, closes here; the
           retired letter closes through the normal conversation zone below. */}
-      {isLetter && completed && !letterHasConversation && (
+      {isLetter && completed && !letterHasConversation && !editingLetter && (
         <section style={styles.conversationZone}>
           <div style={styles.vitaLockup}>
             <VitaMark size={34} />
@@ -2243,10 +2247,16 @@ export default function SessionContainer({
             <span style={styles.coachPill}>Your retirement coach</span>
           </div>
 
-          {/* A finished letter should always be readable on revisit — show the
-              letter itself, not just the completion buttons. */}
+          {/* A finished letter should be readable and editable on revisit, like
+              the other modules — its summary plus an "Edit your letter" link. */}
           {buildResult?.type === "letter" && (
-            <LetterSummary result={buildResult} />
+            <InteractionSummary
+              result={buildResult}
+              onEdit={() => {
+                setEditingLetter(true);
+                setPhase("letter");
+              }}
+            />
           )}
 
           {letterAck && (
