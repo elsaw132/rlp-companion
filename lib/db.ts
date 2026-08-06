@@ -157,6 +157,27 @@ export async function getAllCoachTones(): Promise<CoachToneRow[]> {
   }));
 }
 
+// The member's preferred display name — the answer to onboarding's "What should
+// we call you?", saved as a plain string in the `preferred-name` row (the field
+// is pre-filled at onboarding, so anyone who finished it has one). Read for the
+// admin portal so people show as the name they chose rather than a truncated id.
+// Like the tone above, this is a stated preference — a name they asked to be
+// called — not conversation content, so it's the same narrow, safe exception to
+// the portal never reading `user_data`. Returned as a userId→name map; anyone
+// without one is simply absent and falls back to the short id in the view.
+export async function getAllPreferredNames(): Promise<Record<string, string>> {
+  await ensureTable();
+  const rows = (await sql()`
+    SELECT user_id, value FROM user_data WHERE key = 'preferred-name'
+  `) as { user_id: string; value: unknown }[];
+  const names: Record<string, string> = {};
+  for (const r of rows) {
+    const v = typeof r.value === "string" ? r.value.trim() : "";
+    if (v) names[r.user_id] = v;
+  }
+  return names;
+}
+
 // Wipe everything for one user — the "start over" reset.
 export async function deleteAllUserData(userId: string): Promise<void> {
   if (isDemoReadOnlyUser(userId)) return; // frozen demo account

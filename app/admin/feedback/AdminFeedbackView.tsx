@@ -46,9 +46,9 @@ type Props = {
   coupleCompletions: CoupleCompletionRow[];
   coachTones: CoachToneRow[];
   modules: ModuleMeta[];
-  // First name per participant user id, resolved from Clerk on the server. Not
-  // every id has one (older tester accounts, or a name Clerk never captured),
-  // so it's a partial map — the display falls back to the short id.
+  // The name each participant gave at onboarding ("What should we call you?"),
+  // keyed by user id. Not everyone has one (onboarded before the step, or
+  // cleared it), so it's a partial map — the display falls back to the short id.
   names: Record<string, string>;
 };
 
@@ -303,9 +303,9 @@ export default function AdminFeedbackView({
 }: Props) {
   const [tab, setTab] = useState<Tab>("participants");
 
-  // How a participant reads in the UI: their first name when Clerk gave us one,
-  // otherwise the short id fallback. The full user id always stays on hover
-  // (title=), so an admin can still copy it and two people sharing a first name
+  // How a participant reads in the UI: the name they gave at onboarding when we
+  // have one, otherwise the short id fallback. The full user id always stays on
+  // hover (title=), so an admin can still copy it and two people sharing a name
   // stay distinguishable on inspection.
   const displayName = useCallback(
     (userId: string) => names[userId] || shortUser(userId),
