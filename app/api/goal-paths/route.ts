@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import {
   coerceGoalPaths,
+  type GoalPath,
   type GoalPathInput,
 } from "@/lib/goalPathsSeed";
 
@@ -24,9 +25,17 @@ type DraftRequest = {
 
 export const maxDuration = 60;
 
+// One goal is drafted per model call, in parallel, so each call is small and fast.
+// A hard per-call timeout keeps any single stuck call from eating the whole 60s
+// function budget; every goal finishes (or gives up) in roughly the time of the
+// slowest single goal. maxRetries is kept low so a transient overload doesn't stack
+// extra internal attempts on top of that budget — a still-missing goal is re-drafted
+// once explicitly below, and the surface offers a manual "Try again" beyond that.
+const SINGLE_CALL_TIMEOUT_MS = 28_000;
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
-  maxRetries: 3,
+  maxRetries: 1,
 });
 
 function systemPrompt(): string {
@@ -60,6 +69,77 @@ Voice: warm, specific, plain. Never use these words: reflect, explore, unpack, j
 Respond with ONLY the JSON object described above — no markdown, no preamble, no commentary.`;
 }
 
+// The context that's the same for every goal (about-them, the user model, and their
+// named strengths). Built once and reused across the per-goal calls.
+type SharedContext = {
+  onboarding: string;
+  userModel: string;
+  strengthsBlock: string;
+};
+
+// Draft the path for ONE goal. Returns a real, personalized path or null. Never
+// substitutes generic content: a single-goal input means coerceGoalPaths returns
+// either the real drafted path or null (its per-goal generic filler is discarded
+// when nothing real was produced), so a failure here surfaces honestly upstream.
+async function draftOnePath(
+  g: GoalPathInput,
+  shared: SharedContext,
+  strengths: string[]
+): Promise<GoalPath | null> {
+  const kind = g.track === "be" ? "way to live (be)" : "thing to do/achieve (do)";
+  const extras = [
+    g.area && `area: ${g.area}`,
+    g.season && `season: ${g.season}`,
+    g.note && `what it means to them: ${g.note}`,
+  ]
+    .filter(Boolean)
+    .join("; ");
+  const goalBlock = `THE GOAL THEY SPOTLIGHTED (draft its path, honouring its track):\n1. [${kind}] ${g.goal}${extras ? `\n   (${extras})` : ""}`;
+
+  const context = [shared.onboarding, shared.userModel, goalBlock, shared.strengthsBlock]
+    .filter(Boolean)
+    .join("\n\n");
+
+  try {
+    const response = await anthropic.messages.create(
+      {
+        model: "claude-sonnet-4-6",
+        max_tokens: 900,
+        system: systemPrompt(),
+        messages: [
+          {
+            role: "user",
+            content: `Here is everything this person has shared so far:\n\n${context}`,
+          },
+        ],
+      },
+      { signal: AbortSignal.timeout(SINGLE_CALL_TIMEOUT_MS) }
+    );
+
+    const text = response.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("")
+      .trim();
+
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    const slice = start !== -1 && end !== -1 ? text.slice(start, end + 1) : text;
+
+    const seed = coerceGoalPaths(JSON.parse(slice), [g], strengths);
+    return seed?.paths[0] ?? null;
+  } catch (error) {
+    if (error instanceof Anthropic.APIError) {
+      console.error(
+        `[goal-paths] Anthropic API error for goal "${g.goal}" — status=${error.status} message=${error.message}`
+      );
+    } else {
+      console.error(`[goal-paths] Error drafting goal "${g.goal}":`, error);
+    }
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   let body: DraftRequest;
   try {
@@ -73,73 +153,42 @@ export async function POST(request: Request) {
     ? body.strengths.filter((s): s is string => typeof s === "string" && s.trim() !== "")
     : [];
 
-  // No goals to draw a path for — return the generic fallback rather than
+  // No goals to draw a path for — nothing to draft. Fail honestly rather than
   // inventing goals from thin air.
   if (!goals.length) {
     return Response.json({ seed: null });
   }
 
-  const goalBlock = goals
-    .map((g, i) => {
-      const kind = g.track === "be" ? "way to live (be)" : "thing to do/achieve (do)";
-      const extras = [
-        g.area && `area: ${g.area}`,
-        g.season && `season: ${g.season}`,
-        g.note && `what it means to them: ${g.note}`,
-      ]
-        .filter(Boolean)
-        .join("; ");
-      return `${i + 1}. [${kind}] ${g.goal}${extras ? `\n   (${extras})` : ""}`;
-    })
-    .join("\n");
-
   const strengthsBlock = strengths.length
     ? `THEIR NAMED STRENGTHS (their own words, from earlier — pick from THESE for each goal's "strengths", verbatim; never invent one):\n${strengths.map((s) => `- ${s}`).join("\n")}`
     : "";
-
-  const context = [
-    body.onboarding && body.onboarding.trim() && `ABOUT THEM:\n${body.onboarding.trim()}`,
-    body.userModel && body.userModel.trim(),
-    `THE GOALS THEY SPOTLIGHTED (draft one path per goal, in this order, honouring each track):\n${goalBlock}`,
+  const shared: SharedContext = {
+    onboarding:
+      body.onboarding && body.onboarding.trim() ? `ABOUT THEM:\n${body.onboarding.trim()}` : "",
+    userModel: body.userModel && body.userModel.trim() ? body.userModel.trim() : "",
     strengthsBlock,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  };
 
-  try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2600,
-      system: systemPrompt(),
-      messages: [
-        {
-          role: "user",
-          content: `Here is everything this person has shared so far:\n\n${context}`,
-        },
-      ],
-    });
+  // First pass: draft every goal in parallel. Each is a small, fast call with its own
+  // timeout, so one slow goal can't sink the rest and the whole set finishes in about
+  // the time of the slowest single goal — well inside the function budget.
+  let paths = await Promise.all(goals.map((g) => draftOnePath(g, shared, strengths)));
 
-    const text = response.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("")
-      .trim();
+  // Second pass: re-draft only the goals that came back empty (a transient overload or
+  // a bad JSON parse), again in parallel. We NEVER substitute generic content for a
+  // goal we couldn't draft — a still-missing goal fails the whole set honestly below.
+  if (paths.some((p) => p === null)) {
+    paths = await Promise.all(
+      paths.map((p, i) => (p ? p : draftOnePath(goals[i], shared, strengths)))
+    );
+  }
 
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
-    const slice = start !== -1 && end !== -1 ? text.slice(start, end + 1) : text;
-
-    return Response.json({ seed: coerceGoalPaths(JSON.parse(slice), goals, strengths) });
-  } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      console.error(
-        `[goal-paths] Anthropic API error — status=${error.status} message=${error.message}`
-      );
-    } else {
-      console.error("[goal-paths] Unexpected error:", error);
-    }
-    // Recoverable processing failure — signal it so the client retries rather than
-    // settling on the generic fallback. (Genuinely-empty input is handled above.)
+  // Only render when EVERY spotlighted goal has a real, personalized path. If any is
+  // still missing, signal failure (null) so the surface shows an honest "Try again"
+  // rather than a generic path masquerading as theirs.
+  if (paths.some((p) => p === null)) {
     return Response.json({ seed: null });
   }
+
+  return Response.json({ seed: { paths: paths as GoalPath[] } });
 }

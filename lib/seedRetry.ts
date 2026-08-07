@@ -16,6 +16,12 @@
 // itself is slow, so another attempt would just double the wait.
 const FAST_FAILURE_MS = 12_000;
 
+// A single attempt can't run longer than this — set above the route's own function
+// ceiling so it only trips on a genuinely stalled connection (e.g. a flaky mobile
+// network), aborting the request rather than leaving the surface frozen on the
+// loading spinner indefinitely. A timed-out attempt is treated as a failure.
+const ATTEMPT_TIMEOUT_MS = 65_000;
+
 export async function fetchSeedWithRetry<T>(
   url: string,
   input: unknown,
@@ -25,18 +31,24 @@ export async function fetchSeedWithRetry<T>(
   const total = Math.max(1, attempts);
   for (let i = 0; i < total; i++) {
     const startedAt = Date.now();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
+        signal: controller.signal,
       });
       if (res.ok) {
         const data = (await res.json()) as { seed: T | null };
         if (data.seed && isValid(data.seed)) return data.seed;
       }
     } catch {
-      // network error — a retry candidate, subject to the speed check below
+      // network error or a timed-out (aborted) attempt — a retry candidate, subject
+      // to the speed check below
+    } finally {
+      clearTimeout(timer);
     }
     // Give up rather than retry if this attempt was slow (near the timeout) — another
     // attempt would only stack the wait — or if this was the last attempt.
